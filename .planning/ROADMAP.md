@@ -79,11 +79,10 @@ Plans:
   2. The AI selects super-effective moves over neutral moves when both are available
   3. The AI switches to a non-resisted Pokemon when all of its current Pokemon's moves are resisted by the opponent
   4. The AI applies Terastallization when it would change a resistance into neutral or grant STAB on an otherwise neutral move
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 04-01: Implement AI.pickAction() with move scoring via @smogon/calc expected damage, super-effective preference, and random tie-breaking
-- [ ] 04-02: Implement AI switch logic (switch when all moves resisted) and AI Tera logic (use when matchup flips favorably)
+- [ ] 04-01-PLAN.md — Implement AIOpponent singleton with pickAction(): move scoring via computeDamage(), switch when resisted, Tera when matchup flips, plus smoke test
 
 ### Phase 5: Screen Layer
 **Goal**: All G2 battle screens render correctly within display limits and all gestures route to the right screen transitions
@@ -129,7 +128,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 1. Data Foundation | 3/3 | Complete | 2026-02-26 |
 | 2. Team Generation | 2/2 | Complete | 2026-02-26 |
 | 3. Battle Engine | 4/4 | Complete | 2026-02-26 |
-| 4. AI Opponent | 0/2 | Not started | - |
+| 4. AI Opponent | 0/1 | Not started | - |
 | 5. Screen Layer | 0/3 | Not started | - |
 | 6. Integration | 0/2 | Not started | - |
 
