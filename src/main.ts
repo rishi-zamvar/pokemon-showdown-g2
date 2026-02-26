@@ -1,23 +1,7 @@
 import { GlassAdapterImpl } from "./adapters/glassAdapter";
 import { WakeLockServiceImpl } from "./services/wakeLockService";
 import { DataLoader } from "./data/DataLoader";
-
-/**
- * Bootstrap your G2 app here.
- *
- * Available glass adapter methods:
- *   glass.showList(items, statusText)  — scrollable list with tap selection
- *   glass.showText(text, status)       — text display with split status bar (full rebuild)
- *   glass.updateText(text, status)     — in-place text update (no flash, max 2000 chars)
- *   glass.showMessage(text)            — simple centered message
- *
- * Gesture events from glass.onGesture():
- *   SCROLL_FWD        — swipe forward (down on touchpad)
- *   SCROLL_BACK       — swipe backward (up on touchpad)
- *   TAP               — single/double tap (includes listIndex for list selection)
- *   FOREGROUND_ENTER  — app came to foreground
- *   FOREGROUND_EXIT   — app went to background
- */
+import { ScreenController } from "./screens/ScreenController";
 
 function setStatus(text: string, detail?: string): void {
   const statusText = document.getElementById("status-text");
@@ -48,30 +32,26 @@ async function bootstrap(): Promise<void> {
   } catch (err) {
     console.error("[DataLoader] Data validation failed:", err);
     setStatus("Data error", String(err));
-    return; // Do not proceed with broken data
+    return;
   }
 
-  // --- Your app logic starts here ---
+  // Initialize screen controller and show main menu on glasses
+  const screen = new ScreenController(glass);
+  await screen.init();
 
-  // Example: show a welcome message
-  await glass.showMessage("Hello from G2!");
+  setStatus("Ready", "Battle on your glasses!");
 
-  // Example: listen for gestures
-  glass.onGesture((gesture) => {
-    console.log("Gesture:", gesture.kind, gesture.listIndex);
-
-    // Handle gestures for your app here
+  // Route all gestures through the screen controller
+  glass.onGesture((event) => {
+    void screen.handleGesture(event);
   });
 
-  // Example: show a list
-  // await glass.showList(["Option A", "Option B", "Option C"], "Pick one");
-
-  // Example: show text with status bar
-  // await glass.showText("Main content here", { left: "Title", right: "1/5" });
-
-  // Example: wake lock (keeps phone screen on)
-  // await wakeLock.acquire();
-  // await wakeLock.release();
+  // Keep screen on during gameplay
+  try {
+    await wakeLock.acquire();
+  } catch {
+    console.warn("[WakeLock] Could not acquire wake lock");
+  }
 }
 
 void bootstrap().catch((error: unknown) => {
