@@ -145,11 +145,11 @@ Requirements for initial release. Each maps to roadmap phases.
 | NAV-03 | Phase 5 | Pending |
 | NAV-04 | Phase 5 | Pending |
 | NAV-05 | Phase 5 | Pending |
-| AI-01 | Phase 4 | Pending |
-| AI-02 | Phase 4 | Pending |
-| AI-03 | Phase 4 | Pending |
-| AI-04 | Phase 4 | Pending |
-| AI-05 | Phase 4 | Pending |
+| AI-01 | Phase 4 | Complete |
+| AI-02 | Phase 4 | Complete |
+| AI-03 | Phase 4 | Complete |
+| AI-04 | Phase 4 | Complete |
+| AI-05 | Phase 4 | Complete |
 
 **Coverage:**
 - v0.1 requirements: 42 total (note: prior count of 38 was pre-BATTLE-09 through 12 addition)

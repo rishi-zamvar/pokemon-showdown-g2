@@ -13,7 +13,7 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 - [x] **Phase 1: Data Foundation** - Fix broken data files and wire a validated DataLoader singleton
 - [x] **Phase 2: Team Generation** - Build random 6-Pokemon teams using @pkmn/randoms with filtering
 - [x] **Phase 3: Battle Engine** - Pure turn-state machine with damage calc, status, and Terastallization
-- [ ] **Phase 4: AI Opponent** - Heuristic AI that scores moves by expected damage and switches intelligently
+- [x] **Phase 4: AI Opponent** - Heuristic AI that scores moves by expected damage and switches intelligently
 - [ ] **Phase 5: Screen Layer** - All G2 screens and gesture navigation wired to battle state
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
 
@@ -82,7 +82,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 04-01-PLAN.md — Implement AIOpponent singleton with pickAction(): move scoring via computeDamage(), switch when resisted, Tera when matchup flips, plus smoke test
+- [x] 04-01-PLAN.md — Implement AIOpponent singleton with pickAction(): move scoring via computeDamage(), switch when resisted, Tera when matchup flips, plus smoke test
 
 ### Phase 5: Screen Layer
 **Goal**: All G2 battle screens render correctly within display limits and all gestures route to the right screen transitions
@@ -128,7 +128,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 1. Data Foundation | 3/3 | Complete | 2026-02-26 |
 | 2. Team Generation | 2/2 | Complete | 2026-02-26 |
 | 3. Battle Engine | 4/4 | Complete | 2026-02-26 |
-| 4. AI Opponent | 0/1 | Not started | - |
+| 4. AI Opponent | 1/1 | Complete | 2026-02-26 |
 | 5. Screen Layer | 0/3 | Not started | - |
 | 6. Integration | 0/2 | Not started | - |
 
