@@ -12,7 +12,7 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 
 - [x] **Phase 1: Data Foundation** - Fix broken data files and wire a validated DataLoader singleton
 - [x] **Phase 2: Team Generation** - Build random 6-Pokemon teams using @pkmn/randoms with filtering
-- [ ] **Phase 3: Battle Engine** - Pure turn-state machine with damage calc, status, and Terastallization
+- [x] **Phase 3: Battle Engine** - Pure turn-state machine with damage calc, status, and Terastallization
 - [ ] **Phase 4: AI Opponent** - Heuristic AI that scores moves by expected damage and switches intelligently
 - [ ] **Phase 5: Screen Layer** - All G2 screens and gesture navigation wired to battle state
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
@@ -68,7 +68,7 @@ Plans:
 - [x] 03-01-PLAN.md — Define BattleState types and BattleEngine skeleton with turn resolution, switching, faint detection, and win/loss
 - [x] 03-02-PLAN.md — Implement DamageCalc wrapping @smogon/calc with accuracy, PP tracking, and crit rolls
 - [x] 03-03-PLAN.md — Implement status conditions, Terastallization integration, and complete battle loop
-- [ ] 03-04-PLAN.md — Wire status infliction from move secondary effects and primary status moves (gap closure)
+- [x] 03-04-PLAN.md — Wire status infliction from move secondary effects and primary status moves (gap closure)
 
 ### Phase 4: AI Opponent
 **Goal**: The AI picks a legal action each turn by scoring moves using the same damage pipeline the player uses, switching intelligently, and applying Tera when it flips a bad matchup
@@ -128,7 +128,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete | 2026-02-26 |
 | 2. Team Generation | 2/2 | Complete | 2026-02-26 |
-| 3. Battle Engine | 3/4 | Gap closure | - |
+| 3. Battle Engine | 4/4 | Complete | 2026-02-26 |
 | 4. AI Opponent | 0/2 | Not started | - |
 | 5. Screen Layer | 0/3 | Not started | - |
 | 6. Integration | 0/2 | Not started | - |
