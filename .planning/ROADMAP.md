@@ -96,12 +96,12 @@ Plans:
   5. Terastallize confirmation shows Tera type and "< Back"; confirming uses the one-time Tera action for that Pokemon
   6. Win/loss end screen appears when the battle concludes with an option to return to the main menu
   7. Swipe down/up scrolls the active list; tap selects the highlighted item; response is immediate with no perceptible lag
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 05-01: Implement MainMenuScreen, BattleHUDScreen, and TurnResultScreen with character budget assertions
-- [ ] 05-02: Implement MoveSelectScreen, SwitchScreen, and TeraScreen with "< Back" nav items and correct list rendering
-- [ ] 05-03: Implement BattleEndScreen; wire gesture routing (SCROLL_FWD/BACK, TAP) through screen stack; add phone companion state display with sprites
+- [ ] 05-01-PLAN.md — ScreenState types, display budget constants, and all 8 pure renderer functions
+- [ ] 05-02-PLAN.md — ScreenController state machine with gesture routing, turn resolution, and forced switch handling
+- [ ] 05-03-PLAN.md — Phone companion display with sprites, main.ts wiring, and clean build
 
 ### Phase 6: Integration
 **Goal**: A complete battle plays from main menu to win/loss screen on actual G2 hardware without crashes, data errors, or navigation dead ends
