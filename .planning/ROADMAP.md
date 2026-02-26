@@ -29,12 +29,12 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
   3. learnsets.json does not block page load — lazy-loaded or replaced with @pkmn/randbats
   4. Only the 12 battle Pokemon's data is loaded at match start; all match data is cleared on battle end
   5. Non-standard Pokemon (Megas, CAP, Future, battleOnly formes) are excluded from any lookup used by team gen
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Re-fetch broken data files (abilities, items, typechart) from correct Showdown CDN .js endpoints and strip CommonJS wrapper
-- [ ] 01-02: Build DataLoader singleton with typed O(1) accessors and startup validation assertions
-- [ ] 01-03: Implement per-match data scoping (load 12 Pokemon at start, clear on end) and lazy-load / replace learnsets.json
+- [ ] 01-01-PLAN.md — Re-fetch broken data files from Showdown CDN and strip CommonJS wrapper
+- [ ] 01-02-PLAN.md — Build DataLoader singleton with typed O(1) accessors, install @pkmn/randoms + @smogon/calc
+- [ ] 01-03-PLAN.md — Per-match data scoping (load 12 at start, clear on end) and lazy-load learnsets.json
 
 ### Phase 2: Team Generation
 **Goal**: Player and AI each receive a valid, filtered Gen 9 random battle team of 6 Pokemon with 4 moves, stats, and Tera type before every battle
@@ -121,7 +121,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
