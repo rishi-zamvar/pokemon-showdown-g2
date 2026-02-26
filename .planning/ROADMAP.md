@@ -62,12 +62,12 @@ Plans:
   4. A Pokemon with 0 HP is marked fainted; the engine forces a switch-in before the next turn; a side with all 6 fainted is marked as losing
   5. Terastallization changes the active type and recalculates STAB; the flag is consumed and cannot be used again in the same battle
   6. Move accuracy rolls cause misses at the correct statistical frequency; PP depletes by 1 per use and blocks selection at 0
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: Define BattleState types and BattlePhase FSM enum; implement turn resolution loop (speed ordering, switch priority)
-- [ ] 03-02: Implement DamageCalc wrapping @smogon/calc including type effectiveness, STAB, crit, random roll, and variable-power move handling
-- [ ] 03-03: Implement status conditions (per-turn damage, paralysis speed/skip, sleep/freeze wake chance, faint detection), PP tracking, accuracy rolls, and Terastallization state
+- [ ] 03-01-PLAN.md — Define BattleState types and BattleEngine skeleton with turn resolution, switching, faint detection, and win/loss
+- [ ] 03-02-PLAN.md — Implement DamageCalc wrapping @smogon/calc with accuracy, PP tracking, and crit rolls
+- [ ] 03-03-PLAN.md — Implement status conditions, Terastallization integration, and complete battle loop
 
 ### Phase 4: AI Opponent
 **Goal**: The AI picks a legal action each turn by scoring moves using the same damage pipeline the player uses, switching intelligently, and applying Tera when it flips a bad matchup
