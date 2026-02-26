@@ -45,11 +45,11 @@ Plans:
   2. Every generated Pokemon has 4 moves, correct stats for its level, a Tera type, and a valid species name
   3. No generated team contains Megas, CAP Pokemon, formes tagged battleOnly, or entries with num <= 0
   4. A generated Pokemon's fields pass through @smogon/calc's Pokemon constructor without errors (field-name smoke test)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: Install @pkmn/randoms and @smogon/calc; implement TeamGenerator wrapping getTeam() with isNonstandard / battleOnly filter
-- [ ] 02-02: Verify Tera type population, run 100+ team generation calls, and smoke-test calc field alignment
+- [ ] 02-01-PLAN.md — Define BattlePokemon type and implement TeamGenerator singleton with buildRandom()
+- [ ] 02-02-PLAN.md — 100-iteration stress test validating all fields, calc alignment, and edge cases (Ditto, cosmetic formes)
 
 ### Phase 3: Battle Engine
 **Goal**: A pure (no display calls) turn-state machine that takes a BattleState and an action and returns the next BattleState with correct damage, status effects, type effectiveness, fainting, and win/loss detection
