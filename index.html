@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Pokemon Showdown - G2</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif;
+        color: #e8e8e8;
+        background: #0a0a0a;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .phone-header {
+        padding: 48px 24px 16px;
+        text-align: center;
+      }
+      .phone-header h1 {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.3px;
+        color: #fff;
+      }
+      .phone-header .subtitle {
+        font-size: 13px;
+        color: #888;
+        margin-top: 4px;
+      }
+      .phone-status {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        gap: 16px;
+      }
+      .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #555;
+        transition: background 0.3s;
+      }
+      .status-indicator.connecting {
+        background: #f5a623;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      .status-indicator.connected { background: #4cd964; }
+      .status-indicator.error { background: #ff3b30; }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+      .status-text {
+        font-size: 15px;
+        color: #aaa;
+        text-align: center;
+        line-height: 1.5;
+      }
+      .status-detail {
+        font-size: 12px;
+        color: #666;
+        text-align: center;
+        max-width: 280px;
+      }
+
+      .battle-log {
+        padding: 16px;
+        max-height: 50vh;
+        overflow-y: auto;
+        font-family: "SF Mono", "Menlo", monospace;
+        font-size: 13px;
+        color: #aaa;
+        line-height: 1.6;
+        display: none;
+      }
+      .battle-log.visible { display: block; }
+      .battle-log .log-entry { margin-bottom: 4px; }
+      .battle-log .log-entry.damage { color: #ff6b6b; }
+      .battle-log .log-entry.heal { color: #4cd964; }
+      .battle-log .log-entry.info { color: #f5a623; }
+      .battle-log .log-entry.victory { color: #4cd964; font-weight: 700; }
+      .battle-log .log-entry.defeat { color: #ff3b30; font-weight: 700; }
+
+      .hidden { display: none !important; }
+
+      .battle-companion {
+        padding: 16px 24px;
+      }
+      .battle-companion.hidden { display: none; }
+      .companion-header {
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 16px;
+        text-align: center;
+      }
+      .battle-field {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .pokemon-slot {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 12px;
+        background: #1a1a1a;
+      }
+      .pokemon-slot.opponent { border-left: 3px solid #ff6b6b; }
+      .pokemon-slot.player { border-left: 3px solid #4cd964; }
+      .pokemon-sprite {
+        width: 64px;
+        height: 64px;
+        image-rendering: pixelated;
+      }
+      .pokemon-info { flex: 1; }
+      .pokemon-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+        display: block;
+        margin-bottom: 4px;
+      }
+      .hp-bar-container {
+        height: 6px;
+        background: #333;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-bottom: 2px;
+      }
+      .hp-bar {
+        height: 100%;
+        background: #4cd964;
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
+      .hp-text {
+        font-size: 11px;
+        color: #888;
+      }
+      .companion-log {
+        margin-top: 16px;
+        font-family: "SF Mono", "Menlo", monospace;
+        font-size: 12px;
+        color: #888;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      .companion-log .log-line { margin-bottom: 2px; }
+      .companion-log .log-line.damage { color: #ff6b6b; }
+      .companion-log .log-line.info { color: #f5a623; }
+      .companion-log .log-line.good { color: #4cd964; }
+    </style>
+  </head>
+  <body>
+    <div id="status-screen">
+      <div class="phone-header">
+        <h1>Pokemon Showdown</h1>
+        <div class="subtitle">Battle on Even Realities G2</div>
+      </div>
+      <div class="phone-status" id="status-area">
+        <div class="status-indicator connecting" id="status-dot"></div>
+        <div class="status-text" id="status-text">Connecting to glasses...</div>
+        <div class="status-detail" id="status-detail"></div>
+      </div>
+    </div>
+
+    <div id="battle-companion" class="battle-companion hidden">
+      <div class="companion-header" id="companion-header">Battle</div>
+      <div class="battle-field">
+        <div class="pokemon-slot opponent">
+          <img id="opp-sprite" class="pokemon-sprite" alt="" />
+          <div class="pokemon-info">
+            <span id="opp-name" class="pokemon-name"></span>
+            <div class="hp-bar-container">
+              <div id="opp-hp-bar" class="hp-bar"></div>
+            </div>
+            <span id="opp-hp-text" class="hp-text"></span>
+          </div>
+        </div>
+        <div class="pokemon-slot player">
+          <img id="player-sprite" class="pokemon-sprite" alt="" />
+          <div class="pokemon-info">
+            <span id="player-name" class="pokemon-name"></span>
+            <div class="hp-bar-container">
+              <div id="player-hp-bar" class="hp-bar"></div>
+            </div>
+            <span id="player-hp-text" class="hp-text"></span>
+          </div>
+        </div>
+      </div>
+      <div id="companion-log" class="companion-log"></div>
+    </div>
+
+    <div id="battle-log" class="battle-log"></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
