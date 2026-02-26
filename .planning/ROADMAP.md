@@ -14,7 +14,7 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 - [x] **Phase 2: Team Generation** - Build random 6-Pokemon teams using @pkmn/randoms with filtering
 - [x] **Phase 3: Battle Engine** - Pure turn-state machine with damage calc, status, and Terastallization
 - [x] **Phase 4: AI Opponent** - Heuristic AI that scores moves by expected damage and switches intelligently
-- [ ] **Phase 5: Screen Layer** - All G2 screens and gesture navigation wired to battle state
+- [x] **Phase 5: Screen Layer** - All G2 screens and gesture navigation wired to battle state
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
 
 ## Phase Details
@@ -99,9 +99,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — ScreenState types, display budget constants, and all 8 pure renderer functions
-- [ ] 05-02-PLAN.md — ScreenController state machine with gesture routing, turn resolution, and forced switch handling
-- [ ] 05-03-PLAN.md — Phone companion display with sprites, main.ts wiring, and clean build
+- [x] 05-01-PLAN.md — ScreenState types, display budget constants, and all 8 pure renderer functions
+- [x] 05-02-PLAN.md — ScreenController state machine with gesture routing, turn resolution, and forced switch handling
+- [x] 05-03-PLAN.md — Phone companion display with sprites, main.ts wiring, and clean build
 
 ### Phase 6: Integration
 **Goal**: A complete battle plays from main menu to win/loss screen on actual G2 hardware without crashes, data errors, or navigation dead ends
@@ -129,7 +129,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 2. Team Generation | 2/2 | Complete | 2026-02-26 |
 | 3. Battle Engine | 4/4 | Complete | 2026-02-26 |
 | 4. AI Opponent | 1/1 | Complete | 2026-02-26 |
-| 5. Screen Layer | 0/3 | Not started | - |
+| 5. Screen Layer | 3/3 | Complete | 2026-02-26 |
 | 6. Integration | 0/2 | Not started | - |
 
 ---
