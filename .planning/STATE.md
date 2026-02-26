@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 1 of 6 (Data Foundation)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-02-26 — Completed 01-01-PLAN.md (fix broken data files)
+Last activity: 2026-02-26 — Completed 01-02-PLAN.md (DataLoader module singleton + types)
 
-Progress: [█░░░░░░░░░] ~3% (1/3 plans in Phase 1; phases 2-6 not yet planned in full)
+Progress: [██░░░░░░░░] ~7% (2/3 plans in Phase 1; phases 2-6 not yet planned in full)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: ~2 min
-- Total execution time: ~2 min
+- Total plans completed: 2
+- Average duration: ~3 min
+- Total execution time: ~6 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-data-foundation | 1 completed | ~2 min | ~2 min |
+| 01-data-foundation | 2 completed | ~6 min | ~3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~2 min)
-- Trend: —
+- Last 5 plans: 01-01 (~2 min), 01-02 (~4 min)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -51,6 +51,11 @@ Recent decisions affecting current work:
 - [01-01]: Drop function-valued keys via JSON.stringify — Phase 1 only needs static fields (name, num, desc)
 - [01-01]: PS typechart damageTaken encoding: 0=1x, 1=2x(super), 2=0.5x(resist), 3=0x(immune)
 - [01-01]: PS data keys are lowercase slugs — downstream lookups must use .toLowerCase() or slug normalization
+- [01-02]: Module singleton pattern: export const DataLoader = { ... } object, not class with getInstance()
+- [01-02]: JSON cast requires 'as unknown as' intermediate — some PS pokedex entries are sparse cosmetic formes
+- [01-02]: getStandardPokemon() = !isNonstandard && !battleOnly = exactly 897 standard entries
+- [01-02]: @pkmn/randoms and @smogon/calc installed and importable — ready for team gen and damage calc
+- [01-02]: tsc and vite shims in node_modules/.bin/ had wrong relative paths — fixed; npm run build now works
 
 ### Pending Todos
 
@@ -65,6 +70,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-26T14:11:36Z
-Stopped at: Completed 01-01-PLAN.md — all three broken data files fixed
+Last session: 2026-02-26T14:17:28Z
+Stopped at: Completed 01-02-PLAN.md — DataLoader module singleton, TypeScript interfaces, packages installed
 Resume file: None
