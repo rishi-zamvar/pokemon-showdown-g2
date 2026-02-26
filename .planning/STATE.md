@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 3 of 6 (Battle Engine) -- PHASE COMPLETE
-Plan: 3 of 3 in Phase 3 (03-03 complete)
+Phase: 3 of 6 (Battle Engine) -- PHASE COMPLETE (including gap closure plan 03-04)
+Plan: 4 of 4 in Phase 3 (03-04 complete — gap closure)
 Status: Phase complete
-Last activity: 2026-02-26 — Completed 03-03-PLAN.md (Status Effects + Full Integration)
+Last activity: 2026-02-26 — Completed 03-04-PLAN.md (Status Infliction from Moves — gap closure)
 
-Progress: [████████░░] ~40% (8/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 3 Phase 3)
+Progress: [████████░░] ~45% (9/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3)
 
 ## Performance Metrics
 
@@ -29,11 +29,11 @@ Progress: [████████░░] ~40% (8/~20 plans complete — 3 Phas
 |-------|-------|-------|----------|
 | 01-data-foundation | 3 completed | ~10 min | ~3.3 min |
 | 02-team-generation | 2 completed | ~3 min | ~1.5 min |
-| 03-battle-engine | 3 completed | ~10.5 min | ~3.5 min |
+| 03-battle-engine | 4 completed | ~17.5 min | ~4.4 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (~2 min), 02-02 (~1 min), 03-01 (~2.5 min), 03-02 (~3 min), 03-03 (~5 min)
-- Trend: stable ~2-5 min per plan
+- Last 5 plans: 02-02 (~1 min), 03-01 (~2.5 min), 03-02 (~3 min), 03-03 (~5 min), 03-04 (~7 min)
+- Trend: stable ~2-7 min per plan
 
 *Updated after each plan completion*
 
@@ -78,6 +78,10 @@ Recent decisions affecting current work:
 - [03-03]: Sleep turns decremented at move-attempt time (checkMoveBlock), not end of turn
 - [03-03]: Second Tera attempt degrades to regular attack with console.warn (no crash)
 - [03-03]: Struggle fallback when all 4 moves have 0 PP — typeless damage + 25% max HP recoil
+- [03-04]: inflictStatus() is the single entry point for status from moves — checks existing status + fainted before applying
+- [03-04]: STATUS_INFLICT log actor = who RECEIVED the status (oppositeActor(attacker)), consistent with STATUS_TICK convention
+- [03-04]: DamageCalc result.damage from @smogon/calc must be Array.isArray() guarded — immune/edge returns number not array
+- [03-04]: Smoke test pickMove() must prefer damaging moves — status moves (Spore+healing) can stall test indefinitely
 
 ### Pending Todos
 
@@ -95,6 +99,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-26T15:55:00Z
-Stopped at: Completed 03-03-PLAN.md — Phase 3 complete. Phase 4 (AI) next.
+Last session: 2026-02-26T16:16:36Z
+Stopped at: Completed 03-04-PLAN.md — Phase 3 gap closure complete. Phase 4 (AI) next.
 Resume file: None
