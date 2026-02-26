@@ -114,10 +114,10 @@ Requirements for initial release. Each maps to roadmap phases.
 | DATA-04 | Phase 1 | Complete |
 | DATA-05 | Phase 1 | Complete |
 | DATA-06 | Phase 1 | Complete |
-| TEAM-01 | Phase 2 | Pending |
-| TEAM-02 | Phase 2 | Pending |
-| TEAM-03 | Phase 2 | Pending |
-| TEAM-04 | Phase 2 | Pending |
+| TEAM-01 | Phase 2 | Complete |
+| TEAM-02 | Phase 2 | Complete |
+| TEAM-03 | Phase 2 | Complete |
+| TEAM-04 | Phase 2 | Complete |
 | BATTLE-01 | Phase 3 | Pending |
 | BATTLE-02 | Phase 3 | Pending |
 | BATTLE-03 | Phase 3 | Pending |

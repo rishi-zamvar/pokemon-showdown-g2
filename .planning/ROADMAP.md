@@ -11,7 +11,7 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Data Foundation** - Fix broken data files and wire a validated DataLoader singleton
-- [ ] **Phase 2: Team Generation** - Build random 6-Pokemon teams using @pkmn/randoms with filtering
+- [x] **Phase 2: Team Generation** - Build random 6-Pokemon teams using @pkmn/randoms with filtering
 - [ ] **Phase 3: Battle Engine** - Pure turn-state machine with damage calc, status, and Terastallization
 - [ ] **Phase 4: AI Opponent** - Heuristic AI that scores moves by expected damage and switches intelligently
 - [ ] **Phase 5: Screen Layer** - All G2 screens and gesture navigation wired to battle state
@@ -48,8 +48,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Define BattlePokemon type and implement TeamGenerator singleton with buildRandom()
-- [ ] 02-02-PLAN.md — 100-iteration stress test validating all fields, calc alignment, and edge cases (Ditto, cosmetic formes)
+- [x] 02-01-PLAN.md — Define BattlePokemon type and implement TeamGenerator singleton with buildRandom()
+- [x] 02-02-PLAN.md — 100-iteration stress test validating all fields, calc alignment, and edge cases (Ditto, cosmetic formes)
 
 ### Phase 3: Battle Engine
 **Goal**: A pure (no display calls) turn-state machine that takes a BattleState and an action and returns the next BattleState with correct damage, status effects, type effectiveness, fainting, and win/loss detection
@@ -126,7 +126,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete | 2026-02-26 |
-| 2. Team Generation | 0/2 | Not started | - |
+| 2. Team Generation | 2/2 | Complete | 2026-02-26 |
 | 3. Battle Engine | 0/3 | Not started | - |
 | 4. AI Opponent | 0/2 | Not started | - |
 | 5. Screen Layer | 0/3 | Not started | - |
