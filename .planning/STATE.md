@@ -5,32 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 1 complete, verified — ready for Phase 2 (Team Generation)
+**Current focus:** Phase 2 in progress — 02-01 complete (BattlePokemon type + TeamGenerator)
 
 ## Current Position
 
-Phase: 1 of 6 (Data Foundation) — COMPLETE
-Plan: 3 of 3 in Phase 1
-Status: Phase complete — verified ✓
-Last activity: 2026-02-26 — Phase 1 verified (6/6 must-haves passed)
+Phase: 2 of 6 (Team Generation) — In progress
+Plan: 1 of N in Phase 2 (02-01 complete)
+Status: In progress
+Last activity: 2026-02-26 — Completed 02-01-PLAN.md (BattlePokemon interface + TeamGenerator.buildRandom())
 
-Progress: [███░░░░░░░] ~10% (3/3 plans in Phase 1; phases 2-6 not yet planned in full)
+Progress: [████░░░░░░] ~15% (4/N plans complete — 3 Phase 1 + 1 Phase 2)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: ~3.3 min
-- Total execution time: ~10 min
+- Total plans completed: 4
+- Average duration: ~3 min
+- Total execution time: ~12 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-data-foundation | 3 completed | ~10 min | ~3.3 min |
+| 02-team-generation | 1 completed | ~2 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~2 min), 01-02 (~4 min), 01-03 (~4 min)
+- Last 5 plans: 01-01 (~2 min), 01-02 (~4 min), 01-03 (~4 min), 02-01 (~2 min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -60,6 +61,10 @@ Recent decisions affecting current work:
 - [01-03]: Match-scoped Maps use null (not empty Map) for clearance — null assignment makes Map GC-eligible
 - [01-03]: loadMatchData extracts only 12 entries from 3.19 MB raw response — raw object discarded immediately
 - [01-03]: validate() error handler calls setStatus() then returns — user sees error on glass before abort
+- [02-01]: teraType cast as unknown as TypeName — @pkmn/randoms returns string, @smogon/calc wants TypeName union
+- [02-01]: calcSpecies stored on BattlePokemon — downstream callers use it directly without re-doing Dex lookup
+- [02-01]: stats computed at generation time via CalcPokemon constructor — no recalculation at battle runtime
+- [02-01]: No post-filter for nonstandard Pokemon — @pkmn/randoms internal randomData allowlist is authoritative
 
 ### Pending Todos
 
@@ -71,9 +76,11 @@ None.
 - [Phase 1 blocker RESOLVED]: learnsets.json moved to public/data/ — lazy-loaded via fetch, not bundled
 - [Phase 3 flag]: Damage formula modifier order is subtle — research phase recommended before implementation
 - [Data note]: PS typechart damageTaken uses 1=2x (not 3) — plan had incorrect assertion; actual encoding documented above
+- [Phase 4 note]: Pass BattlePokemon.calcSpecies (not species) to @smogon/calc — cosmetic forme crash avoided
+- [Bundle note]: @pkmn/sim + @pkmn/randoms produce ~1.25 MB bundle (247 KB gzip) — chunk warning is cosmetic, not blocking
 
 ## Session Continuity
 
-Last session: 2026-02-26T14:22:00Z
-Stopped at: Completed 01-03-PLAN.md — match data scoping, learnsets lazy-load, validate() wired into bootstrap
+Last session: 2026-02-26T14:42:23Z
+Stopped at: Completed 02-01-PLAN.md — BattlePokemon interface + TeamGenerator.buildRandom() with cosmetic forme resolution
 Resume file: None
