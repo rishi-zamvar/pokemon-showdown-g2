@@ -50,6 +50,13 @@ const _items: Map<string, ItemEntry> = new Map(
 const _typechart: TypeChart = typechartRaw as unknown as TypeChart;
 
 // ---------------------------------------------------------------------------
+// Per-match data — populated at battle start, cleared at battle end
+// ---------------------------------------------------------------------------
+
+let _matchPokemon: Map<string, PokemonEntry> | null = null;
+let _matchLearnsets: Map<string, Record<string, unknown>> | null = null;
+
+// ---------------------------------------------------------------------------
 // Validate thresholds (minimum expected entry counts)
 // ---------------------------------------------------------------------------
 
@@ -151,5 +158,61 @@ export const DataLoader = {
       }
     }
     return result;
+  },
+
+  // -------------------------------------------------------------------------
+  // Per-match data lifecycle — call loadMatchData() at battle start,
+  // clearMatchData() at battle end to keep memory footprint minimal
+  // -------------------------------------------------------------------------
+
+  /**
+   * Load match-scoped data for exactly the 12 battle Pokemon.
+   * Pokemon entries come from the already-loaded global pokedex (no extra network call).
+   * Learnsets are lazy-fetched from public/data/learnsets.json and only the
+   * 12 match Pokemon's learnsets are retained — the full 3.19 MB raw object is
+   * discarded after extraction.
+   */
+  async loadMatchData(pokemonIds: string[]): Promise<void> {
+    // Build match Pokemon map from global pokedex (already in memory — no network call)
+    _matchPokemon = new Map(
+      pokemonIds
+        .map(id => [id, _pokedex.get(id)] as const)
+        .filter((entry): entry is [string, PokemonEntry] => entry[1] !== undefined),
+    );
+
+    // Lazy-load learnsets from public/ — only extract the 12 match Pokemon
+    const raw: Record<string, Record<string, unknown>> = await fetch(
+      "/data/learnsets.json",
+    ).then(r => r.json());
+    _matchLearnsets = new Map(
+      pokemonIds
+        .filter(id => id in raw)
+        .map(id => [id, raw[id]] as [string, Record<string, unknown>]),
+    );
+    // raw is now eligible for GC — only the 12 Pokemon's learnsets are retained
+  },
+
+  /**
+   * Clear all match-scoped data. Call when a battle ends.
+   * Sets both Maps to null so they are eligible for garbage collection.
+   */
+  clearMatchData(): void {
+    _matchPokemon = null;
+    _matchLearnsets = null;
+  },
+
+  /** Return a match-scoped Pokemon entry. Returns undefined if match not loaded or Pokemon not found. */
+  getMatchPokemon(id: string): PokemonEntry | undefined {
+    return _matchPokemon?.get(id);
+  },
+
+  /** Return a match-scoped learnset entry. Returns undefined if match not loaded or Pokemon not found. */
+  getMatchLearnset(id: string): Record<string, unknown> | undefined {
+    return _matchLearnsets?.get(id);
+  },
+
+  /** Returns true if match data has been loaded (loadMatchData completed). */
+  isMatchLoaded(): boolean {
+    return _matchPokemon !== null;
   },
 } as const;
