@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 3 (Battle Engine) in progress — 03-01 and 03-02 complete, 03-03 next
+**Current focus:** Phase 3 (Battle Engine) complete — all 3 plans done. Phase 4 (AI) next.
 
 ## Current Position
 
-Phase: 3 of 6 (Battle Engine)
-Plan: 2 of 3 in Phase 3 (03-02 complete)
-Status: In progress
-Last activity: 2026-02-26 — Completed 03-02-PLAN.md (DamageCalc + real damage in BattleEngine)
+Phase: 3 of 6 (Battle Engine) -- PHASE COMPLETE
+Plan: 3 of 3 in Phase 3 (03-03 complete)
+Status: Phase complete
+Last activity: 2026-02-26 — Completed 03-03-PLAN.md (Status Effects + Full Integration)
 
-Progress: [███████░░░] ~35% (7/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 2 Phase 3)
+Progress: [████████░░] ~40% (8/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 3 Phase 3)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: ~2.6 min
-- Total execution time: ~18 min
+- Total plans completed: 8
+- Average duration: ~2.9 min
+- Total execution time: ~23 min
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [███████░░░] ~35% (7/~20 plans complete — 3 Phas
 |-------|-------|-------|----------|
 | 01-data-foundation | 3 completed | ~10 min | ~3.3 min |
 | 02-team-generation | 2 completed | ~3 min | ~1.5 min |
-| 03-battle-engine | 2 completed | ~5.5 min | ~2.75 min |
+| 03-battle-engine | 3 completed | ~10.5 min | ~3.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (~4 min), 02-01 (~2 min), 02-02 (~1 min), 03-01 (~2.5 min), 03-02 (~3 min)
-- Trend: stable ~2-3 min per plan
+- Last 5 plans: 02-01 (~2 min), 02-02 (~1 min), 03-01 (~2.5 min), 03-02 (~3 min), 03-03 (~5 min)
+- Trend: stable ~2-5 min per plan
 
 *Updated after each plan completion*
 
@@ -75,6 +75,9 @@ Recent decisions affecting current work:
 - [03-02]: Status moves return 0 without calling @smogon/calc — avoids edge cases
 - [03-02]: PP consumed even on miss — only PP_OUT (0 remaining) skips consumption
 - [03-02]: Tera type passed to both attacker and defender CalcPokemon only when teraActive is true
+- [03-03]: Sleep turns decremented at move-attempt time (checkMoveBlock), not end of turn
+- [03-03]: Second Tera attempt degrades to regular attack with console.warn (no crash)
+- [03-03]: Struggle fallback when all 4 moves have 0 PP — typeless damage + 25% max HP recoil
 
 ### Pending Todos
 
@@ -85,12 +88,13 @@ None.
 - [Phase 1 blocker RESOLVED]: abilities.json, items.json, typechart.json now contain valid data (314, 583, 19 entries)
 - [Phase 1 blocker RESOLVED]: learnsets.json moved to public/data/ — lazy-loaded via fetch, not bundled
 - [Phase 3 flag RESOLVED]: Damage formula delegated to @smogon/calc — no manual modifier ordering needed
+- [Phase 3 flag RESOLVED]: All status conditions implemented with correct Gen 9 mechanics
 - [Data note]: PS typechart damageTaken uses 1=2x (not 3) — plan had incorrect assertion; actual encoding documented above
 - [Phase 4 note]: Pass BattlePokemon.calcSpecies (not species) to @smogon/calc — cosmetic forme crash avoided
 - [Bundle note]: @pkmn/sim + @pkmn/randoms produce ~1.25 MB bundle (247 KB gzip) — chunk warning is cosmetic, not blocking
 
 ## Session Continuity
 
-Last session: 2026-02-26T15:47:00Z
-Stopped at: Completed 03-02-PLAN.md — DamageCalc + real damage; 03-03 (Status Effects) next
+Last session: 2026-02-26T15:55:00Z
+Stopped at: Completed 03-03-PLAN.md — Phase 3 complete. Phase 4 (AI) next.
 Resume file: None
