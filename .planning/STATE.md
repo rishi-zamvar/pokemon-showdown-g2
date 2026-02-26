@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 2 complete — Phase 3 (Battle State) is next
+**Current focus:** Phase 3 (Battle Engine) in progress — 03-01 complete, 03-02 next
 
 ## Current Position
 
-Phase: 2 of 6 (Team Generation) — Complete
-Plan: 2 of 2 in Phase 2 (02-02 complete — Phase 2 fully done)
-Status: Phase complete — verified ✓
-Last activity: 2026-02-26 — Phase 2 verified (7/7 must-haves passed, 600 Pokemon stress tested)
+Phase: 3 of 6 (Battle Engine)
+Plan: 1 of 3 in Phase 3 (03-01 complete)
+Status: In progress
+Last activity: 2026-02-26 — Completed 03-01-PLAN.md (BattleState types + BattleEngine + TurnResolver)
 
-Progress: [█████░░░░░] ~20% (5/N plans complete — 3 Phase 1 + 2 Phase 2)
+Progress: [██████░░░░] ~30% (6/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 1 Phase 3)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: ~3 min
-- Total execution time: ~12 min
+- Total plans completed: 6
+- Average duration: ~2.5 min
+- Total execution time: ~15 min
 
 **By Phase:**
 
@@ -29,10 +29,11 @@ Progress: [█████░░░░░] ~20% (5/N plans complete — 3 Phase 
 |-------|-------|-------|----------|
 | 01-data-foundation | 3 completed | ~10 min | ~3.3 min |
 | 02-team-generation | 2 completed | ~3 min | ~1.5 min |
+| 03-battle-engine | 1 completed | ~2.5 min | ~2.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~2 min), 01-02 (~4 min), 01-03 (~4 min), 02-01 (~2 min), 02-02 (~1 min)
-- Trend: stable, Phase 2 plans faster than Phase 1
+- Last 5 plans: 01-02 (~4 min), 01-03 (~4 min), 02-01 (~2 min), 02-02 (~1 min), 03-01 (~2.5 min)
+- Trend: stable ~2-3 min per plan
 
 *Updated after each plan completion*
 
@@ -67,6 +68,10 @@ Recent decisions affecting current work:
 - [02-01]: No post-filter for nonstandard Pokemon — @pkmn/randoms internal randomData allowlist is authoritative
 - [02-02]: Stress test as standalone tsx script — no Jest/Vitest needed; tsx executes .ts directly
 - [02-02]: 100 iterations confirmed: 0 failures, 2 Ditto appearances (~0.3%), 52 cosmetic forme resolutions (~8.7%) — all handled correctly
+- [03-01]: Placeholder 50 HP damage in BattleEngine — replaced by DamageCalc in 03-02
+- [03-01]: Double KO convention: opponent wins (rare edge case)
+- [03-01]: Toxic counter resets to 1 on switch-in (Gen 9 behavior)
+- [03-01]: All BattleState updates are immutable via spread — never mutate in place
 
 ### Pending Todos
 
@@ -83,6 +88,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-26T14:45:10Z
-Stopped at: Completed 02-02-PLAN.md — TeamGenerator stress test; Phase 2 fully complete; Phase 3 (BattleState) next
+Last session: 2026-02-26T15:41:00Z
+Stopped at: Completed 03-01-PLAN.md — BattleState types, BattleEngine, TurnResolver; 03-02 (DamageCalc) next
 Resume file: None
