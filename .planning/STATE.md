@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 5 (Screen Layer) in progress. Plans 01-02 complete, plan 03 remaining.
+**Current focus:** Phase 5 (Screen Layer) COMPLETE. Ready for Phase 6 (Integration & Testing).
 
 ## Current Position
 
-Phase: 5 of 6 (Screen Layer) -- IN PROGRESS
-Plan: 2 of 3 in Phase 5 (complete)
-Status: In progress
-Last activity: 2026-02-26 — Completed 05-02-PLAN.md
+Phase: 5 of 6 (Screen Layer) -- COMPLETE
+Plan: 3 of 3 in Phase 5 (complete)
+Status: Phase complete
+Last activity: 2026-02-26 — Completed 05-03-PLAN.md
 
-Progress: [████████████░] ~60% (12/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 2 Phase 5)
+Progress: [█████████████░] ~65% (13/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: ~3.0 min
-- Total execution time: ~36 min
+- Total plans completed: 13
+- Average duration: ~2.9 min
+- Total execution time: ~38 min
 
 **By Phase:**
 
@@ -31,11 +31,11 @@ Progress: [████████████░] ~60% (12/~20 plans complete 
 | 02-team-generation | 2 completed | ~3 min | ~1.5 min |
 | 03-battle-engine | 4 completed | ~17.5 min | ~4.4 min |
 | 04-ai-opponent | 1 completed | ~2 min | ~2 min |
-| 05-screen-layer | 2 of 3 completed | ~4 min | ~2 min |
+| 05-screen-layer | 3 completed | ~6 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-04 (~7 min), 04-01 (~2 min), 05-01 (~2 min), 05-02 (~2 min)
-- Trend: stable ~2-7 min per plan
+- Last 5 plans: 04-01 (~2 min), 05-01 (~2 min), 05-02 (~2 min), 05-03 (~2 min)
+- Trend: stable ~2 min per plan
 
 *Updated after each plan completion*
 
@@ -93,6 +93,9 @@ Recent decisions affecting current work:
 - [05-02]: teraQueued flag reset in ALL paths leaving ATTACK_SELECT — prevents stale tera state
 - [05-02]: resolveSwitch auto-switches opponent first on double faint before player switch
 - [05-02]: SCROLL_FWD/BACK are complete no-ops — no render call, avoids unnecessary glass rebuilds
+- [05-03]: Sprite URL uses DataLoader.getPokemon(slug).num for dex number — avoids separate sprite lookup
+- [05-03]: Companion log renders last turn entries only (not full history) — keeps companion concise
+- [05-03]: Phone companion updates via DOM manipulation in render() postamble, not in renderers
 
 ### Pending Todos
 
@@ -110,6 +113,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-26T19:54:00Z
-Stopped at: Completed 05-02-PLAN.md. Phase 5 plan 03 remaining.
+Last session: 2026-02-26T20:03:00Z
+Stopped at: Completed 05-03-PLAN.md. Phase 5 complete. Phase 6 next.
 Resume file: None
