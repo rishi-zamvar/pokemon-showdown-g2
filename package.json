@@ -17,11 +17,13 @@
   "dependencies": {
     "@evenrealities/even_hub_sdk": "^0.0.7",
     "@evenrealities/evenhub-cli": "^0.1.5",
-    "@evenrealities/evenhub-simulator": "^0.4.1"
+    "@evenrealities/evenhub-simulator": "^0.4.1",
+    "@pkmn/randoms": "^0.10.6",
+    "@smogon/calc": "^0.10.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "typescript": "^5.7.0",
+    "typescript": "^5.9.3",
     "vite": "^6.0.0"
   }
 }
