@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 2 in progress — 02-01 complete (BattlePokemon type + TeamGenerator)
+**Current focus:** Phase 2 complete — Phase 3 (Battle State) is next
 
 ## Current Position
 
-Phase: 2 of 6 (Team Generation) — In progress
-Plan: 1 of N in Phase 2 (02-01 complete)
-Status: In progress
-Last activity: 2026-02-26 — Completed 02-01-PLAN.md (BattlePokemon interface + TeamGenerator.buildRandom())
+Phase: 2 of 6 (Team Generation) — Complete
+Plan: 2 of 2 in Phase 2 (02-02 complete — Phase 2 fully done)
+Status: In progress (Phase 3 next)
+Last activity: 2026-02-26 — Completed 02-02-PLAN.md (TeamGenerator 100-iteration stress test, 600 Pokemon validated)
 
-Progress: [████░░░░░░] ~15% (4/N plans complete — 3 Phase 1 + 1 Phase 2)
+Progress: [█████░░░░░] ~20% (5/N plans complete — 3 Phase 1 + 2 Phase 2)
 
 ## Performance Metrics
 
@@ -28,11 +28,11 @@ Progress: [████░░░░░░] ~15% (4/N plans complete — 3 Phase 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-data-foundation | 3 completed | ~10 min | ~3.3 min |
-| 02-team-generation | 1 completed | ~2 min | ~2 min |
+| 02-team-generation | 2 completed | ~3 min | ~1.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~2 min), 01-02 (~4 min), 01-03 (~4 min), 02-01 (~2 min)
-- Trend: stable
+- Last 5 plans: 01-01 (~2 min), 01-02 (~4 min), 01-03 (~4 min), 02-01 (~2 min), 02-02 (~1 min)
+- Trend: stable, Phase 2 plans faster than Phase 1
 
 *Updated after each plan completion*
 
@@ -65,6 +65,8 @@ Recent decisions affecting current work:
 - [02-01]: calcSpecies stored on BattlePokemon — downstream callers use it directly without re-doing Dex lookup
 - [02-01]: stats computed at generation time via CalcPokemon constructor — no recalculation at battle runtime
 - [02-01]: No post-filter for nonstandard Pokemon — @pkmn/randoms internal randomData allowlist is authoritative
+- [02-02]: Stress test as standalone tsx script — no Jest/Vitest needed; tsx executes .ts directly
+- [02-02]: 100 iterations confirmed: 0 failures, 2 Ditto appearances (~0.3%), 52 cosmetic forme resolutions (~8.7%) — all handled correctly
 
 ### Pending Todos
 
@@ -81,6 +83,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-26T14:42:23Z
-Stopped at: Completed 02-01-PLAN.md — BattlePokemon interface + TeamGenerator.buildRandom() with cosmetic forme resolution
+Last session: 2026-02-26T14:45:10Z
+Stopped at: Completed 02-02-PLAN.md — TeamGenerator stress test; Phase 2 fully complete; Phase 3 (BattleState) next
 Resume file: None
