@@ -8,6 +8,7 @@
  */
 
 import { BattleEngine } from "./BattleEngine.js";
+import { DataLoader } from "../data/DataLoader.js";
 import type { BattleState, PlayerAction, TurnLogEntry } from "../types/battleState.js";
 
 let passed = 0;
@@ -35,7 +36,7 @@ const snapshot = JSON.stringify(initialState);
 
 let state: BattleState = initialState;
 let totalTurns = 0;
-const maxTurns = 200; // Safety valve
+const maxTurns = 500; // Safety valve — increased from 200 since status infliction can extend battles
 const allLogs: TurnLogEntry[] = [];
 let switchCount = 0;
 
@@ -46,14 +47,35 @@ while (state.phase !== "BATTLE_OVER" && totalTurns < maxTurns) {
     const playerMon = playerSide.team[playerSide.activeIndex]!;
     const opponentMon = opponentSide.team[opponentSide.activeIndex]!;
 
-    // Pick a move: prefer least-used move to avoid PP exhaustion stalls.
-    // Cycle through all moves round-robin style based on turn count.
+    // Pick a move: prefer damaging moves over status moves to keep battles moving.
+    // Fall back to status moves only if all damaging moves are exhausted.
     function pickMove(mon: typeof playerMon): string {
-      // Sort moves by PP used (ascending) and pick the least used one
-      const sorted = [...mon.moves].sort(
+      // Separate moves into damaging (Physical/Special) and status
+      const damaging = mon.moves.filter(m => {
+        const info = DataLoader.getMove(m.toLowerCase());
+        return info && info.category !== "Status";
+      });
+      const statusMoves = mon.moves.filter(m => {
+        const info = DataLoader.getMove(m.toLowerCase());
+        return !info || info.category === "Status";
+      });
+
+      // Find the least-used damaging move with PP remaining
+      const availableDamaging = damaging.filter(m => {
+        const maxPP = DataLoader.getMove(m.toLowerCase())?.pp ?? 0;
+        return (mon.ppUsed[m] ?? 0) < maxPP;
+      });
+
+      if (availableDamaging.length > 0) {
+        return availableDamaging.sort(
+          (a, b) => (mon.ppUsed[a] ?? 0) - (mon.ppUsed[b] ?? 0),
+        )[0]!;
+      }
+
+      // Fall back to any least-used status move (or Struggle will trigger)
+      return [...mon.moves].sort(
         (a, b) => (mon.ppUsed[a] ?? 0) - (mon.ppUsed[b] ?? 0),
-      );
-      return sorted[0]!;
+      )[0]!;
     }
 
     const pMove = pickMove(playerMon);
@@ -111,7 +133,7 @@ while (state.phase !== "BATTLE_OVER" && totalTurns < maxTurns) {
 assert(state.phase === "BATTLE_OVER", `battle ended with BATTLE_OVER (got ${state.phase})`);
 assert(state.winner === "player" || state.winner === "opponent", `winner is ${state.winner}`);
 assert(totalTurns > 0, `battle took ${totalTurns} turns`);
-assert(totalTurns < maxTurns, `battle finished before ${maxTurns} turn safety limit`);
+assert(totalTurns < maxTurns, `battle finished before ${maxTurns} turn safety limit (took ${totalTurns})`);
 
 console.log(`\n  Battle summary: ${totalTurns} turns, ${switchCount} switches, winner: ${state.winner}`);
 
@@ -350,6 +372,144 @@ if (damageLogIdx >= 0) {
 } else {
   console.log("  INFO: no DAMAGE (miss) — order check N/A");
   passed++;
+}
+
+// ---------------------------------------------------------------------------
+// Test 11: Secondary effects inflict status (Scald 30% burn)
+// ---------------------------------------------------------------------------
+console.log("\n=== Test 11: Secondary effects inflict status (Scald burn) ===");
+
+// Run 100 Scald attacks and count STATUS_INFLICT with brn.
+// Expected ~30% of hits -> between 10 and 60 burns from 100 attempts.
+// We also verify status is never inflicted on an already-burned Pokemon.
+
+{
+  let burnInflictCount = 0;
+  let doubleStatusAttempts = 0;
+
+  for (let i = 0; i < 100; i++) {
+    const testState = BattleEngine.startBattle();
+
+    // Force player active to use "scald" by building a modified state.
+    // We can't change moves easily, so instead we'll call inflictStatus directly
+    // by running the engine with scald if available, or manually verifying the logic.
+    // Since we can't guarantee "scald" is in the random team, test the mechanism
+    // by constructing a state and submitting scald directly as an action.
+    // The engine will look up scald via DataLoader.getMove — that's enough to
+    // validate the secondary effect path.
+
+    const result = BattleEngine.submitAction(
+      testState,
+      { type: "ATTACK", moveSlug: "scald" },
+      { type: "ATTACK", moveSlug: testState.opponentSide.team[0]!.moves[0]! },
+    );
+
+    // STATUS_INFLICT actor="opponent" means the opponent received the status
+    // (actor in inflictStatus is the target's side — oppositeActor(player) = opponent)
+    const statusInflicts = result.log.filter(
+      e => e.kind === "STATUS_INFLICT" && e.detail.status === "brn" && e.actor === "opponent",
+    );
+    burnInflictCount += statusInflicts.length;
+
+    // Check: the opponent should be burned at most once per turn from Scald
+    if (statusInflicts.length > 1) {
+      doubleStatusAttempts++;
+    }
+  }
+
+  console.log(`  INFO: Scald burn count over 100 attacks: ${burnInflictCount}`);
+  assert(
+    burnInflictCount >= 10 && burnInflictCount <= 60,
+    `Scald inflicted burn ${burnInflictCount}/100 times (expected 10-60, ~30%)`,
+  );
+  assert(
+    doubleStatusAttempts === 0,
+    `No double STATUS_INFLICT entries from single hit (${doubleStatusAttempts} violations)`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Test 12: Primary status moves inflict status (Thunder Wave -> par)
+// ---------------------------------------------------------------------------
+console.log("\n=== Test 12: Primary status moves inflict status (Thunder Wave -> par) ===");
+
+{
+  const twState = BattleEngine.startBattle();
+
+  // Force the player to use thunderwave — the engine will look it up via DataLoader
+  // and apply its status field ("par") directly since category === "Status".
+  const twResult = BattleEngine.submitAction(
+    twState,
+    { type: "ATTACK", moveSlug: "thunderwave" },
+    { type: "ATTACK", moveSlug: twState.opponentSide.team[0]!.moves[0]! },
+  );
+
+  const statusInflicts = twResult.log.filter(
+    e => e.kind === "STATUS_INFLICT" && e.detail.status === "par",
+  );
+
+  // Thunder Wave has accuracy 90, so it can miss. Check that it either inflicted
+  // status or missed (no spurious application).
+  const missEvents = twResult.log.filter(e => e.kind === "MISS" && e.actor === "player");
+
+  if (missEvents.length === 0) {
+    // Hit — should have paralyzed unless target was already statused
+    const targetAfter = twResult.nextState.opponentSide.team[
+      twResult.nextState.opponentSide.activeIndex
+    ]!;
+    // Target starts with no status so paralysis should have applied
+    assert(
+      statusInflicts.length === 1,
+      `Thunder Wave: STATUS_INFLICT logged (got ${statusInflicts.length})`,
+    );
+    assert(
+      targetAfter.status === "par",
+      `Thunder Wave: target.status is "${targetAfter.status}" (expected "par")`,
+    );
+  } else {
+    // Missed — no status should be applied
+    console.log("  INFO: Thunder Wave missed — verifying no spurious status");
+    const targetAfter = twResult.nextState.opponentSide.team[
+      twResult.nextState.opponentSide.activeIndex
+    ]!;
+    assert(
+      statusInflicts.length === 0,
+      `Thunder Wave miss: no STATUS_INFLICT logged (got ${statusInflicts.length})`,
+    );
+    assert(
+      targetAfter.status === "",
+      `Thunder Wave miss: target.status is "${targetAfter.status}" (expected "")`,
+    );
+  }
+
+  // Run 10 more Thunder Wave turns to confirm non-double-status
+  let alreadyParCount = 0;
+  for (let i = 0; i < 10; i++) {
+    const parState = BattleEngine.startBattle();
+    // Force opponent to already be paralyzed
+    const parTeam = parState.opponentSide.team.map((mon, idx) =>
+      idx === 0 ? { ...mon, status: "par" as const } : mon,
+    );
+    const parBattle: BattleState = {
+      ...parState,
+      opponentSide: { ...parState.opponentSide, team: parTeam },
+    };
+    const parResult = BattleEngine.submitAction(
+      parBattle,
+      { type: "ATTACK", moveSlug: "thunderwave" },
+      { type: "ATTACK", moveSlug: parState.opponentSide.team[0]!.moves[0]! },
+    );
+    // Only check for status inflicted on the opponent (actor="opponent" means opponent received it)
+    // Thunder Wave should NOT inflict "par" on an already-par target
+    const inflictsOnPar = parResult.log.filter(
+      e => e.kind === "STATUS_INFLICT" && e.actor === "opponent",
+    );
+    if (inflictsOnPar.length > 0) alreadyParCount++;
+  }
+  assert(
+    alreadyParCount === 0,
+    `Status never double-applied: 0 inflictions on already-par target over 10 tries (got ${alreadyParCount})`,
+  );
 }
 
 // ---------------------------------------------------------------------------

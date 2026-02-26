@@ -86,11 +86,19 @@ export function computeDamage(
   // Calculate damage
   const result = calculate(GEN9, calcAttacker, calcDefender, calcMove);
 
-  // result.damage is always number[] (16 rolls) in Gen 9 singles
-  const rolls = result.damage as number[];
+  // result.damage is number[] (16 rolls) in Gen 9 singles, but can be 0 for
+  // some edge cases (e.g. immune targets, moves with no damage formula).
+  // Guard against non-array values to prevent NaN propagation.
+  const damageResult = result.damage as number | number[];
+  if (!Array.isArray(damageResult)) {
+    return typeof damageResult === "number" ? damageResult : 0;
+  }
+  if (damageResult.length === 0) {
+    return 0;
+  }
 
   // Return a random roll from the 16-value bracket
-  return rolls[Math.floor(Math.random() * rolls.length)]!;
+  return damageResult[Math.floor(Math.random() * damageResult.length)]!;
 }
 
 // ---------------------------------------------------------------------------

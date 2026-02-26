@@ -41,7 +41,9 @@ import {
   checkMoveBlock,
   applyEndOfTurnStatus,
   resetToxicOnSwitchIn,
+  inflictStatus,
 } from "./StatusEngine.js";
+import { DataLoader } from "../data/DataLoader.js";
 
 // ---------------------------------------------------------------------------
 // Immutable state update helpers
@@ -348,6 +350,54 @@ export const BattleEngine = {
             targetMaxHp: targetMon.stats.hp,
           },
         });
+
+        // --- Status Infliction from Moves ---
+        // Look up move data once; reuse for both primary and secondary blocks.
+        const moveInfo = DataLoader.getMove(actualMoveSlug.toLowerCase());
+
+        // Block A — Primary status moves (category === "Status"): apply status field directly.
+        // Status moves deal 0 damage; the status is the primary effect.
+        if (moveInfo?.category === "Status" && moveInfo.status) {
+          const targetAfterDmg = current[targetSideKey].team[targetSide.activeIndex]!;
+          const statusResult = inflictStatus(
+            targetAfterDmg,
+            moveInfo.status,
+            oppositeActor(actor), // actor receiving the status
+          );
+          if (statusResult.log) {
+            current = updateSideTeam(current, targetSideKey, team =>
+              replaceTeamMember(team, targetSide.activeIndex, statusResult.newPokemon),
+            );
+            log.push(statusResult.log);
+          }
+        }
+
+        // Block B — Secondary effect on damaging moves: roll chance to inflict status.
+        // Only roll if the move dealt damage, is not Struggle, and has a secondary with a status.
+        if (
+          damage > 0 &&
+          !useStruggle &&
+          moveInfo?.secondary &&
+          moveInfo.secondary.status &&
+          typeof moveInfo.secondary.chance === "number"
+        ) {
+          if (Math.random() * 100 < moveInfo.secondary.chance) {
+            const targetAfterDmg2 = current[targetSideKey].team[targetSide.activeIndex]!;
+            if (!targetAfterDmg2.fainted) {
+              const secResult = inflictStatus(
+                targetAfterDmg2,
+                moveInfo.secondary.status,
+                oppositeActor(actor),
+              );
+              if (secResult.log) {
+                current = updateSideTeam(current, targetSideKey, team =>
+                  replaceTeamMember(team, targetSide.activeIndex, secResult.newPokemon),
+                );
+                log.push(secResult.log);
+              }
+            }
+          }
+        }
 
         // Struggle recoil: attacker takes 25% of max HP as recoil damage
         if (useStruggle && damage > 0) {
