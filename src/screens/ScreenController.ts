@@ -343,6 +343,7 @@ export class ScreenController {
   private async render(): Promise<void> {
     switch (this.state.screen) {
       case 'MAIN_MENU': {
+        this.hideCompanion();
         const result = renderMainMenu();
         await this.glass.showList(result.items, result.status);
         break;
@@ -384,6 +385,177 @@ export class ScreenController {
         await this.glass.showList(result.items, result.status);
         break;
       }
+    }
+
+    if (this.state.battleState) {
+      this.updatePhoneCompanion();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Phone companion display
+  // ---------------------------------------------------------------------------
+
+  /** Hide the companion panel and restore the status screen. */
+  private hideCompanion(): void {
+    const companion = document.getElementById('battle-companion');
+    const status = document.getElementById('status-screen');
+    if (companion) companion.classList.add('hidden');
+    if (status) status.classList.remove('hidden');
+  }
+
+  /** Update the phone's HTML companion display with current battle state. */
+  private updatePhoneCompanion(): void {
+    const companion = document.getElementById('battle-companion');
+    const bs = this.state.battleState;
+    if (!companion || !bs) return;
+
+    // Show companion, hide status screen
+    companion.classList.remove('hidden');
+    const status = document.getElementById('status-screen');
+    if (status) status.classList.add('hidden');
+
+    const header = document.getElementById('companion-header');
+
+    // Check for battle end
+    if (bs.winner) {
+      if (header) header.textContent = bs.winner === 'player' ? 'Victory!' : 'Defeat';
+    } else {
+      if (header) header.textContent = `Battle — Turn ${bs.turnCount}`;
+    }
+
+    // Update opponent Pokemon
+    const oppMon = bs.opponentSide.team[bs.opponentSide.activeIndex]!;
+    this.updatePokemonSlot(
+      oppMon.species,
+      oppMon.name,
+      oppMon.currentHp,
+      oppMon.stats.hp,
+      oppMon.fainted,
+      'opp',
+    );
+
+    // Update player Pokemon
+    const playerMon = bs.playerSide.team[bs.playerSide.activeIndex]!;
+    this.updatePokemonSlot(
+      playerMon.species,
+      playerMon.name,
+      playerMon.currentHp,
+      playerMon.stats.hp,
+      playerMon.fainted,
+      'player',
+    );
+
+    // Update companion log with last turn entries
+    const logContainer = document.getElementById('companion-log');
+    if (logContainer && this.lastTurnLog.length > 0) {
+      logContainer.innerHTML = '';
+      for (const entry of this.lastTurnLog) {
+        const div = document.createElement('div');
+        div.className = 'log-line ' + this.logEntryClass(entry.kind);
+        div.textContent = this.logEntryText(entry);
+        logContainer.appendChild(div);
+      }
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+  }
+
+  /** Update a single Pokemon slot (opponent or player) in the companion. */
+  private updatePokemonSlot(
+    species: string,
+    displayName: string,
+    currentHp: number,
+    maxHp: number,
+    fainted: boolean,
+    prefix: 'opp' | 'player',
+  ): void {
+    // Sprite
+    const spriteEl = document.getElementById(`${prefix}-sprite`) as HTMLImageElement | null;
+    if (spriteEl) {
+      const slug = species.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const entry = DataLoader.getPokemon(slug);
+      const num = entry?.num ?? 0;
+      if (num > 0) {
+        spriteEl.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${num}.png`;
+        spriteEl.alt = displayName;
+      }
+    }
+
+    // Name
+    const nameEl = document.getElementById(`${prefix}-name`);
+    if (nameEl) nameEl.textContent = displayName;
+
+    // HP
+    const hpPct = fainted ? 0 : Math.max(1, Math.round((currentHp / maxHp) * 100));
+    const hpColor = hpPct > 50 ? '#4cd964' : hpPct > 25 ? '#f5a623' : '#ff3b30';
+
+    const hpBar = document.getElementById(`${prefix}-hp-bar`);
+    if (hpBar) {
+      hpBar.style.width = `${hpPct}%`;
+      hpBar.style.background = hpColor;
+    }
+
+    const hpText = document.getElementById(`${prefix}-hp-text`);
+    if (hpText) hpText.textContent = `${currentHp}/${maxHp} (${hpPct}%)`;
+  }
+
+  /** Map log entry kind to CSS class for companion log. */
+  private logEntryClass(kind: string): string {
+    switch (kind) {
+      case 'DAMAGE':
+      case 'FAINT':
+      case 'LOSS':
+        return 'damage';
+      case 'STATUS_INFLICT':
+      case 'STATUS_TICK':
+      case 'MISS':
+      case 'PARALYSIS_SKIP':
+      case 'FROZEN':
+      case 'ASLEEP':
+      case 'PP_OUT':
+        return 'info';
+      case 'SWITCH':
+      case 'TERA':
+      case 'WIN':
+        return 'good';
+      default:
+        return '';
+    }
+  }
+
+  /** Format a log entry as human-readable text. */
+  private logEntryText(entry: import('../types/battleState.js').TurnLogEntry): string {
+    const d = entry.detail;
+    const actor = entry.actor === 'player' ? 'You' : 'Foe';
+    switch (entry.kind) {
+      case 'DAMAGE':
+        return `${actor}'s ${String(d['target'] ?? '?')} took ${String(d['damage'] ?? '?')} damage`;
+      case 'MISS':
+        return `${actor}'s attack missed!`;
+      case 'FAINT':
+        return `${actor}'s ${String(d['pokemon'] ?? '?')} fainted!`;
+      case 'STATUS_INFLICT':
+        return `${String(d['pokemon'] ?? '?')} was ${String(d['status'] ?? 'affected')}!`;
+      case 'STATUS_TICK':
+        return `${String(d['pokemon'] ?? '?')} is hurt by ${String(d['status'] ?? 'status')}`;
+      case 'SWITCH':
+        return `${actor} sent out ${String(d['pokemon'] ?? '?')}`;
+      case 'TERA':
+        return `${actor}'s ${String(d['pokemon'] ?? '?')} terastallized to ${String(d['type'] ?? '?')}!`;
+      case 'WIN':
+        return 'You won the battle!';
+      case 'LOSS':
+        return 'You lost the battle...';
+      case 'PP_OUT':
+        return `${String(d['move'] ?? '?')} has no PP left!`;
+      case 'PARALYSIS_SKIP':
+        return `${String(d['pokemon'] ?? '?')} is paralyzed and can't move!`;
+      case 'FROZEN':
+        return `${String(d['pokemon'] ?? '?')} is frozen solid!`;
+      case 'ASLEEP':
+        return `${String(d['pokemon'] ?? '?')} is fast asleep!`;
+      default:
+        return JSON.stringify(d);
     }
   }
 }
