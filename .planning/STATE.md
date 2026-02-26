@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 5 (Screen Layer) in progress. Plan 01 complete, plans 02-03 remaining.
+**Current focus:** Phase 5 (Screen Layer) in progress. Plans 01-02 complete, plan 03 remaining.
 
 ## Current Position
 
 Phase: 5 of 6 (Screen Layer) -- IN PROGRESS
-Plan: 1 of 3 in Phase 5 (complete)
+Plan: 2 of 3 in Phase 5 (complete)
 Status: In progress
-Last activity: 2026-02-26 — Completed 05-01-PLAN.md
+Last activity: 2026-02-26 — Completed 05-02-PLAN.md
 
-Progress: [██████████░] ~55% (11/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 1 Phase 5)
+Progress: [████████████░] ~60% (12/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 2 Phase 5)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: ~3.1 min
-- Total execution time: ~34 min
+- Total plans completed: 12
+- Average duration: ~3.0 min
+- Total execution time: ~36 min
 
 **By Phase:**
 
@@ -31,10 +31,10 @@ Progress: [██████████░] ~55% (11/~20 plans complete — 3 
 | 02-team-generation | 2 completed | ~3 min | ~1.5 min |
 | 03-battle-engine | 4 completed | ~17.5 min | ~4.4 min |
 | 04-ai-opponent | 1 completed | ~2 min | ~2 min |
-| 05-screen-layer | 1 of 3 completed | ~2 min | ~2 min |
+| 05-screen-layer | 2 of 3 completed | ~4 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-03 (~5 min), 03-04 (~7 min), 04-01 (~2 min), 05-01 (~2 min)
+- Last 5 plans: 03-04 (~7 min), 04-01 (~2 min), 05-01 (~2 min), 05-02 (~2 min)
 - Trend: stable ~2-7 min per plan
 
 *Updated after each plan completion*
@@ -90,6 +90,9 @@ Recent decisions affecting current work:
 - [04-01]: computeDamage random roll acceptable for AI scoring — 2x multiplier too large for noise to flip preference
 - [05-01]: Non-null assertion (!) on team[activeIndex] — activeIndex always valid during battle; avoids undefined checks in renderers
 - [05-01]: HP floor Math.max(1,...) only for non-fainted Pokemon; fainted shows 0%
+- [05-02]: teraQueued flag reset in ALL paths leaving ATTACK_SELECT — prevents stale tera state
+- [05-02]: resolveSwitch auto-switches opponent first on double faint before player switch
+- [05-02]: SCROLL_FWD/BACK are complete no-ops — no render call, avoids unnecessary glass rebuilds
 
 ### Pending Todos
 
@@ -107,6 +110,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-26T19:50:00Z
-Stopped at: Completed 05-01-PLAN.md. Phase 5 plans 02-03 remaining.
+Last session: 2026-02-26T19:54:00Z
+Stopped at: Completed 05-02-PLAN.md. Phase 5 plan 03 remaining.
 Resume file: None
