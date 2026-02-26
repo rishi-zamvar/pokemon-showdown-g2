@@ -5,32 +5,32 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 1 — Data Foundation
+**Current focus:** Phase 1 complete — ready for Phase 2 (Battle Engine)
 
 ## Current Position
 
-Phase: 1 of 6 (Data Foundation)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-26 — Completed 01-02-PLAN.md (DataLoader module singleton + types)
+Phase: 1 of 6 (Data Foundation) — COMPLETE
+Plan: 3 of 3 in Phase 1
+Status: Phase complete
+Last activity: 2026-02-26 — Completed 01-03-PLAN.md (match data scoping + learnsets lazy-load)
 
-Progress: [██░░░░░░░░] ~7% (2/3 plans in Phase 1; phases 2-6 not yet planned in full)
+Progress: [███░░░░░░░] ~10% (3/3 plans in Phase 1; phases 2-6 not yet planned in full)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: ~3 min
-- Total execution time: ~6 min
+- Total plans completed: 3
+- Average duration: ~3.3 min
+- Total execution time: ~10 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-data-foundation | 2 completed | ~6 min | ~3 min |
+| 01-data-foundation | 3 completed | ~10 min | ~3.3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~2 min), 01-02 (~4 min)
+- Last 5 plans: 01-01 (~2 min), 01-02 (~4 min), 01-03 (~4 min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -56,20 +56,24 @@ Recent decisions affecting current work:
 - [01-02]: getStandardPokemon() = !isNonstandard && !battleOnly = exactly 897 standard entries
 - [01-02]: @pkmn/randoms and @smogon/calc installed and importable — ready for team gen and damage calc
 - [01-02]: tsc and vite shims in node_modules/.bin/ had wrong relative paths — fixed; npm run build now works
+- [01-03]: learnsets.json belongs in public/data/ not src/data/ — Vite bundles src/data/*.json at build time
+- [01-03]: Match-scoped Maps use null (not empty Map) for clearance — null assignment makes Map GC-eligible
+- [01-03]: loadMatchData extracts only 12 entries from 3.19 MB raw response — raw object discarded immediately
+- [01-03]: validate() error handler calls setStatus() then returns — user sees error on glass before abort
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
 - [Phase 1 blocker RESOLVED]: abilities.json, items.json, typechart.json now contain valid data (314, 583, 19 entries)
-- [Phase 1 blocker]: learnsets.json is 3.19MB — lazy-load or replace with @pkmn/randbats before committing import strategy
+- [Phase 1 blocker RESOLVED]: learnsets.json moved to public/data/ — lazy-loaded via fetch, not bundled
 - [Phase 3 flag]: Damage formula modifier order is subtle — research phase recommended before implementation
 - [Data note]: PS typechart damageTaken uses 1=2x (not 3) — plan had incorrect assertion; actual encoding documented above
 
 ## Session Continuity
 
-Last session: 2026-02-26T14:17:28Z
-Stopped at: Completed 01-02-PLAN.md — DataLoader module singleton, TypeScript interfaces, packages installed
+Last session: 2026-02-26T14:22:00Z
+Stopped at: Completed 01-03-PLAN.md — match data scoping, learnsets lazy-load, validate() wired into bootstrap
 Resume file: None
