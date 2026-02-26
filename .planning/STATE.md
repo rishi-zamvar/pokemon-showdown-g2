@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 1 complete — ready for Phase 2 (Battle Engine)
+**Current focus:** Phase 1 complete, verified — ready for Phase 2 (Team Generation)
 
 ## Current Position
 
 Phase: 1 of 6 (Data Foundation) — COMPLETE
 Plan: 3 of 3 in Phase 1
-Status: Phase complete
-Last activity: 2026-02-26 — Completed 01-03-PLAN.md (match data scoping + learnsets lazy-load)
+Status: Phase complete — verified ✓
+Last activity: 2026-02-26 — Phase 1 verified (6/6 must-haves passed)
 
 Progress: [███░░░░░░░] ~10% (3/3 plans in Phase 1; phases 2-6 not yet planned in full)
 

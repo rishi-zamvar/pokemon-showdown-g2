@@ -10,7 +10,7 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Data Foundation** - Fix broken data files and wire a validated DataLoader singleton
+- [x] **Phase 1: Data Foundation** - Fix broken data files and wire a validated DataLoader singleton
 - [ ] **Phase 2: Team Generation** - Build random 6-Pokemon teams using @pkmn/randoms with filtering
 - [ ] **Phase 3: Battle Engine** - Pure turn-state machine with damage calc, status, and Terastallization
 - [ ] **Phase 4: AI Opponent** - Heuristic AI that scores moves by expected damage and switches intelligently
@@ -32,9 +32,9 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Re-fetch broken data files from Showdown CDN and strip CommonJS wrapper
-- [ ] 01-02-PLAN.md — Build DataLoader singleton with typed O(1) accessors, install @pkmn/randoms + @smogon/calc
-- [ ] 01-03-PLAN.md — Per-match data scoping (load 12 at start, clear on end) and lazy-load learnsets.json
+- [x] 01-01-PLAN.md — Re-fetch broken data files from Showdown CDN and strip CommonJS wrapper
+- [x] 01-02-PLAN.md — Build DataLoader singleton with typed O(1) accessors, install @pkmn/randoms + @smogon/calc
+- [x] 01-03-PLAN.md — Per-match data scoping (load 12 at start, clear on end) and lazy-load learnsets.json
 
 ### Phase 2: Team Generation
 **Goal**: Player and AI each receive a valid, filtered Gen 9 random battle team of 6 Pokemon with 4 moves, stats, and Tera type before every battle
@@ -125,7 +125,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation | 0/3 | Not started | - |
+| 1. Data Foundation | 3/3 | Complete | 2026-02-26 |
 | 2. Team Generation | 0/2 | Not started | - |
 | 3. Battle Engine | 0/3 | Not started | - |
 | 4. AI Opponent | 0/2 | Not started | - |
