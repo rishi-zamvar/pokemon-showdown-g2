@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 3 verified complete (6/6 must-haves). Phase 4 (AI Opponent) next.
+**Current focus:** Phase 4 Plan 01 complete. Phase 4 (AI Opponent) in progress.
 
 ## Current Position
 
-Phase: 3 of 6 (Battle Engine) -- VERIFIED COMPLETE
-Plan: 4 of 4 in Phase 3 (all plans + gap closure done)
-Status: Phase verified complete (6/6 must-haves)
-Last activity: 2026-02-26 — Phase 3 re-verified after gap closure (6/6 passed)
+Phase: 4 of 6 (AI Opponent) -- In progress
+Plan: 1 of 1 in Phase 4 (04-01 complete)
+Status: Plan complete
+Last activity: 2026-02-26 — Completed 04-01-PLAN.md (AIOpponent module + smoke test)
 
-Progress: [████████░░] ~45% (9/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3)
+Progress: [█████████░] ~50% (10/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4)
 
 ## Performance Metrics
 
@@ -30,9 +30,10 @@ Progress: [████████░░] ~45% (9/~20 plans complete — 3 Phas
 | 01-data-foundation | 3 completed | ~10 min | ~3.3 min |
 | 02-team-generation | 2 completed | ~3 min | ~1.5 min |
 | 03-battle-engine | 4 completed | ~17.5 min | ~4.4 min |
+| 04-ai-opponent | 1 completed | ~2 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (~1 min), 03-01 (~2.5 min), 03-02 (~3 min), 03-03 (~5 min), 03-04 (~7 min)
+- Last 5 plans: 03-02 (~3 min), 03-03 (~5 min), 03-04 (~7 min), 04-01 (~2 min)
 - Trend: stable ~2-7 min per plan
 
 *Updated after each plan completion*
@@ -82,6 +83,10 @@ Recent decisions affecting current work:
 - [03-04]: STATUS_INFLICT log actor = who RECEIVED the status (oppositeActor(attacker)), consistent with STATUS_TICK convention
 - [03-04]: DamageCalc result.damage from @smogon/calc must be Array.isArray() guarded — immune/edge returns number not array
 - [03-04]: Smoke test pickMove() must prefer damaging moves — status moves (Spore+healing) can stall test indefinitely
+- [04-01]: AI switch threshold: only switch when damaging moves exist AND all score 0 (not just all moves score 0)
+- [04-01]: AI Tera threshold: 1.3x improvement triggers TERA_ATTACK — ~10-20% activation rate in practice
+- [04-01]: pickBestSwitch uses candidate mon not current aiMon — prevents scoring wrong Pokemon
+- [04-01]: computeDamage random roll acceptable for AI scoring — 2x multiplier too large for noise to flip preference
 
 ### Pending Todos
 
@@ -99,6 +104,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-26T16:30:00Z
-Stopped at: Phase 3 verified complete (6/6). Phase 4 (AI) next.
+Last session: 2026-02-26T19:07:18Z
+Stopped at: Completed 04-01-PLAN.md (AIOpponent module + smoke test, 2 tasks, 2 files)
 Resume file: None
