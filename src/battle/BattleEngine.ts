@@ -8,9 +8,11 @@
  *
  * Design rules:
  *   - ALL state updates are immutable (spread, never mutate)
- *   - Damage is placeholder 50 HP until Plan 03-02 wires DamageCalc
+ *   - Damage uses @smogon/calc via DamageCalc wrapper (Plan 03-02)
+ *   - PP tracked per move, blocked at 0
+ *   - Accuracy rolls cause misses on < 100 accuracy moves
+ *   - Critical hits at Gen 9 rates via rollCrit()
  *   - No status per-turn effects (Plan 03-03)
- *   - No accuracy checks (Plan 03-02)
  *
  * Pattern: module-level singleton (export const BattleEngine = { ... } as const)
  */
@@ -26,12 +28,14 @@ import type {
 import { initActivePokemon } from "../types/battleState.js";
 import { TeamGenerator } from "./TeamGenerator.js";
 import { resolveTurnOrder } from "./TurnResolver.js";
-
-// ---------------------------------------------------------------------------
-// Placeholder damage constant — replaced by DamageCalc in Plan 03-02
-// ---------------------------------------------------------------------------
-
-const PLACEHOLDER_DAMAGE = 50;
+import {
+  computeDamage,
+  rollCrit,
+  doesMoveHit,
+  getMovePP,
+  getMoveAccuracy,
+  getMoveCritRatio,
+} from "./DamageCalc.js";
 
 // ---------------------------------------------------------------------------
 // Immutable state update helpers
@@ -236,12 +240,51 @@ export const BattleEngine = {
           });
         }
 
-        // Apply placeholder damage to target
+        // --- PP Check ---
+        const maxPP = getMovePP(moveSlug);
+        const currentAttacker = current[actorSideKey].team[current[actorSideKey].activeIndex]!;
+        const usedPP = currentAttacker.ppUsed[moveSlug] ?? 0;
+
+        if (usedPP >= maxPP) {
+          // Move has no PP remaining — skip attack entirely
+          log.push({
+            kind: "PP_OUT",
+            actor,
+            detail: { move: moveSlug },
+          });
+          continue;
+        }
+
+        // Consume 1 PP (immutable update)
+        current = updateSideTeam(current, actorSideKey, team =>
+          replaceTeamMember(team, current[actorSideKey].activeIndex, {
+            ppUsed: { ...currentAttacker.ppUsed, [moveSlug]: usedPP + 1 },
+          }),
+        );
+
+        // --- Accuracy Check ---
+        const accuracy = getMoveAccuracy(moveSlug);
+        if (!doesMoveHit(accuracy)) {
+          log.push({
+            kind: "MISS",
+            actor,
+            detail: { move: moveSlug },
+          });
+          continue;
+        }
+
+        // --- Crit Roll ---
+        const critRatio = getMoveCritRatio(moveSlug);
+        const isCrit = rollCrit(critRatio);
+
+        // --- Damage Calculation ---
+        const attackerMon = current[actorSideKey].team[current[actorSideKey].activeIndex]!;
         const targetSide = current[targetSideKey];
         const targetIndex = targetSide.activeIndex;
         const targetMon = targetSide.team[targetIndex]!;
 
-        const newHp = Math.max(0, targetMon.currentHp - PLACEHOLDER_DAMAGE);
+        const damage = computeDamage(attackerMon, targetMon, moveSlug, isCrit);
+        const newHp = Math.max(0, targetMon.currentHp - damage);
         const fainted = newHp === 0;
 
         current = updateSideTeam(current, targetSideKey, team =>
@@ -256,7 +299,8 @@ export const BattleEngine = {
           actor,
           detail: {
             move: moveSlug,
-            damage: PLACEHOLDER_DAMAGE,
+            damage,
+            isCrit,
             targetHp: newHp,
             targetMaxHp: targetMon.stats.hp,
           },
