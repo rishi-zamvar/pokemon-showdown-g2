@@ -119,9 +119,9 @@ export interface MoveEntry {
   selfBoost?: { boosts?: Partial<Record<StatName, number>> };
   critRatio?: number;
   multihit?: number | [number, number];
-  drain?: [number, number];
-  recoil?: [number, number];
-  heal?: [number, number];
+  drain?: number[];
+  recoil?: number[];
+  heal?: number[];
   breaksProtect?: boolean;
   ignoreImmunity?: boolean | Record<string, boolean>;
   ignoreDefensive?: boolean;
