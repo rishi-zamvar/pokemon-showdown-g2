@@ -12,7 +12,8 @@
  *   - PP tracked per move, blocked at 0
  *   - Accuracy rolls cause misses on < 100 accuracy moves
  *   - Critical hits at Gen 9 rates via rollCrit()
- *   - No status per-turn effects (Plan 03-03)
+ *   - Status effects: checkMoveBlock() before attack, applyEndOfTurnStatus() after (Plan 03-03)
+ *   - Tera one-use per side enforced; logs warning if attempted twice
  *
  * Pattern: module-level singleton (export const BattleEngine = { ... } as const)
  */
@@ -36,6 +37,11 @@ import {
   getMoveAccuracy,
   getMoveCritRatio,
 } from "./DamageCalc.js";
+import {
+  checkMoveBlock,
+  applyEndOfTurnStatus,
+  resetToxicOnSwitchIn,
+} from "./StatusEngine.js";
 
 // ---------------------------------------------------------------------------
 // Immutable state update helpers
@@ -190,11 +196,12 @@ export const BattleEngine = {
           },
         };
 
-        // Reset toxic counter if switched-in Pokemon has tox status
+        // Reset toxic counter on switch-in via StatusEngine
         const switchedIn = current[actorSideKey].team[toIndex]!;
-        if (switchedIn.status === "tox") {
+        const resetMon = resetToxicOnSwitchIn(switchedIn);
+        if (resetMon !== switchedIn) {
           current = updateSideTeam(current, actorSideKey, team =>
-            replaceTeamMember(team, toIndex, { toxicCounter: 1 }),
+            replaceTeamMember(team, toIndex, resetMon),
           );
         }
 
@@ -211,71 +218,107 @@ export const BattleEngine = {
         // ATTACK or TERA_ATTACK
         const moveSlug = action.moveSlug;
 
+        // --- Status Move Block Check ---
+        const blockResult = checkMoveBlock(actorMon, actor);
+        if (blockResult.logEntry) {
+          log.push(blockResult.logEntry);
+        }
+        // Update pokemon state (sleep turns decremented, freeze may thaw)
+        if (blockResult.newPokemon !== actorMon) {
+          current = updateSideTeam(current, actorSideKey, team =>
+            replaceTeamMember(team, actorSide.activeIndex, blockResult.newPokemon),
+          );
+        }
+        if (blockResult.blocked) {
+          continue; // Skip attack — paralysis, sleep, or freeze
+        }
+
         // Handle Tera activation
         if (action.type === "TERA_ATTACK") {
           if (current[actorSideKey].teraUsed) {
-            throw new Error(`${actor} already used Terastallization this battle`);
+            // Log warning but don't crash — treat as regular attack
+            console.warn(`${actor} already used Terastallization — treating as regular ATTACK`);
+          } else {
+            // Set teraActive on the Pokemon and teraUsed on the side
+            current = updateSideTeam(current, actorSideKey, team =>
+              replaceTeamMember(team, current[actorSideKey].activeIndex, {
+                teraActive: true,
+              }),
+            );
+            current = {
+              ...current,
+              [actorSideKey]: {
+                ...current[actorSideKey],
+                teraUsed: true,
+              },
+            };
+
+            log.push({
+              kind: "TERA",
+              actor,
+              detail: {
+                teraType: current[actorSideKey].team[current[actorSideKey].activeIndex]!.teraType,
+              },
+            });
           }
-
-          // Set teraActive on the Pokemon and teraUsed on the side
-          current = updateSideTeam(current, actorSideKey, team =>
-            replaceTeamMember(team, current[actorSideKey].activeIndex, {
-              teraActive: true,
-            }),
-          );
-          current = {
-            ...current,
-            [actorSideKey]: {
-              ...current[actorSideKey],
-              teraUsed: true,
-            },
-          };
-
-          log.push({
-            kind: "TERA",
-            actor,
-            detail: {
-              teraType: current[actorSideKey].team[current[actorSideKey].activeIndex]!.teraType,
-            },
-          });
         }
 
         // --- PP Check ---
-        const maxPP = getMovePP(moveSlug);
         const currentAttacker = current[actorSideKey].team[current[actorSideKey].activeIndex]!;
+        let actualMoveSlug = moveSlug;
+        let useStruggle = false;
+
+        const maxPP = getMovePP(moveSlug);
         const usedPP = currentAttacker.ppUsed[moveSlug] ?? 0;
 
         if (usedPP >= maxPP) {
-          // Move has no PP remaining — skip attack entirely
-          log.push({
-            kind: "PP_OUT",
-            actor,
-            detail: { move: moveSlug },
+          // Check if ALL moves are out of PP — if so, use Struggle
+          const allPPOut = currentAttacker.moves.every(m => {
+            const mMax = getMovePP(m);
+            const mUsed = currentAttacker.ppUsed[m] ?? 0;
+            return mUsed >= mMax;
           });
-          continue;
+
+          if (allPPOut) {
+            // All PP exhausted — use Struggle (typeless 50 BP, always hits, 25% recoil)
+            useStruggle = true;
+            actualMoveSlug = "struggle";
+          } else {
+            // This specific move has no PP but others do — skip
+            log.push({
+              kind: "PP_OUT",
+              actor,
+              detail: { move: moveSlug },
+            });
+            continue;
+          }
         }
 
-        // Consume 1 PP (immutable update)
-        current = updateSideTeam(current, actorSideKey, team =>
-          replaceTeamMember(team, current[actorSideKey].activeIndex, {
-            ppUsed: { ...currentAttacker.ppUsed, [moveSlug]: usedPP + 1 },
-          }),
-        );
-
-        // --- Accuracy Check ---
-        const accuracy = getMoveAccuracy(moveSlug);
-        if (!doesMoveHit(accuracy)) {
-          log.push({
-            kind: "MISS",
-            actor,
-            detail: { move: moveSlug },
-          });
-          continue;
+        // Consume 1 PP (skip for Struggle)
+        if (!useStruggle) {
+          current = updateSideTeam(current, actorSideKey, team =>
+            replaceTeamMember(team, current[actorSideKey].activeIndex, {
+              ppUsed: { ...currentAttacker.ppUsed, [moveSlug]: usedPP + 1 },
+            }),
+          );
         }
 
-        // --- Crit Roll ---
-        const critRatio = getMoveCritRatio(moveSlug);
-        const isCrit = rollCrit(critRatio);
+        // --- Accuracy Check (Struggle always hits) ---
+        if (!useStruggle) {
+          const accuracy = getMoveAccuracy(actualMoveSlug);
+          if (!doesMoveHit(accuracy)) {
+            log.push({
+              kind: "MISS",
+              actor,
+              detail: { move: actualMoveSlug },
+            });
+            continue;
+          }
+        }
+
+        // --- Crit Roll (Struggle cannot crit) ---
+        const critRatio = useStruggle ? 0 : getMoveCritRatio(actualMoveSlug);
+        const isCrit = useStruggle ? false : rollCrit(critRatio);
 
         // --- Damage Calculation ---
         const attackerMon = current[actorSideKey].team[current[actorSideKey].activeIndex]!;
@@ -283,7 +326,7 @@ export const BattleEngine = {
         const targetIndex = targetSide.activeIndex;
         const targetMon = targetSide.team[targetIndex]!;
 
-        const damage = computeDamage(attackerMon, targetMon, moveSlug, isCrit);
+        const damage = computeDamage(attackerMon, targetMon, actualMoveSlug, isCrit);
         const newHp = Math.max(0, targetMon.currentHp - damage);
         const fainted = newHp === 0;
 
@@ -298,7 +341,7 @@ export const BattleEngine = {
           kind: "DAMAGE",
           actor,
           detail: {
-            move: moveSlug,
+            move: actualMoveSlug,
             damage,
             isCrit,
             targetHp: newHp,
@@ -306,7 +349,39 @@ export const BattleEngine = {
           },
         });
 
-        // Log faint if it occurred
+        // Struggle recoil: attacker takes 25% of max HP as recoil damage
+        if (useStruggle && damage > 0) {
+          const recoil = Math.max(1, Math.floor(attackerMon.stats.hp / 4));
+          const attackerAfter = current[actorSideKey].team[current[actorSideKey].activeIndex]!;
+          const recoilHp = Math.max(0, attackerAfter.currentHp - recoil);
+          const attackerFainted = recoilHp === 0;
+          current = updateSideTeam(current, actorSideKey, team =>
+            replaceTeamMember(team, current[actorSideKey].activeIndex, {
+              currentHp: recoilHp,
+              fainted: attackerFainted,
+            }),
+          );
+          log.push({
+            kind: "DAMAGE",
+            actor,
+            detail: {
+              move: "struggle-recoil",
+              damage: recoil,
+              isCrit: false,
+              targetHp: recoilHp,
+              targetMaxHp: attackerMon.stats.hp,
+            },
+          });
+          if (attackerFainted) {
+            log.push({
+              kind: "FAINT",
+              actor,
+              detail: { pokemon: attackerMon.name },
+            });
+          }
+        }
+
+        // Log faint if target was KO'd
         if (fainted) {
           log.push({
             kind: "FAINT",
@@ -314,6 +389,32 @@ export const BattleEngine = {
             detail: {
               pokemon: targetMon.name,
             },
+          });
+        }
+      }
+    }
+
+    // --- End-of-turn status effects ---
+    // Apply to both sides' active Pokemon (if not fainted and not already BATTLE_OVER)
+    for (const sideActor of ["player", "opponent"] as const) {
+      const sk = sideKeyFor(sideActor);
+      const side = current[sk];
+      const activeMon = side.team[side.activeIndex]!;
+      if (activeMon.fainted) continue;
+
+      const statusResult = applyEndOfTurnStatus(activeMon, sideActor);
+      if (statusResult.damage > 0 || statusResult.log.length > 0) {
+        current = updateSideTeam(current, sk, team =>
+          replaceTeamMember(team, side.activeIndex, statusResult.newPokemon),
+        );
+        log.push(...statusResult.log);
+
+        // Check for faint from status damage
+        if (statusResult.newPokemon.fainted) {
+          log.push({
+            kind: "FAINT",
+            actor: sideActor,
+            detail: { pokemon: activeMon.name },
           });
         }
       }
@@ -364,10 +465,11 @@ export const BattleEngine = {
       },
     };
 
-    // Reset toxic counter if switched-in Pokemon has tox status
-    if (targetMon.status === "tox") {
+    // Reset toxic counter on switch-in via StatusEngine
+    const resetMon = resetToxicOnSwitchIn(targetMon);
+    if (resetMon !== targetMon) {
       current = updateSideTeam(current, sideKey, team =>
-        replaceTeamMember(team, toIndex, { toxicCounter: 1 }),
+        replaceTeamMember(team, toIndex, resetMon),
       );
     }
 
