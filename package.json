@@ -1,0 +1,27 @@
+{
+  "name": "g2-pokemon-showdown",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pokemon battle game for Even Realities G2 smart glasses",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "sim": "evenhub-simulator http://localhost:5173",
+    "qr": "evenhub qr",
+    "pack": "npm run build && evenhub pack app.json ./dist --output pokemon-showdown.ehpk",
+    "fix-data": "node scripts/fix-data.mjs"
+  },
+  "dependencies": {
+    "@evenrealities/even_hub_sdk": "^0.0.7",
+    "@evenrealities/evenhub-cli": "^0.1.5",
+    "@evenrealities/evenhub-simulator": "^0.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}
