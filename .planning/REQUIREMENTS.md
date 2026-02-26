@@ -108,54 +108,54 @@ Requirements for initial release. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | — | Pending |
-| DATA-02 | — | Pending |
-| DATA-03 | — | Pending |
-| DATA-04 | — | Pending |
-| DATA-05 | — | Pending |
-| DATA-06 | — | Pending |
-| TEAM-01 | — | Pending |
-| TEAM-02 | — | Pending |
-| TEAM-03 | — | Pending |
-| TEAM-04 | — | Pending |
-| BATTLE-01 | — | Pending |
-| BATTLE-02 | — | Pending |
-| BATTLE-03 | — | Pending |
-| BATTLE-04 | — | Pending |
-| BATTLE-05 | — | Pending |
-| BATTLE-06 | — | Pending |
-| BATTLE-07 | — | Pending |
-| BATTLE-08 | — | Pending |
-| BATTLE-09 | — | Pending |
-| BATTLE-10 | — | Pending |
-| BATTLE-11 | — | Pending |
-| BATTLE-12 | — | Pending |
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
-| UI-04 | — | Pending |
-| UI-05 | — | Pending |
-| UI-06 | — | Pending |
-| UI-07 | — | Pending |
-| UI-08 | — | Pending |
-| UI-09 | — | Pending |
-| UI-10 | — | Pending |
-| NAV-01 | — | Pending |
-| NAV-02 | — | Pending |
-| NAV-03 | — | Pending |
-| NAV-04 | — | Pending |
-| NAV-05 | — | Pending |
-| AI-01 | — | Pending |
-| AI-02 | — | Pending |
-| AI-03 | — | Pending |
-| AI-04 | — | Pending |
-| AI-05 | — | Pending |
+| DATA-01 | Phase 1 | Pending |
+| DATA-02 | Phase 1 | Pending |
+| DATA-03 | Phase 1 | Pending |
+| DATA-04 | Phase 1 | Pending |
+| DATA-05 | Phase 1 | Pending |
+| DATA-06 | Phase 1 | Pending |
+| TEAM-01 | Phase 2 | Pending |
+| TEAM-02 | Phase 2 | Pending |
+| TEAM-03 | Phase 2 | Pending |
+| TEAM-04 | Phase 2 | Pending |
+| BATTLE-01 | Phase 3 | Pending |
+| BATTLE-02 | Phase 3 | Pending |
+| BATTLE-03 | Phase 3 | Pending |
+| BATTLE-04 | Phase 3 | Pending |
+| BATTLE-05 | Phase 3 | Pending |
+| BATTLE-06 | Phase 3 | Pending |
+| BATTLE-07 | Phase 3 | Pending |
+| BATTLE-08 | Phase 3 | Pending |
+| BATTLE-09 | Phase 3 | Pending |
+| BATTLE-10 | Phase 3 | Pending |
+| BATTLE-11 | Phase 3 | Pending |
+| BATTLE-12 | Phase 3 | Pending |
+| UI-01 | Phase 5 | Pending |
+| UI-02 | Phase 5 | Pending |
+| UI-03 | Phase 5 | Pending |
+| UI-04 | Phase 5 | Pending |
+| UI-05 | Phase 5 | Pending |
+| UI-06 | Phase 5 | Pending |
+| UI-07 | Phase 5 | Pending |
+| UI-08 | Phase 5 | Pending |
+| UI-09 | Phase 5 | Pending |
+| UI-10 | Phase 5 | Pending |
+| NAV-01 | Phase 5 | Pending |
+| NAV-02 | Phase 5 | Pending |
+| NAV-03 | Phase 5 | Pending |
+| NAV-04 | Phase 5 | Pending |
+| NAV-05 | Phase 5 | Pending |
+| AI-01 | Phase 4 | Pending |
+| AI-02 | Phase 4 | Pending |
+| AI-03 | Phase 4 | Pending |
+| AI-04 | Phase 4 | Pending |
+| AI-05 | Phase 4 | Pending |
 
 **Coverage:**
-- v0.1 requirements: 38 total
-- Mapped to phases: 0
-- Unmapped: 38
+- v0.1 requirements: 42 total (note: prior count of 38 was pre-BATTLE-09 through 12 addition)
+- Mapped to phases: 42
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after initial definition*
+*Last updated: 2026-02-26 — traceability updated after roadmap creation*
