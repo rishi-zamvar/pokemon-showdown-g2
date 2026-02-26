@@ -62,12 +62,13 @@ Plans:
   4. A Pokemon with 0 HP is marked fainted; the engine forces a switch-in before the next turn; a side with all 6 fainted is marked as losing
   5. Terastallization changes the active type and recalculates STAB; the flag is consumed and cannot be used again in the same battle
   6. Move accuracy rolls cause misses at the correct statistical frequency; PP depletes by 1 per use and blocks selection at 0
-**Plans**: 3 plans
+**Plans**: 4 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Define BattleState types and BattleEngine skeleton with turn resolution, switching, faint detection, and win/loss
-- [ ] 03-02-PLAN.md — Implement DamageCalc wrapping @smogon/calc with accuracy, PP tracking, and crit rolls
-- [ ] 03-03-PLAN.md — Implement status conditions, Terastallization integration, and complete battle loop
+- [x] 03-01-PLAN.md — Define BattleState types and BattleEngine skeleton with turn resolution, switching, faint detection, and win/loss
+- [x] 03-02-PLAN.md — Implement DamageCalc wrapping @smogon/calc with accuracy, PP tracking, and crit rolls
+- [x] 03-03-PLAN.md — Implement status conditions, Terastallization integration, and complete battle loop
+- [ ] 03-04-PLAN.md — Wire status infliction from move secondary effects and primary status moves (gap closure)
 
 ### Phase 4: AI Opponent
 **Goal**: The AI picks a legal action each turn by scoring moves using the same damage pipeline the player uses, switching intelligently, and applying Tera when it flips a bad matchup
@@ -127,7 +128,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete | 2026-02-26 |
 | 2. Team Generation | 2/2 | Complete | 2026-02-26 |
-| 3. Battle Engine | 0/3 | Not started | - |
+| 3. Battle Engine | 3/4 | Gap closure | - |
 | 4. AI Opponent | 0/2 | Not started | - |
 | 5. Screen Layer | 0/3 | Not started | - |
 | 6. Integration | 0/2 | Not started | - |
