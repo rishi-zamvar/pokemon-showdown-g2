@@ -17,7 +17,7 @@
  *   - Toxic counter resets to 1 on switch-in (Pitfall 7), not 0
  */
 
-import type { ActivePokemon, TurnLogEntry } from "../types/battleState.js";
+import type { ActivePokemon, TurnLogEntry, StatusCondition } from "../types/battleState.js";
 
 // ---------------------------------------------------------------------------
 // applyEndOfTurnStatus — end-of-turn damage and state changes
@@ -239,6 +239,62 @@ export function inflictSleep(pokemon: ActivePokemon): ActivePokemon {
     status: "slp" as const,
     sleepTurns: 2 + Math.floor(Math.random() * 3), // 2, 3, or 4
   };
+}
+
+// ---------------------------------------------------------------------------
+// inflictStatus — apply a status condition to a Pokemon from a move
+// ---------------------------------------------------------------------------
+
+/**
+ * Inflict a status condition on a Pokemon (from a primary status move or secondary effect).
+ *
+ * Rules:
+ *   - If pokemon already has a non-empty status, returns unchanged (no double-status in Gen 9).
+ *   - If pokemon is fainted, returns unchanged.
+ *   - "slp" delegates to inflictSleep() which rolls 2-4 turns at inflict time.
+ *   - "tox" sets toxicCounter to 1 (Pitfall 7: first tick is 1/16, not 0/16).
+ *   - Returns a STATUS_INFLICT TurnLogEntry so the UI can display it.
+ */
+export function inflictStatus(
+  pokemon: ActivePokemon,
+  status: string,
+  actor: "player" | "opponent",
+): { newPokemon: ActivePokemon; log: TurnLogEntry | null } {
+  // Cannot inflict if already statused
+  if (pokemon.status !== "") {
+    return { newPokemon: pokemon, log: null };
+  }
+  // Cannot inflict on fainted Pokemon
+  if (pokemon.fainted) {
+    return { newPokemon: pokemon, log: null };
+  }
+
+  let newPokemon: ActivePokemon;
+
+  switch (status) {
+    case "slp":
+      newPokemon = inflictSleep(pokemon); // reuse existing — rolls 2-4 turns
+      break;
+    case "tox":
+      newPokemon = { ...pokemon, status: "tox" as const, toxicCounter: 1 };
+      break;
+    case "brn":
+    case "par":
+    case "psn":
+    case "frz":
+      newPokemon = { ...pokemon, status: status as StatusCondition };
+      break;
+    default:
+      return { newPokemon: pokemon, log: null }; // unknown status, no-op
+  }
+
+  const log: TurnLogEntry = {
+    kind: "STATUS_INFLICT",
+    actor,
+    detail: { status, pokemon: pokemon.name },
+  };
+
+  return { newPokemon, log };
 }
 
 // ---------------------------------------------------------------------------

@@ -89,6 +89,18 @@ export interface PokemonEntry {
 }
 
 // ---------------------------------------------------------------------------
+// MoveSecondaryEffect — typed secondary effect on move entries
+// ---------------------------------------------------------------------------
+
+export interface MoveSecondaryEffect {
+  chance: number;
+  status?: string;
+  boosts?: Partial<Record<StatName, number>>;
+  volatileStatus?: string;
+  self?: { boosts?: Partial<Record<StatName, number>> };
+}
+
+// ---------------------------------------------------------------------------
 // MoveEntry — matches moves.json entries
 // ---------------------------------------------------------------------------
 
@@ -106,7 +118,7 @@ export interface MoveEntry {
 
   // Optional effect fields
   flags?: Record<string, unknown>;
-  secondary?: unknown;
+  secondary?: MoveSecondaryEffect | null;
   secondaries?: unknown[];
   self?: unknown;
   sideCondition?: string;
