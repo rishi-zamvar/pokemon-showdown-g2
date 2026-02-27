@@ -115,10 +115,12 @@ Plans:
   4. Sprites remain visible on the glass display throughout the entire turn animation sequence
   5. Player can tap during animation to skip to the end result immediately
   6. All gestures except tap-to-skip are blocked during animation playback (no accidental navigation)
-**Plans**: 0 plans
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 5.1 to break down)
+- [ ] 05.1-01-PLAN.md — Animation primitives: SpriteEffects, ANIM constants, updateImage on GlassAdapter, export formatEntry/formatHpBar
+- [ ] 05.1-02-PLAN.md — AnimationEngine class: async sequencer with typewriter, sprite flash, HP drain, and skip
+- [ ] 05.1-03-PLAN.md — ScreenController integration: wire animation into resolveTurn, gesture blocking, auto-transition
 
 ### Phase 6: Integration
 **Goal**: A complete battle plays from main menu to win/loss screen on actual G2 hardware without crashes, data errors, or navigation dead ends
@@ -147,7 +149,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 6
 | 3. Battle Engine | 4/4 | Complete | 2026-02-26 |
 | 4. AI Opponent | 1/1 | Complete | 2026-02-26 |
 | 5. Screen Layer | 3/3 | Complete | 2026-02-26 |
-| 5.1 Battle Animations | 0/? | Not started | - |
+| 5.1 Battle Animations | 0/3 | Not started | - |
 | 6. Integration | 0/2 | Not started | - |
 
 ---
