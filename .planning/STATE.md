@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 5.1 (Battle Animations) — Game Boy-style animated turn resolution inserted before Phase 6.
+**Current focus:** Phase 5.1 complete. Ready for Phase 6 (Final Integration & Polish).
 
 ## Current Position
 
-Phase: 5.1 of 6 (Battle Animations) -- In progress
-Plan: 2 of 3 in Phase 5.1
-Status: In progress
-Last activity: 2026-02-27 — Completed 05.1-02-PLAN.md (AnimationEngine)
+Phase: 5.1 of 6 (Battle Animations) -- Complete
+Plan: 3 of 3 in Phase 5.1 complete
+Status: Phase 5.1 complete, ready for Phase 6
+Last activity: 2026-02-27 — Completed 05.1-03-PLAN.md (AnimationEngine wiring into ScreenController)
 
-Progress: [███████████████░] ~72% (15/~23 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 2 Phase 5.1)
+Progress: [████████████████] ~74% (16/~23 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
-- Average duration: ~2.7 min
-- Total execution time: ~40 min
+- Total plans completed: 16
+- Average duration: ~2.6 min
+- Total execution time: ~41.5 min
 
 **By Phase:**
 
@@ -34,7 +34,7 @@ Progress: [███████████████░] ~72% (15/~23 plans 
 | 05-screen-layer | 3 completed | ~6 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-01 (~2 min), 05-02 (~2 min), 05-03 (~2 min), 05.1-01 (~2 min), 05.1-02 (~2 min)
+- Last 5 plans: 05-02 (~2 min), 05-03 (~2 min), 05.1-01 (~2 min), 05.1-02 (~2 min), 05.1-03 (~1.5 min)
 - Trend: stable ~2 min per plan
 
 *Updated after each plan completion*
@@ -103,6 +103,9 @@ Recent decisions affecting current work:
 - [05.1-02]: Shared mutable currentText/hpStatus in playEntry scope — both typewriter and HP drain update display via same updateText call
 - [05.1-02]: findFaintedSide matches entry.detail.pokemon against prevState active mon names — FAINT entries lack side field
 - [05.1-02]: HP drain uses prevState.currentHp as startHp, interpolates down by damage — endHp floored at 0
+- [05.1-03]: prevState used for initial HUD display so animation drains from correct starting HP
+- [05.1-03]: Final showBattleHud(nextState) after animation ensures correct HP even if skipped mid-drain
+- [05.1-03]: TURN_RESULT kept for resolveSwitch — forced switches don't animate
 
 ### Pending Todos
 
@@ -124,6 +127,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-27T11:31:29Z
-Stopped at: Completed 05.1-02-PLAN.md. AnimationEngine done. 05.1-03 (wiring into ScreenController) next.
+Last session: 2026-02-27T11:36:10Z
+Stopped at: Completed 05.1-03-PLAN.md. Phase 5.1 (Battle Animations) complete. Phase 6 next.
 Resume file: None
