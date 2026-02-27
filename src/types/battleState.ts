@@ -83,7 +83,50 @@ export interface TurnLogEntry {
     | "PP_OUT"
     | "PARALYSIS_SKIP"
     | "FROZEN"
-    | "ASLEEP";
+    | "ASLEEP"
+    // New - type effectiveness
+    | "SUPER_EFFECTIVE"
+    | "RESISTED"
+    | "IMMUNE"
+    // New - stat changes
+    | "STAT_BOOST"
+    | "STAT_UNBOOST"
+    | "STAT_CLEAR"
+    // New - volatiles
+    | "VOLATILE_START"
+    | "VOLATILE_END"
+    // New - weather/terrain/side
+    | "WEATHER"
+    | "TERRAIN"
+    | "SIDE_START"
+    | "SIDE_END"
+    // New - heal
+    | "HEAL"
+    // New - items
+    | "ITEM_REVEAL"
+    | "ITEM_CONSUME"
+    // New - abilities
+    | "ABILITY"
+    // New - protect/endure
+    | "PROTECT"
+    // New - multi-hit
+    | "HIT_COUNT"
+    // New - move failure
+    | "MOVE_FAIL"
+    // New - charging/recharge
+    | "PREPARE"
+    | "RECHARGE"
+    // New - transform
+    | "TRANSFORM"
+    // New - status cure
+    | "CURE_STATUS"
+    // New - cant expansions
+    | "FLINCH_SKIP"
+    | "RECHARGE_SKIP"
+    // New - activate (generic)
+    | "ACTIVATE"
+    // New - generic text fallback
+    | "TEXT";
   actor: "player" | "opponent";
   detail: Record<string, unknown>;
 }
