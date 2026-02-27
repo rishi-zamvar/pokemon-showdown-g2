@@ -20,6 +20,7 @@ import type { ScreenState } from './ScreenState.js';
 import { BattleEngine } from '../battle/BattleEngine.js';
 import { AIOpponent } from '../battle/AIOpponent.js';
 import { DataLoader } from '../data/DataLoader.js';
+import { AnimationEngine } from '../animation/AnimationEngine.js';
 import { renderMainMenu } from './renderers/mainMenuRenderer.js';
 import { renderBattleHud } from './renderers/battleHudRenderer.js';
 import { renderActionMenu } from './renderers/actionMenuRenderer.js';
@@ -28,14 +29,20 @@ import { renderSwitchSelect } from './renderers/switchSelectRenderer.js';
 import { renderTeraConfirm } from './renderers/teraConfirmRenderer.js';
 import { renderTurnResult } from './renderers/turnResultRenderer.js';
 import { renderEndScreen } from './renderers/endScreenRenderer.js';
+import { renderSpriteRefresh } from './renderers/spriteRefreshRenderer.js';
+import { SpriteService } from '../sprites/SpriteService.js';
+import { ANIM } from '../config/constants.js';
 
 export class ScreenController {
   private readonly glass: GlassAdapter;
+  private readonly animationEngine = new AnimationEngine();
   private state: ScreenState;
   private lastTurnLog: TurnLogEntry[] = [];
   private switchIndexMap: number[] = [];
   private forcedSwitch = false;
   private teraQueued = false;
+  private playerDexNums: number[] = [];
+  private opponentDexNums: number[] = [];
 
   constructor(glass: GlassAdapter) {
     this.glass = glass;
@@ -53,6 +60,15 @@ export class ScreenController {
 
   /** Main gesture entry point. Routes based on event kind. */
   async handleGesture(event: GestureEvent): Promise<void> {
+    // Animation gesture blocking (ANIM-05, ANIM-06)
+    if (this.animationEngine.isRunning()) {
+      if (event.kind === 'TAP') {
+        this.animationEngine.skip();
+      }
+      // All other gestures swallowed during animation
+      return;
+    }
+
     switch (event.kind) {
       case 'TAP':
         await this.onTap(event.listIndex);
@@ -77,7 +93,7 @@ export class ScreenController {
 
     switch (this.state.screen) {
       case 'MAIN_MENU':
-        await this.startNewBattle();
+        await this.handleMainMenu(idx);
         break;
 
       case 'BATTLE_HUD':
@@ -109,12 +125,55 @@ export class ScreenController {
       case 'END_SCREEN':
         await this.handleEndScreen(idx);
         break;
+
+      case 'SPRITE_REFRESH':
+        await this.handleSpriteRefresh(idx);
+        break;
     }
   }
 
   // ---------------------------------------------------------------------------
   // Screen-specific tap handlers
   // ---------------------------------------------------------------------------
+
+  private async handleMainMenu(idx: number): Promise<void> {
+    switch (idx) {
+      case 0: // "Enter Battle"
+        await this.startNewBattle();
+        break;
+      case 1: // "Refresh Sprites"
+        this.state = { ...this.state, screen: 'SPRITE_REFRESH', cursorIndex: 0 };
+        await this.render();
+        break;
+    }
+  }
+
+  private async handleSpriteRefresh(idx: number): Promise<void> {
+    switch (idx) {
+      case 0: // "< Back"
+        this.state = { ...this.state, screen: 'MAIN_MENU', cursorIndex: 0 };
+        await this.render();
+        break;
+      case 1: // "Mine"
+        SpriteService.clearBitmapCache(this.playerDexNums);
+        await this.glass.showMessage('Player sprites cleared!');
+        this.state = { ...this.state, screen: 'MAIN_MENU', cursorIndex: 0 };
+        await this.render();
+        break;
+      case 2: // "Theirs"
+        SpriteService.clearBitmapCache(this.opponentDexNums);
+        await this.glass.showMessage('Opponent sprites cleared!');
+        this.state = { ...this.state, screen: 'MAIN_MENU', cursorIndex: 0 };
+        await this.render();
+        break;
+      case 3: // "Both"
+        SpriteService.clearAllBitmapCache();
+        await this.glass.showMessage('All sprites cleared!');
+        this.state = { ...this.state, screen: 'MAIN_MENU', cursorIndex: 0 };
+        await this.render();
+        break;
+    }
+  }
 
   private async handleActionMenu(idx: number): Promise<void> {
     switch (idx) {
@@ -264,24 +323,74 @@ export class ScreenController {
     ].map(mon => mon.species.toLowerCase());
 
     await DataLoader.loadMatchData(allSlugs);
+    await this.glass.showMessage('Loading sprites...');
+
+    // Collect dex numbers for sprite loading and refresh tracking
+    const getDexNum = (species: string): number => {
+      const slug = species.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const entry = DataLoader.getPokemon(slug);
+      return entry?.num ?? 0;
+    };
+
+    this.playerDexNums = battleState.playerSide.team
+      .map(mon => getDexNum(mon.species))
+      .filter(n => n > 0);
+    this.opponentDexNums = battleState.opponentSide.team
+      .map(mon => getDexNum(mon.species))
+      .filter(n => n > 0);
+
+    // Fetch and cache bitmap sprites — front for opponents, back for player
+    await SpriteService.fetchAndCacheBitmaps(this.opponentDexNums, this.playerDexNums);
 
     await this.render();
   }
 
   private async resolveTurn(playerAction: PlayerAction): Promise<void> {
-    const bs = this.state.battleState!;
-    const aiAction = AIOpponent.pickAction(bs);
-    const result = BattleEngine.submitAction(bs, playerAction, aiAction);
+    const prevState = this.state.battleState!;
+    const aiAction = AIOpponent.pickAction(prevState);
+    const result = BattleEngine.submitAction(prevState, playerAction, aiAction);
 
     this.lastTurnLog = result.log;
     this.state = {
       ...this.state,
-      screen: 'TURN_RESULT',
+      screen: 'ANIMATING',
       cursorIndex: 0,
       battleState: result.nextState,
     };
 
-    await this.render();
+    // Step 1: Show battle HUD layout with sprites (uses PREVIOUS state for current HP display)
+    const hudResult = renderBattleHud(prevState);
+    await this.glass.showBattleHud(
+      hudResult.oppText,
+      hudResult.playerText,
+      { left: 'Battle', right: '' },
+      hudResult.oppSprite,
+      hudResult.playerSprite,
+    );
+
+    // Step 2: Play animated sequence
+    await this.animationEngine.playTurn(
+      result.log,
+      prevState,
+      result.nextState,
+      this.glass,
+    );
+
+    // Step 3: Write final state to display (cleanup after animation or skip)
+    const finalHud = renderBattleHud(result.nextState);
+    await this.glass.showBattleHud(
+      finalHud.oppText,
+      finalHud.playerText,
+      finalHud.status,
+      finalHud.oppSprite,
+      finalHud.playerSprite,
+    );
+
+    // Step 4: Brief pause before transition
+    await this.delay(ANIM.POST_ANIM_DELAY_MS);
+
+    // Step 5: Auto-transition based on resulting battle phase
+    await this.transitionAfterTurn(result.nextState);
   }
 
   /**
@@ -336,6 +445,28 @@ export class ScreenController {
     await this.render();
   }
 
+  private async transitionAfterTurn(nextState: BattleState): Promise<void> {
+    switch (nextState.phase) {
+      case 'WAITING_FOR_ACTION':
+        this.state = { ...this.state, screen: 'BATTLE_HUD', cursorIndex: 0 };
+        await this.render();
+        break;
+      case 'WAITING_FOR_SWITCH':
+        this.forcedSwitch = true;
+        this.state = { ...this.state, screen: 'SWITCH_SELECT', cursorIndex: 0 };
+        await this.render();
+        break;
+      case 'BATTLE_OVER':
+        this.state = { ...this.state, screen: 'END_SCREEN', cursorIndex: 0 };
+        await this.render();
+        break;
+    }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   // ---------------------------------------------------------------------------
   // Render dispatch
   // ---------------------------------------------------------------------------
@@ -350,7 +481,13 @@ export class ScreenController {
       }
       case 'BATTLE_HUD': {
         const result = renderBattleHud(this.state.battleState!);
-        await this.glass.showText(result.text, result.status);
+        await this.glass.showBattleHud(
+          result.oppText,
+          result.playerText,
+          result.status,
+          result.oppSprite,
+          result.playerSprite,
+        );
         break;
       }
       case 'ACTION_MENU': {
@@ -385,6 +522,14 @@ export class ScreenController {
         await this.glass.showList(result.items, result.status);
         break;
       }
+      case 'SPRITE_REFRESH': {
+        const result = renderSpriteRefresh();
+        await this.glass.showList(result.items, result.status);
+        break;
+      }
+      case 'ANIMATING':
+        // Animation engine handles rendering via in-place updates
+        break;
     }
 
     if (this.state.battleState) {
