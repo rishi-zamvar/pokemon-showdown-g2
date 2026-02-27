@@ -54,6 +54,25 @@ Teams.setGeneratorFactory(TeamGenerators);
 const GEN9 = Generations.get(9);
 
 // ---------------------------------------------------------------------------
+// Volatile conditions to display on HUD, mapped to abbreviations
+// ---------------------------------------------------------------------------
+
+const VOLATILE_ABBREVS: Record<string, string> = {
+  confusion: 'CNF',
+  taunt: 'TAUNT',
+  encore: 'ENCORE',
+  disable: 'DISBL',
+  leechseed: 'SEED',
+  curse: 'CURSE',
+  substitute: 'SUB',
+  focusenergy: 'FOCUS',
+  mustrecharge: 'RCHRG',
+  trapped: 'TRAP',
+  partiallytrapped: 'BIND',
+  flinch: 'FLNCH',
+};
+
+// ---------------------------------------------------------------------------
 // Module-level mutable state
 // ---------------------------------------------------------------------------
 
@@ -178,6 +197,7 @@ function buildPPUsed(
 
 /**
  * Update prevHp map with current HP values for all pokemon on both sides.
+ * Uses species name as key (not position index) because sim reorders on switch.
  */
 function updatePrevHp(): void {
   if (!battle) return;
@@ -185,47 +205,139 @@ function updatePrevHp(): void {
   const p2 = battle.sides[1];
   if (!p1 || !p2) return;
 
-  p1.pokemon.forEach((mon, i) => {
-    prevHp.set(`p1-${i}`, mon.hp);
-  });
-  p2.pokemon.forEach((mon, i) => {
-    prevHp.set(`p2-${i}`, mon.hp);
-  });
+  for (const mon of p1.pokemon) {
+    prevHp.set(`p1-${mon.species.name}`, mon.hp);
+  }
+  for (const mon of p2.pokemon) {
+    prevHp.set(`p2-${mon.species.name}`, mon.hp);
+  }
+}
+
+/**
+ * Find the sim Pokemon matching an original team entry.
+ * The sim reorders its pokemon[] array on every switch, so we must
+ * match by species name rather than by position index.
+ *
+ * Match priority:
+ *  1. simMon.set.species — original PokemonSet data (most reliable, exact match)
+ *  2. simMon.species.name — current species (can change with forme changes)
+ *  3. simMon.species.baseSpecies — handles mid-battle forme changes
+ *  4. simMon.name — display name fallback
+ */
+function findSimMon(
+  simSide: Side,
+  species: string,
+  name: string,
+): import("@pkmn/sim").Pokemon | undefined {
+  const key = species.toLowerCase();
+  const nameKey = name.toLowerCase();
+  // 1. Original PokemonSet species (best match — preserved from team generation)
+  for (const mon of simSide.pokemon) {
+    const setSpecies = (mon as unknown as { set?: { species?: string } }).set?.species;
+    if (setSpecies && setSpecies.toLowerCase() === key) return mon;
+  }
+  // 2. Current species name
+  for (const mon of simSide.pokemon) {
+    if (mon.species.name.toLowerCase() === key) return mon;
+  }
+  // 3. Base species (handles forme changes like Mimikyu → Mimikyu-Busted)
+  for (const mon of simSide.pokemon) {
+    if ((mon.species as unknown as { baseSpecies?: string }).baseSpecies?.toLowerCase() === key) return mon;
+  }
+  // 4. Display name match
+  for (const mon of simSide.pokemon) {
+    if (mon.name.toLowerCase() === nameKey) return mon;
+  }
+  return undefined;
+}
+
+/**
+ * Translate an original team index to the sim's current party index.
+ * Needed because the sim swaps array positions on every switch.
+ */
+function originalToSimIndex(
+  simSide: Side,
+  teamData: ActivePokemon[],
+  origIndex: number,
+): number {
+  const target = teamData[origIndex];
+  if (!target) return origIndex;
+  const simMon = findSimMon(simSide, target.species, target.name);
+  if (!simMon) return origIndex;
+  const idx = simSide.pokemon.indexOf(simMon);
+  return idx >= 0 ? idx : origIndex;
 }
 
 /**
  * Derive a BattleSide from the sim's Side object, preserving base team data.
+ *
+ * IMPORTANT: The sim reorders pokemon[] on every switch (active always at [0]).
+ * We match sim pokemon to our original team order by species name so that
+ * team indices stay stable for the UI (switch select, sprites, etc.).
  */
 function deriveSide(
   simSide: Side,
   teamData: ActivePokemon[],
   prevSideState: BattleSide,
 ): BattleSide {
-  const activeSimMon = simSide.active[0];
-  const activeIndex = activeSimMon
-    ? simSide.pokemon.indexOf(activeSimMon)
-    : prevSideState.activeIndex;
-
-  const team = simSide.pokemon.map((simMon, i) => {
-    const prev = teamData[i] ?? prevSideState.team[i] ?? teamData[0]!;
+  // Map team in ORIGINAL order (matching teamData indices)
+  const team = teamData.map((prev, _i) => {
+    const simMon = findSimMon(simSide, prev.species, prev.name);
+    if (!simMon) {
+      // Shouldn't happen — fallback to previous state
+      return prevSideState.team[_i] ?? prev;
+    }
     const ppUsed = buildPPUsed(simMon);
+
+    // Extract visible volatile statuses from sim state
+    const volatiles: string[] = [];
+    if (simMon.volatiles) {
+      for (const key of Object.keys(simMon.volatiles)) {
+        const abbrev = VOLATILE_ABBREVS[key];
+        if (abbrev) volatiles.push(abbrev);
+      }
+    }
+
     return {
       ...prev,
       currentHp: simMon.hp,
       status: (simMon.status as StatusCondition) || "",
-      // toxicCounter and sleepTurns not tracked in sim-derived state —
-      // keep previous values or reset to 0 (sim handles the actual mechanics)
       toxicCounter: 0,
       sleepTurns: 0,
       fainted: simMon.fainted,
       teraActive: !!((simMon as unknown as { terastallized?: string }).terastallized),
       ppUsed,
+      volatiles,
     } satisfies ActivePokemon;
   });
 
+  // Find activeIndex by matching the sim's active pokemon to our team order
+  const activeSimMon = simSide.active[0];
+  let activeIndex = prevSideState.activeIndex;
+  if (activeSimMon) {
+    const setSpecies = (activeSimMon as unknown as { set?: { species?: string } }).set?.species;
+    const activeKey = (setSpecies ?? activeSimMon.species.name).toLowerCase();
+    const idx = teamData.findIndex(
+      td => td.species.toLowerCase() === activeKey || td.name.toLowerCase() === activeKey,
+    );
+    if (idx >= 0) {
+      activeIndex = idx;
+    } else {
+      // Fallback: try current species.name if set.species didn't match
+      const fallbackKey = activeSimMon.species.name.toLowerCase();
+      const fallbackIdx = teamData.findIndex(
+        td => td.species.toLowerCase() === fallbackKey || td.name.toLowerCase() === fallbackKey,
+      );
+      if (fallbackIdx >= 0) activeIndex = fallbackIdx;
+      console.warn(`[deriveSide] Active mon "${activeSimMon.species.name}" (set: ${setSpecies}) not found in teamData:`, teamData.map(t => t.species));
+    }
+  } else {
+    console.log(`[deriveSide] active[0] is null (side: ${simSide.id}) — keeping prevActiveIndex=${activeIndex}`);
+  }
+
   return {
     team,
-    activeIndex: activeIndex >= 0 ? activeIndex : prevSideState.activeIndex,
+    activeIndex,
     teraUsed: team.some(mon => mon.teraActive),
   };
 }
@@ -293,10 +405,10 @@ function fillDamageValues(
   const p2 = battle.sides[1];
   if (!p1 || !p2) return log;
 
-  // Build a map of current HP for all pokemon
+  // Build a map of current HP for all pokemon (keyed by species name, not index)
   const currentHp: Map<string, number> = new Map();
-  p1.pokemon.forEach((mon, i) => currentHp.set(`p1-${i}`, mon.hp));
-  p2.pokemon.forEach((mon, i) => currentHp.set(`p2-${i}`, mon.hp));
+  for (const mon of p1.pokemon) currentHp.set(`p1-${mon.species.name}`, mon.hp);
+  for (const mon of p2.pokemon) currentHp.set(`p2-${mon.species.name}`, mon.hp);
 
   // For DAMAGE entries: we need to match the log entry to a pokemon.
   // Strategy: For each DAMAGE entry, find which opponent pokemon lost HP.
@@ -480,7 +592,12 @@ export const SimBattleAdapter = {
     const p2Side = b.sides[1]!;
 
     // Translate actions to PS choice strings
-    const p1Choice = actionToChoice(playerAction, p1Side);
+    // Player switch indices are in original team order — translate to sim party order
+    const translatedPlayerAction: PlayerAction =
+      playerAction.type === "SWITCH"
+        ? { type: "SWITCH", toIndex: originalToSimIndex(p1Side, playerTeamData, playerAction.toIndex) }
+        : playerAction;
+    const p1Choice = actionToChoice(translatedPlayerAction, p1Side);
     const p2Choice = actionToChoice(opponentAction, p2Side);
 
     // Record HP before this turn for damage calculation
@@ -534,13 +651,18 @@ export const SimBattleAdapter = {
     const p1Side = b.sides[0]!;
     const p2Side = b.sides[1]!;
 
-    const playerChoice = side === "player" ? `switch ${toIndex + 1}` : "pass";
+    // Player's toIndex is in original team order — translate to sim party order
+    const simPlayerIdx = side === "player"
+      ? originalToSimIndex(p1Side, playerTeamData, toIndex)
+      : toIndex;
+    const playerChoice = side === "player" ? `switch ${simPlayerIdx + 1}` : "pass";
     let opponentChoice: string;
 
     if (side === "opponent") {
-      opponentChoice = `switch ${toIndex + 1}`;
+      const simOppIdx = originalToSimIndex(p2Side, opponentTeamData, toIndex);
+      opponentChoice = `switch ${simOppIdx + 1}`;
     } else if (aiSwitchIndex !== undefined) {
-      // Double-faint case — both sides switch in same call
+      // Double-faint case — aiSwitchIndex is already a sim party index from SimAIOpponent
       opponentChoice = `switch ${aiSwitchIndex + 1}`;
     } else {
       // Check if opponent side needs to switch too
@@ -559,6 +681,8 @@ export const SimBattleAdapter = {
 
     // Suppress unused-variable warnings: we use p1Side only via playerChoice computation above
     void p1Side;
+
+    console.log(`[submitSwitch] playerChoice="${playerChoice}" opponentChoice="${opponentChoice}" side="${side}" toIndex=${toIndex} aiSwitchIndex=${aiSwitchIndex}`);
 
     // Record HP before this operation
     updatePrevHp();
