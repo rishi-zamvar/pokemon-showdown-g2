@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 5.3 of 6 (Switch Animation Polish)
-Plan: 07 of N in Phase 5.3 (05.3-01, 05.3-02, 05.3-07 complete)
-Status: In progress — 05.3-07 complete (getDexNum baseSpecies fallback)
-Last activity: 2026-02-27 — Completed 05.3-07-PLAN.md (getDexNum forme fix)
+Plan: 03 of N in Phase 5.3 (05.3-01, 05.3-02, 05.3-03, 05.3-07 complete)
+Status: In progress — 05.3-03 complete (formatEntry text expansion)
+Last activity: 2026-02-27 — Completed 05.3-03-PLAN.md (format entry text expansion)
 
 Progress: [████████████████████] ~85% (21/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 partial + 2 Phase 5.3)
 
@@ -147,6 +147,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-27T16:57:00Z
-Stopped at: Completed 05.3-07-PLAN.md (getDexNum baseSpecies fallback)
+Last session: 2026-02-27T16:58:00Z
+Stopped at: Completed 05.3-03-PLAN.md (formatEntry text expansion)
 Resume file: None
