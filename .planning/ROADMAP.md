@@ -15,6 +15,7 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 - [x] **Phase 3: Battle Engine** - Pure turn-state machine with damage calc, status, and Terastallization
 - [x] **Phase 4: AI Opponent** - Heuristic AI that scores moves by expected damage and switches intelligently
 - [x] **Phase 5: Screen Layer** - All G2 screens and gesture navigation wired to battle state
+- [ ] **Phase 5.1: Battle Animations** (INSERTED) - Game Boy-style battle animations: typewriter text, sprite flash, HP drain
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
 
 ## Phase Details
@@ -103,6 +104,22 @@ Plans:
 - [x] 05-02-PLAN.md — ScreenController state machine with gesture routing, turn resolution, and forced switch handling
 - [x] 05-03-PLAN.md — Phone companion display with sprites, main.ts wiring, and clean build
 
+### Phase 5.1: Battle Animations (INSERTED)
+**Goal**: Turn resolution plays as a Game Boy-style animated sequence — sprites stay visible, text streams character-by-character, sprites flash on damage, HP bars drain progressively — making battles feel like classic Pokemon Red/Blue on G2 hardware
+**Depends on**: Phase 5
+**Requirements**: ANIM-01 (typewriter text), ANIM-02 (sprite flash on hit), ANIM-03 (HP drain animation), ANIM-04 (sequential log entry playback), ANIM-05 (tap-to-skip), ANIM-06 (gesture blocking during animation)
+**Success Criteria** (what must be TRUE):
+  1. After player selects an action, turn events play out one-by-one with typewriter text reveal (~40ms/char) — not shown as a static text block
+  2. When a Pokemon takes damage, its sprite briefly flashes (inverted or blank → restore) before HP updates
+  3. HP bar text updates progressively (drains frame-by-frame) rather than jumping to the final value
+  4. Sprites remain visible on the glass display throughout the entire turn animation sequence
+  5. Player can tap during animation to skip to the end result immediately
+  6. All gestures except tap-to-skip are blocked during animation playback (no accidental navigation)
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 5.1 to break down)
+
 ### Phase 6: Integration
 **Goal**: A complete battle plays from main menu to win/loss screen on actual G2 hardware without crashes, data errors, or navigation dead ends
 **Depends on**: Phase 5
@@ -121,7 +138,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -130,6 +147,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 3. Battle Engine | 4/4 | Complete | 2026-02-26 |
 | 4. AI Opponent | 1/1 | Complete | 2026-02-26 |
 | 5. Screen Layer | 3/3 | Complete | 2026-02-26 |
+| 5.1 Battle Animations | 0/? | Not started | - |
 | 6. Integration | 0/2 | Not started | - |
 
 ---

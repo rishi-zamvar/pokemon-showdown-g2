@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 5 (Screen Layer) COMPLETE. Ready for Phase 6 (Integration & Testing).
+**Current focus:** Phase 5.1 (Battle Animations) — Game Boy-style animated turn resolution inserted before Phase 6.
 
 ## Current Position
 
-Phase: 5 of 6 (Screen Layer) -- COMPLETE
-Plan: 3 of 3 in Phase 5 (complete)
-Status: Phase complete
-Last activity: 2026-02-26 — Completed 05-03-PLAN.md
+Phase: 5.1 of 6 (Battle Animations) -- NOT STARTED
+Plan: 0 of ? in Phase 5.1
+Status: Phase not yet planned
+Last activity: 2026-02-27 — Inserted Phase 5.1 (Battle Animations)
 
 Progress: [█████████████░] ~65% (13/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5)
 
@@ -100,6 +100,10 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 None.
+
+### Roadmap Evolution
+
+- Phase 5.1 inserted after Phase 5: Game Boy-style battle animations — typewriter text, sprite flash on damage, HP drain animation, sequential log playback (INSERTED)
 
 ### Blockers/Concerns
 
