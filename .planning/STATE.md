@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 5.2 — Replace custom battle engine with @pkmn/sim for accurate Gen 9 mechanics.
+**Current focus:** Phase 5.3 — Switch animation polish (pokeball frames, sprite slide, text polish).
 
 ## Current Position
 
-Phase: 5.2 of 6 (@pkmn/sim Integration) -- Checkpoint (human-verify pending)
-Plan: 3 of 3 in Phase 5.2 (Task 1 complete, Task 2 awaiting human-verify)
-Status: Plans 05.2-01, 05.2-02, 05.2-03 Task 1 complete; checkpoint:human-verify paused
-Last activity: 2026-02-27 — Completed 05.2-03 Task 1 (ScreenController rewired to SimBattleAdapter/SimAIOpponent)
+Phase: 5.3 of 6 (Switch Animation Polish)
+Plan: 2 of N in Phase 5.3
+Status: In progress — 05.3-02 complete
+Last activity: 2026-02-27 — Completed 05.3-02 (AnimationFrames BMP generators)
 
-Progress: [██████████████████] ~79% (19/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 partial)
+Progress: [███████████████████] ~83% (20/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 partial + 1 Phase 5.3)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
-- Average duration: ~2.6 min
-- Total execution time: ~41.5 min
+- Total plans completed: 17
+- Average duration: ~2.5 min
+- Total execution time: ~42.5 min
 
 **By Phase:**
 
@@ -34,8 +34,8 @@ Progress: [██████████████████] ~79% (19/~24 
 | 05-screen-layer | 3 completed | ~6 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-02 (~2 min), 05-03 (~2 min), 05.1-01 (~2 min), 05.1-02 (~2 min), 05.1-03 (~1.5 min)
-- Trend: stable ~2 min per plan
+- Last 5 plans: 05-03 (~2 min), 05.1-01 (~2 min), 05.1-02 (~2 min), 05.1-03 (~1.5 min), 05.3-02 (~1 min)
+- Trend: stable ~1.5 min per plan
 
 *Updated after each plan completion*
 
@@ -117,6 +117,8 @@ Recent decisions affecting current work:
 - [05.2-03]: SimBattleAdapter.getBattle() is bridge between ScreenController and SimAIOpponent — adapter is sole owner of Battle instance
 - [05.2-03]: Double-faint resolveSwitch calls SimAIOpponent.pickSwitch(battle) then single submitSwitch() with aiSwitchIndex — one makeChoices() covers both sides
 - [05.2-03]: Old engine files (BattleEngine, AIOpponent, DamageCalc, StatusEngine, TurnResolver) preserved but no longer imported — cleanup deferred to future phase
+- [05.3-02]: encodeBmp exported as additive change -- internal callers unaffected
+- [05.3-02]: Lazy caching via module-level null variables -- frames generated on first switch, reused forever
 
 ### Pending Todos
 
@@ -126,6 +128,7 @@ None.
 
 - Phase 5.1 inserted after Phase 5: Game Boy-style battle animations — typewriter text, sprite flash on damage, HP drain animation, sequential log playback (INSERTED)
 - Phase 5.2 inserted after Phase 5.1: Replace custom BattleEngine with @pkmn/sim for accurate Gen 9 mechanics (INSERTED)
+- Phase 5.3 inserted after Phase 5.2: Switch animation (pokeball→green square→checkbox), sprite slide, text polish, activeIndex fix (INSERTED)
 
 ### Blockers/Concerns
 
@@ -139,6 +142,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-27T15:13:00Z
-Stopped at: 05.2-03 Task 1 committed (9f62d97). Paused at checkpoint:human-verify (Task 2) — user needs to build/deploy and run end-to-end battle test.
+Last session: 2026-02-27T15:50:00Z
+Stopped at: Completed 05.3-02-PLAN.md (AnimationFrames BMP generators)
 Resume file: None
