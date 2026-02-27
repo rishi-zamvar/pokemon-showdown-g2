@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 5.3 of 6 (Switch Animation Polish)
-Plan: 03 of N in Phase 5.3 (05.3-01, 05.3-02, 05.3-03, 05.3-07 complete)
-Status: In progress — 05.3-03 complete (formatEntry text expansion)
-Last activity: 2026-02-27 — Completed 05.3-03-PLAN.md (format entry text expansion)
+Plan: 04 of N in Phase 5.3 (05.3-01, 05.3-02, 05.3-03, 05.3-04, 05.3-07 complete)
+Status: In progress — 05.3-04 complete (volatile status HUD display)
+Last activity: 2026-02-27 — Completed 05.3-04-PLAN.md (volatile status HUD display)
 
 Progress: [████████████████████] ~85% (21/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 partial + 2 Phase 5.3)
 
@@ -124,6 +124,8 @@ Recent decisions affecting current work:
 - [05.3-02]: Lazy caching via module-level null variables -- frames generated on first switch, reused forever
 - [05.3-07]: getDexNum baseSpecies fallback: strip forme suffix after first hyphen when exact slug fails — resolves Gastrodon-East, Indeedee-F, etc.
 - [05.3-07]: Four getDexNum sites updated: AnimationEngine, battleHudRenderer, ScreenController (startNewBattleInner + updatePokemonSlot)
+- [05.3-04]: 12 volatile conditions tracked via VOLATILE_ABBREVS map — only game-relevant volatiles that affect player decisions
+- [05.3-04]: Single-bracket format for tera + status + volatiles — maximizes info density on 64-char G2 line
 
 ### Pending Todos
 
@@ -148,5 +150,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-27T16:58:00Z
-Stopped at: Completed 05.3-03-PLAN.md (formatEntry text expansion)
+Stopped at: Completed 05.3-04-PLAN.md (volatile status HUD display)
 Resume file: None
