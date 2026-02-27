@@ -16,6 +16,7 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 - [x] **Phase 4: AI Opponent** - Heuristic AI that scores moves by expected damage and switches intelligently
 - [x] **Phase 5: Screen Layer** - All G2 screens and gesture navigation wired to battle state
 - [x] **Phase 5.1: Battle Animations** (INSERTED) - Game Boy-style battle animations: typewriter text, sprite flash, HP drain
+- [ ] **Phase 5.2: @pkmn/sim Integration** (INSERTED) - Replace custom battle engine with @pkmn/sim for accurate Gen 9 mechanics
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
 
 ## Phase Details
@@ -122,6 +123,22 @@ Plans:
 - [x] 05.1-02-PLAN.md — AnimationEngine class: async sequencer with typewriter, sprite flash, HP drain, and skip
 - [x] 05.1-03-PLAN.md — ScreenController integration: wire animation into resolveTurn, gesture blocking, auto-transition
 
+### Phase 5.2: @pkmn/sim Integration (INSERTED)
+**Goal**: Replace the custom BattleEngine with @pkmn/sim so battles use accurate Gen 9 mechanics — correct damage rolls, abilities, items, priority, weather, terrain, and the full move/status ruleset — while keeping the existing screen layer, animations, and AI intact
+**Depends on**: Phase 5.1
+**Requirements**: (no new requirements — this phase replaces the implementation behind BATTLE-01 through BATTLE-12)
+**Success Criteria** (what must be TRUE):
+  1. Battles run through @pkmn/sim's RandomPlayerAI or equivalent, producing correct Gen 9 damage, priority, and ability interactions
+  2. BattleState is derived from @pkmn/sim's battle object — HP, status, moves, PP, faint, and win/loss all come from sim state
+  3. Player actions (attack, switch, Tera) translate to @pkmn/sim protocol choices and execute correctly
+  4. AI opponent uses @pkmn/sim's built-in RandomPlayerAI or the existing heuristic AI adapted to sim state
+  5. All existing screens, animations, sprites, and gesture navigation continue to work without changes
+  6. Team generation uses @pkmn/sim's built-in random team generation
+**Plans**: TBD
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 5.2 to break down)
+
 ### Phase 6: Integration
 **Goal**: A complete battle plays from main menu to win/loss screen on actual G2 hardware without crashes, data errors, or navigation dead ends
 **Depends on**: Phase 5
@@ -140,7 +157,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -150,6 +167,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 6
 | 4. AI Opponent | 1/1 | Complete | 2026-02-26 |
 | 5. Screen Layer | 3/3 | Complete | 2026-02-26 |
 | 5.1 Battle Animations | 3/3 | Complete | 2026-02-27 |
+| 5.2 @pkmn/sim Integration | 0/? | Not started | - |
 | 6. Integration | 0/2 | Not started | - |
 
 ---
