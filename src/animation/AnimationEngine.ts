@@ -33,14 +33,28 @@ function getActiveMon(state: BattleState, side: Side): ActivePokemon {
   return s.team[s.activeIndex]!;
 }
 
-/** Resolve a species slug to its dex number. */
+/** Resolve a species slug to its dex number.
+ *  Handles forme variants like "Gastrodon-East" by falling back to base species.
+ *  Priority: exact match > base species (before first hyphen) > 0 (not found).
+ */
 function getDexNum(species: string): number {
   const slug = species.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return DataLoader.getPokemon(slug)?.num ?? 0;
+  const exact = DataLoader.getPokemon(slug);
+  if (exact?.num) return exact.num;
+
+  // Fallback: strip forme suffix (everything after first hyphen)
+  const hyphenIdx = species.indexOf('-');
+  if (hyphenIdx > 0) {
+    const baseSlug = species.slice(0, hyphenIdx).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const base = DataLoader.getPokemon(baseSlug);
+    if (base?.num) return base.num;
+  }
+
+  return 0;
 }
 
-/** Get the cached sprite base64 for a side's active mon. */
-function getSpriteForSide(state: BattleState, side: Side): string | null {
+/** Get the cached sprite BMP Uint8Array for a side's active mon. */
+function getSpriteForSide(state: BattleState, side: Side): Uint8Array | null {
   const mon = getActiveMon(state, side);
   const dexNum = getDexNum(mon.species);
   if (dexNum <= 0) return null;
@@ -109,7 +123,7 @@ export class AnimationEngine {
     nextState: BattleState,
     glass: GlassAdapter,
   ): Promise<void> {
-    const fullText = formatEntry(entry);
+    const fullText = formatEntry(entry, prevState);
 
     // Shared mutable state for concurrent text + HP updates
     let currentText = '';
@@ -190,7 +204,7 @@ export class AnimationEngine {
     const normal = getSpriteForSide(state, side);
     if (!normal) return; // No sprite cached, skip flash
 
-    const inverted = await invertSprite(normal);
+    const inverted = invertSprite(normal);
     const blank = blankSprite();
 
     const containerID = side === 'opponent'
@@ -200,7 +214,7 @@ export class AnimationEngine {
       ? CONTAINER_NAMES.oppSprite
       : CONTAINER_NAMES.playerSprite;
 
-    const updateImg = async (data: string): Promise<void> => {
+    const updateImg = async (data: Uint8Array): Promise<void> => {
       await glass.updateImage(containerID, containerName, data);
     };
 
