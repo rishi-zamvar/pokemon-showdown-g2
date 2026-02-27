@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 5.2 of 6 (@pkmn/sim Integration) -- Planning
-Plan: 0 of ? in Phase 5.2
-Status: Phase 5.2 inserted, planning in progress
-Last activity: 2026-02-27 — Inserted Phase 5.2 to swap in @pkmn/sim
+Phase: 5.2 of 6 (@pkmn/sim Integration) -- In progress
+Plan: 2 of ? in Phase 5.2
+Status: Plan 05.2-02 complete — SimAIOpponent created
+Last activity: 2026-02-27 — Completed 05.2-02-PLAN.md (SimAIOpponent)
 
-Progress: [████████████████] ~74% (16/~23 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1)
+Progress: [█████████████████] ~76% (18/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 2 Phase 5.2)
 
 ## Performance Metrics
 
@@ -106,6 +106,10 @@ Recent decisions affecting current work:
 - [05.1-03]: prevState used for initial HUD display so animation drains from correct starting HP
 - [05.1-03]: Final showBattleHud(nextState) after animation ensures correct HP even if skipped mid-drain
 - [05.1-03]: TURN_RESULT kept for resolveSwitch — forced switches don't animate
+- [05.2-02]: SimAIOpponent casts activeRequest as any — ChoiceRequest union narrowed via wait/forceSwitch/active property checks
+- [05.2-02]: Random move selection replaces damage scoring — sim ChoiceRequest guarantees legal moves; matches PS RandomPlayerAI
+- [05.2-02]: Tera at 20% via canTerastallize field in request — sim tracks teraUsed internally, no flag needed in SimAIOpponent
+- [05.2-02]: _pickForceSwitchIndex skips forceSwitch.length active slots, detects fainted via condition.endsWith(' fnt')
 
 ### Pending Todos
 
@@ -128,6 +132,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-27T11:36:10Z
-Stopped at: Completed 05.1-03-PLAN.md. Phase 5.1 (Battle Animations) complete. Phase 6 next.
+Last session: 2026-02-27T15:04:11Z
+Stopped at: Completed 05.2-02-PLAN.md (SimAIOpponent). Next: 05.2-03 (ScreenController wiring).
 Resume file: None
