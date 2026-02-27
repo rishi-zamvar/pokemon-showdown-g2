@@ -151,14 +151,16 @@ Plans:
   4. All animation entries show proper text — no "undefined" values for damage, status, faint, switch, or tera events
   5. Player-side activeIndex updates correctly after forced switch (faint) — name, sprite, and moves reflect the new Pokemon
   6. Species matching between sim and UI state handles all forme variations (cosmetic, gender, mid-battle changes)
-**Plans**: 6 plans
+**Plans**: 8 plans
 
 Plans:
 - [ ] 05.3-01-PLAN.md — Expand TurnLogEntry kinds + LogParser with all ~35 PS protocol message types
 - [ ] 05.3-02-PLAN.md — Create AnimationFrames.ts (pokeball/square/checkbox BMP) + export encodeBmp
 - [ ] 05.3-03-PLAN.md — Add PS-accurate formatEntry text for all new TurnLogEntry kinds
 - [ ] 05.3-04-PLAN.md — HUD volatile status display (ActivePokemon.volatiles + SimBattleAdapter + battleHudRenderer)
-- [ ] 05.3-05-PLAN.md — AnimationEngine SWITCH/HEAL effects + ScreenController resolveSwitch animation wiring
+- [ ] 05.3-05-PLAN.md — AnimationEngine SWITCH/HEAL effects (3-frame + sprite slide + heal drain)
+- [ ] 05.3-05b-PLAN.md — ScreenController resolveSwitch animation wiring (no preloadSprites)
+- [ ] 05.3-07-PLAN.md — Fix getDexNum forme normalization for variant species (Gastrodon-East etc.)
 - [ ] 05.3-06-PLAN.md — Build verification + human-verify checkpoint
 
 ### Phase 6: Integration
@@ -190,7 +192,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 | 5. Screen Layer | 3/3 | Complete | 2026-02-26 |
 | 5.1 Battle Animations | 3/3 | Complete | 2026-02-27 |
 | 5.2 @pkmn/sim Integration | 0/? | Not started | - |
-| 5.3 Switch Animation & Text Polish | 0/6 | Not started | - |
+| 5.3 Switch Animation & Text Polish | 0/8 | Not started | - |
 | 6. Integration | 0/2 | Not started | - |
 
 ---
