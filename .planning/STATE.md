@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 5.2 of 6 (@pkmn/sim Integration) -- In progress
-Plan: 2 of 3 in Phase 5.2
-Status: Plans 05.2-01 and 05.2-02 complete
-Last activity: 2026-02-27 — Completed 05.2-01-PLAN.md (SimBattleAdapter + LogParser)
+Phase: 5.2 of 6 (@pkmn/sim Integration) -- Checkpoint (human-verify pending)
+Plan: 3 of 3 in Phase 5.2 (Task 1 complete, Task 2 awaiting human-verify)
+Status: Plans 05.2-01, 05.2-02, 05.2-03 Task 1 complete; checkpoint:human-verify paused
+Last activity: 2026-02-27 — Completed 05.2-03 Task 1 (ScreenController rewired to SimBattleAdapter/SimAIOpponent)
 
-Progress: [█████████████████] ~76% (18/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 2 Phase 5.2)
+Progress: [██████████████████] ~79% (19/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 partial)
 
 ## Performance Metrics
 
@@ -114,6 +114,9 @@ Recent decisions affecting current work:
 - [05.2-02]: Random move selection replaces damage scoring — sim ChoiceRequest guarantees legal moves; matches PS RandomPlayerAI
 - [05.2-02]: Tera at 20% via canTerastallize field in request — sim tracks teraUsed internally, no flag needed in SimAIOpponent
 - [05.2-02]: _pickForceSwitchIndex skips forceSwitch.length active slots, detects fainted via condition.endsWith(' fnt')
+- [05.2-03]: SimBattleAdapter.getBattle() is bridge between ScreenController and SimAIOpponent — adapter is sole owner of Battle instance
+- [05.2-03]: Double-faint resolveSwitch calls SimAIOpponent.pickSwitch(battle) then single submitSwitch() with aiSwitchIndex — one makeChoices() covers both sides
+- [05.2-03]: Old engine files (BattleEngine, AIOpponent, DamageCalc, StatusEngine, TurnResolver) preserved but no longer imported — cleanup deferred to future phase
 
 ### Pending Todos
 
@@ -136,6 +139,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-27T15:06:57Z
-Stopped at: Completed 05.2-01-PLAN.md (SimBattleAdapter + LogParser). Plans 05.2-02 was already complete. Next: 05.2-03 (ScreenController wiring).
+Last session: 2026-02-27T15:13:00Z
+Stopped at: 05.2-03 Task 1 committed (9f62d97). Paused at checkpoint:human-verify (Task 2) — user needs to build/deploy and run end-to-end battle test.
 Resume file: None
