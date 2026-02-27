@@ -121,10 +121,15 @@ export function parseLogLines(lines: string[]): TurnLogEntry[] {
         if (isStatusTick) {
           // Residual/status damage — actor is the pokemon being damaged
           const actor = pokemonToActor(targetIdent);
+          // Extract a human-readable source from the [from] tag
+          const sourceMatch = fromTag.match(/\[from\]\s*(.+)/);
+          const source = sourceMatch?.[1]?.trim() ?? "residual";
           entries.push({
             kind: "STATUS_TICK",
             actor,
             detail: {
+              pokemon: extractName(targetIdent),
+              status: source,
               targetHp: cur,
               targetMaxHp: max,
             },
@@ -269,8 +274,17 @@ export function parseLogLines(lines: string[]): TurnLogEntry[] {
             actor,
             detail: { pokemon: pokemonName },
           });
+        } else if (reason.includes("flinch")) {
+          entries.push({ kind: "FLINCH_SKIP", actor, detail: { pokemon: pokemonName } });
+        } else if (reason.includes("recharge")) {
+          entries.push({ kind: "RECHARGE_SKIP", actor, detail: { pokemon: pokemonName } });
+        } else if (reason.includes("taunt")) {
+          const move = parts[4] ?? "";
+          entries.push({ kind: "ACTIVATE", actor, detail: { pokemon: pokemonName, effect: "taunt", move } });
+        } else if (reason.includes("disable")) {
+          const move = parts[4] ?? "";
+          entries.push({ kind: "ACTIVATE", actor, detail: { pokemon: pokemonName, effect: "disable", move } });
         }
-        // Other cant reasons (recharge, disable, etc.) are silently ignored
         break;
       }
 
@@ -280,8 +294,248 @@ export function parseLogLines(lines: string[]): TurnLogEntry[] {
         break;
       }
 
+      case "-supereffective": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "SUPER_EFFECTIVE", actor, detail: {} });
+        break;
+      }
+      case "-resisted": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "RESISTED", actor, detail: {} });
+        break;
+      }
+      case "-immune": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "IMMUNE", actor, detail: { pokemon: extractName(pokemonIdent) } });
+        break;
+      }
+
+      case "-boost": {
+        const pokemonIdent = parts[2] ?? "";
+        const stat = parts[3] ?? "";
+        const amount = parseInt(parts[4] ?? "0", 10);
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "STAT_BOOST", actor, detail: { pokemon: extractName(pokemonIdent), stat, amount } });
+        break;
+      }
+      case "-unboost": {
+        const pokemonIdent = parts[2] ?? "";
+        const stat = parts[3] ?? "";
+        const amount = parseInt(parts[4] ?? "0", 10);
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "STAT_UNBOOST", actor, detail: { pokemon: extractName(pokemonIdent), stat, amount } });
+        break;
+      }
+      case "-setboost": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "STAT_BOOST", actor, detail: { pokemon: extractName(pokemonIdent), stat: parts[3] ?? "", amount: parseInt(parts[4] ?? "0", 10) } });
+        break;
+      }
+      case "-clearboost": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "STAT_CLEAR", actor, detail: { pokemon: extractName(pokemonIdent), type: "clear" } });
+        break;
+      }
+      case "-clearallboost": {
+        entries.push({ kind: "STAT_CLEAR", actor: "player", detail: { type: "clearall" } });
+        break;
+      }
+      case "-swapboost": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "STAT_CLEAR", actor, detail: { pokemon: extractName(pokemonIdent), type: "swap" } });
+        break;
+      }
+      case "-invertboost": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "STAT_CLEAR", actor, detail: { pokemon: extractName(pokemonIdent), type: "invert" } });
+        break;
+      }
+      case "-copyboost": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "STAT_CLEAR", actor, detail: { pokemon: extractName(pokemonIdent), type: "copy", target: extractName(parts[3] ?? "") } });
+        break;
+      }
+
+      case "-heal": {
+        const pokemonIdent = parts[2] ?? "";
+        const hpStatus = parts[3] ?? "";
+        const fromTag = parts[4] ?? "";
+        const { cur, max } = parseHp(hpStatus);
+        const actor = pokemonToActor(pokemonIdent);
+        const sourceMatch = fromTag.match(/\[from\]\s*(.+)/);
+        const source = sourceMatch?.[1]?.trim() ?? "";
+        entries.push({
+          kind: "HEAL",
+          actor,
+          detail: { pokemon: extractName(pokemonIdent), targetHp: cur, targetMaxHp: max, source },
+        });
+        break;
+      }
+
+      case "-weather": {
+        const weatherId = parts[2] ?? "";
+        const isUpkeep = parts.some(p => p === "[upkeep]");
+        if (isUpkeep) break; // Suppress upkeep ticks — too verbose for glasses
+        const isNone = weatherId.toLowerCase() === "none" || weatherId === "";
+        entries.push({
+          kind: "WEATHER",
+          actor: "player", // Weather is global, actor is arbitrary
+          detail: { weather: weatherId, phase: isNone ? "end" : "start" },
+        });
+        break;
+      }
+
+      case "-fieldstart": {
+        const effect = parts[2] ?? "";
+        entries.push({ kind: "TERRAIN", actor: "player", detail: { terrain: effect, phase: "start" } });
+        break;
+      }
+      case "-fieldend": {
+        const effect = parts[2] ?? "";
+        entries.push({ kind: "TERRAIN", actor: "player", detail: { terrain: effect, phase: "end" } });
+        break;
+      }
+
+      case "-sidestart": {
+        const sideIdent = parts[2] ?? "";
+        const effect = parts[3] ?? "";
+        const actor = sideIdent.startsWith("p1") ? "player" : "opponent";
+        entries.push({ kind: "SIDE_START", actor, detail: { effect } });
+        break;
+      }
+      case "-sideend": {
+        const sideIdent = parts[2] ?? "";
+        const effect = parts[3] ?? "";
+        const actor = sideIdent.startsWith("p1") ? "player" : "opponent";
+        entries.push({ kind: "SIDE_END", actor, detail: { effect } });
+        break;
+      }
+
+      case "-start": {
+        const pokemonIdent = parts[2] ?? "";
+        const volatile = parts[3] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        const moveArg = parts[4] ?? "";
+        entries.push({
+          kind: "VOLATILE_START",
+          actor,
+          detail: { pokemon: extractName(pokemonIdent), volatile, move: moveArg },
+        });
+        break;
+      }
+      case "-end": {
+        const pokemonIdent = parts[2] ?? "";
+        const volatile = parts[3] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({
+          kind: "VOLATILE_END",
+          actor,
+          detail: { pokemon: extractName(pokemonIdent), volatile },
+        });
+        break;
+      }
+
+      case "-item": {
+        const pokemonIdent = parts[2] ?? "";
+        const item = parts[3] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "ITEM_REVEAL", actor, detail: { pokemon: extractName(pokemonIdent), item } });
+        break;
+      }
+      case "-enditem": {
+        const pokemonIdent = parts[2] ?? "";
+        const item = parts[3] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        const isEaten = parts.some(p => p === "[eat]");
+        entries.push({ kind: "ITEM_CONSUME", actor, detail: { pokemon: extractName(pokemonIdent), item, eaten: isEaten } });
+        break;
+      }
+
+      case "-ability": {
+        const pokemonIdent = parts[2] ?? "";
+        const ability = parts[3] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "ABILITY", actor, detail: { pokemon: extractName(pokemonIdent), ability } });
+        break;
+      }
+      case "-endability": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "ABILITY", actor, detail: { pokemon: extractName(pokemonIdent), ability: "", ended: true } });
+        break;
+      }
+
+      case "-singleturn": {
+        const pokemonIdent = parts[2] ?? "";
+        const effect = parts[3] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "PROTECT", actor, detail: { pokemon: extractName(pokemonIdent), effect } });
+        break;
+      }
+
+      case "-hitcount": {
+        const pokemonIdent = parts[2] ?? "";
+        const count = parseInt(parts[3] ?? "0", 10);
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "HIT_COUNT", actor, detail: { pokemon: extractName(pokemonIdent), count } });
+        break;
+      }
+
+      case "-fail": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "MOVE_FAIL", actor, detail: { pokemon: extractName(pokemonIdent) } });
+        break;
+      }
+
+      case "-prepare": {
+        const pokemonIdent = parts[2] ?? "";
+        const move = parts[3] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "PREPARE", actor, detail: { pokemon: extractName(pokemonIdent), move } });
+        break;
+      }
+      case "-mustrecharge": {
+        const pokemonIdent = parts[2] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "RECHARGE", actor, detail: { pokemon: extractName(pokemonIdent) } });
+        break;
+      }
+
+      case "-transform": {
+        const pokemonIdent = parts[2] ?? "";
+        const targetIdent = parts[3] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "TRANSFORM", actor, detail: { pokemon: extractName(pokemonIdent), target: extractName(targetIdent) } });
+        break;
+      }
+
+      case "-curestatus": {
+        const pokemonIdent = parts[2] ?? "";
+        const status = parts[3] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "CURE_STATUS", actor, detail: { pokemon: extractName(pokemonIdent), status } });
+        break;
+      }
+
+      case "-activate": {
+        const pokemonIdent = parts[2] ?? "";
+        const effect = parts[3] ?? "";
+        const actor = pokemonToActor(pokemonIdent);
+        entries.push({ kind: "ACTIVATE", actor, detail: { pokemon: extractName(pokemonIdent), effect } });
+        break;
+      }
+
       // Ignored protocol messages (not mapped to TurnLogEntry)
-      // |turn|N, |upkeep|, |-heal|, |-boost|, |-unboost|, etc.
+      // |turn|N, |upkeep|, |-hint|, |request|, |t:|, |start|, |player|, |teamsize|, |gen|, |tier|, |rule|, |gametype|, |clearpoke|, |poke|, |teampreview|
       default:
         break;
     }
