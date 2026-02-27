@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 5.3 of 6 (Switch Animation Polish)
-Plan: 05 of N in Phase 5.3 (05.3-01, 05.3-02, 05.3-03, 05.3-04, 05.3-05, 05.3-07 complete)
-Status: In progress — 05.3-05 complete (SWITCH & HEAL animations)
-Last activity: 2026-02-27 — Completed 05.3-05-PLAN.md (SWITCH & HEAL animations)
+Plan: 05b of N in Phase 5.3 (05.3-01, 05.3-02, 05.3-03, 05.3-04, 05.3-05, 05.3-05b, 05.3-07 complete)
+Status: In progress — 05.3-05b complete (resolveSwitch animation wiring)
+Last activity: 2026-02-27 — Completed 05.3-05b-PLAN.md (resolveSwitch animation playback)
 
 Progress: [████████████████████] ~85% (21/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 partial + 2 Phase 5.3)
 
@@ -129,6 +129,7 @@ Recent decisions affecting current work:
 - [05.3-05]: SWITCH animation runs sequentially (await), not via Promise.all — animation must complete before typewriter text
 - [05.3-05]: Sprite slide uses shiftSpriteBmp with negative offset for left-to-right entrance effect
 - [05.3-05]: HEAL uses prevState/nextState HP diff, not entry.detail percentages — actual HP values are authoritative
+- [05.3-05b]: resolveSwitch mirrors resolveTurn animation pattern exactly — prevState HUD, playTurn, nextState HUD, transition
 
 ### Pending Todos
 
@@ -152,6 +153,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-27T17:01:00Z
-Stopped at: Completed 05.3-05-PLAN.md (SWITCH & HEAL animations)
+Last session: 2026-02-27T17:04:00Z
+Stopped at: Completed 05.3-05b-PLAN.md (resolveSwitch animation playback)
 Resume file: None
