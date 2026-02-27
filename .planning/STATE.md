@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 5.1 of 6 (Battle Animations) -- NOT STARTED
-Plan: 0 of ? in Phase 5.1
-Status: Phase not yet planned
-Last activity: 2026-02-27 — Inserted Phase 5.1 (Battle Animations)
+Phase: 5.1 of 6 (Battle Animations) -- In progress
+Plan: 1 of 3 in Phase 5.1
+Status: In progress
+Last activity: 2026-02-27 — Completed 05.1-01-PLAN.md (animation primitives)
 
-Progress: [█████████████░] ~65% (13/~20 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5)
+Progress: [██████████████░] ~68% (14/~23 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 1 Phase 5.1)
 
 ## Performance Metrics
 
@@ -96,6 +96,10 @@ Recent decisions affecting current work:
 - [05-03]: Sprite URL uses DataLoader.getPokemon(slug).num for dex number — avoids separate sprite lookup
 - [05-03]: Companion log renders last turn entries only (not full history) — keeps companion concise
 - [05-03]: Phone companion updates via DOM manipulation in render() postamble, not in renderers
+- [05.1-01]: blankSprite() has hardcoded base64 fallback if Canvas 2D context unavailable
+- [05.1-01]: Pixel inversion uses (data[i] ?? 0) pattern for TypeScript strict indexed access compliance
+- [05.1-01]: HP_BAR_WIDTH exported alongside formatHpBar so AnimationEngine can reconstruct bar strings at any HP
+- [05.1-01]: updateImage() throws 'Not connected' if bridge null -- consistent with existing adapter pattern
 
 ### Pending Todos
 
@@ -117,6 +121,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-26T20:03:00Z
-Stopped at: Completed 05-03-PLAN.md. Phase 5 complete. Phase 6 next.
+Last session: 2026-02-27T11:27:13Z
+Stopped at: Completed 05.1-01-PLAN.md. Animation primitives done. 05.1-02 (AnimationEngine) next.
 Resume file: None
