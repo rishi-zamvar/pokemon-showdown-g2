@@ -197,7 +197,8 @@ function buildPPUsed(
 
 /**
  * Update prevHp map with current HP values for all pokemon on both sides.
- * Uses species name as key (not position index) because sim reorders on switch.
+ * Uses positional keys (p1-0, p1-1, etc.) for stability — species name
+ * changes after Transform, breaking species-based keys.
  */
 function updatePrevHp(): void {
   if (!battle) return;
@@ -205,11 +206,11 @@ function updatePrevHp(): void {
   const p2 = battle.sides[1];
   if (!p1 || !p2) return;
 
-  for (const mon of p1.pokemon) {
-    prevHp.set(`p1-${mon.species.name}`, mon.hp);
+  for (let i = 0; i < p1.pokemon.length; i++) {
+    prevHp.set(`p1-${i}`, p1.pokemon[i]!.hp);
   }
-  for (const mon of p2.pokemon) {
-    prevHp.set(`p2-${mon.species.name}`, mon.hp);
+  for (let i = 0; i < p2.pokemon.length; i++) {
+    prevHp.set(`p2-${i}`, p2.pokemon[i]!.hp);
   }
 }
 
@@ -224,25 +225,33 @@ function updatePrevHp(): void {
  *  3. simMon.species.baseSpecies — handles mid-battle forme changes
  *  4. simMon.name — display name fallback
  */
+/** Normalize species name for matching: lowercase, strip non-alphanumeric */
+function normalizeSpecies(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function findSimMon(
   simSide: Side,
   species: string,
   name: string,
 ): import("@pkmn/sim").Pokemon | undefined {
-  const key = species.toLowerCase();
+  const key = normalizeSpecies(species);
   const nameKey = name.toLowerCase();
   // 1. Original PokemonSet species (best match — preserved from team generation)
+  //    Normalize both sides: set.species uses spaces ("Decidueye Hisui"),
+  //    teamData uses hyphens ("Decidueye-Hisui")
   for (const mon of simSide.pokemon) {
     const setSpecies = (mon as unknown as { set?: { species?: string } }).set?.species;
-    if (setSpecies && setSpecies.toLowerCase() === key) return mon;
+    if (setSpecies && normalizeSpecies(setSpecies) === key) return mon;
   }
   // 2. Current species name
   for (const mon of simSide.pokemon) {
-    if (mon.species.name.toLowerCase() === key) return mon;
+    if (normalizeSpecies(mon.species.name) === key) return mon;
   }
   // 3. Base species (handles forme changes like Mimikyu → Mimikyu-Busted)
   for (const mon of simSide.pokemon) {
-    if ((mon.species as unknown as { baseSpecies?: string }).baseSpecies?.toLowerCase() === key) return mon;
+    if ((mon.species as unknown as { baseSpecies?: string }).baseSpecies &&
+        normalizeSpecies((mon.species as unknown as { baseSpecies: string }).baseSpecies) === key) return mon;
   }
   // 4. Display name match
   for (const mon of simSide.pokemon) {
@@ -289,6 +298,11 @@ function deriveSide(
     }
     const ppUsed = buildPPUsed(simMon);
 
+    // Detect if this mon has transformed (Ditto/Imposter/Transform move)
+    const isTransformed = !!(simMon.volatiles?.['transform']);
+    const species = isTransformed ? simMon.species.name : prev.species;
+    const moves = isTransformed ? simMon.moveSlots.map(s => s.id) : prev.moves;
+
     // Extract visible volatile statuses from sim state
     const volatiles: string[] = [];
     if (simMon.volatiles) {
@@ -298,10 +312,18 @@ function deriveSide(
       }
     }
 
+    // Update max HP from sim if it changed (e.g. Terapagos Tera Shift form change)
+    const stats = simMon.maxhp !== prev.stats.hp
+      ? { ...prev.stats, hp: simMon.maxhp }
+      : prev.stats;
+
     return {
       ...prev,
+      species,
+      moves,
       currentHp: simMon.hp,
-      status: (simMon.status as StatusCondition) || "",
+      stats,
+      status: (simMon.status && simMon.status !== 'fnt' ? simMon.status : '') as StatusCondition,
       toxicCounter: 0,
       sleepTurns: 0,
       fainted: simMon.fainted,
@@ -316,17 +338,17 @@ function deriveSide(
   let activeIndex = prevSideState.activeIndex;
   if (activeSimMon) {
     const setSpecies = (activeSimMon as unknown as { set?: { species?: string } }).set?.species;
-    const activeKey = (setSpecies ?? activeSimMon.species.name).toLowerCase();
+    const activeKey = normalizeSpecies(setSpecies ?? activeSimMon.species.name);
     const idx = teamData.findIndex(
-      td => td.species.toLowerCase() === activeKey || td.name.toLowerCase() === activeKey,
+      td => normalizeSpecies(td.species) === activeKey || td.name.toLowerCase() === (setSpecies ?? activeSimMon.species.name).toLowerCase(),
     );
     if (idx >= 0) {
       activeIndex = idx;
     } else {
       // Fallback: try current species.name if set.species didn't match
-      const fallbackKey = activeSimMon.species.name.toLowerCase();
+      const fallbackKey = normalizeSpecies(activeSimMon.species.name);
       const fallbackIdx = teamData.findIndex(
-        td => td.species.toLowerCase() === fallbackKey || td.name.toLowerCase() === fallbackKey,
+        td => normalizeSpecies(td.species) === fallbackKey || td.name.toLowerCase() === activeSimMon.species.name.toLowerCase(),
       );
       if (fallbackIdx >= 0) activeIndex = fallbackIdx;
       console.warn(`[deriveSide] Active mon "${activeSimMon.species.name}" (set: ${setSpecies}) not found in teamData:`, teamData.map(t => t.species));
@@ -405,10 +427,10 @@ function fillDamageValues(
   const p2 = battle.sides[1];
   if (!p1 || !p2) return log;
 
-  // Build a map of current HP for all pokemon (keyed by species name, not index)
+  // Build a map of current HP for all pokemon (positional keys, stable across transform)
   const currentHp: Map<string, number> = new Map();
-  for (const mon of p1.pokemon) currentHp.set(`p1-${mon.species.name}`, mon.hp);
-  for (const mon of p2.pokemon) currentHp.set(`p2-${mon.species.name}`, mon.hp);
+  for (let i = 0; i < p1.pokemon.length; i++) currentHp.set(`p1-${i}`, p1.pokemon[i]!.hp);
+  for (let i = 0; i < p2.pokemon.length; i++) currentHp.set(`p2-${i}`, p2.pokemon[i]!.hp);
 
   // For DAMAGE entries: we need to match the log entry to a pokemon.
   // Strategy: For each DAMAGE entry, find which opponent pokemon lost HP.
@@ -652,15 +674,30 @@ export const SimBattleAdapter = {
     const p2Side = b.sides[1]!;
 
     // Player's toIndex is in original team order — translate to sim party order
-    const simPlayerIdx = side === "player"
+    let simPlayerIdx = side === "player"
       ? originalToSimIndex(p1Side, playerTeamData, toIndex)
       : toIndex;
+
+    // Validate: if the translated sim index points to a fainted/active mon, scan for a valid target
+    if (side === "player") {
+      const targetMon = p1Side.pokemon[simPlayerIdx];
+      if (!targetMon || targetMon.fainted || simPlayerIdx === 0) {
+        for (let i = 1; i < p1Side.pokemon.length; i++) {
+          const mon = p1Side.pokemon[i];
+          if (mon && !mon.fainted) {
+            simPlayerIdx = i;
+            break;
+          }
+        }
+      }
+    }
+
     const playerChoice = side === "player" ? `switch ${simPlayerIdx + 1}` : "pass";
     let opponentChoice: string;
 
     if (side === "opponent") {
-      const simOppIdx = originalToSimIndex(p2Side, opponentTeamData, toIndex);
-      opponentChoice = `switch ${simOppIdx + 1}`;
+      // toIndex from SimAIOpponent is already a sim party index — don't translate
+      opponentChoice = `switch ${toIndex + 1}`;
     } else if (aiSwitchIndex !== undefined) {
       // Double-faint case — aiSwitchIndex is already a sim party index from SimAIOpponent
       opponentChoice = `switch ${aiSwitchIndex + 1}`;
@@ -687,9 +724,26 @@ export const SimBattleAdapter = {
     // Record HP before this operation
     updatePrevHp();
 
-    // Clear log and execute choices
+    // Execute choices per-side to handle WaitRequests correctly.
+    // Waiting sides (requestState === '') reject all choices, but isChoiceDone()
+    // returns true for them. Only call choose() on sides with an active request.
     logBuffer.length = 0;
-    b.makeChoices(playerChoice, opponentChoice);
+    // Use per-side choose with retry logic for Revival Blessing edge cases.
+    // Revival Blessing requires switching to a FAINTED Pokemon; our normal logic
+    // picks alive Pokemon, so retry with a fainted target if the first choice fails.
+    for (const [sd, choice] of [[p1Side, playerChoice], [p2Side, opponentChoice]] as const) {
+      if (!sd.requestState || !choice) continue;
+      const ok = sd.choose(choice);
+      if (!ok && sd.choice.error?.includes('pass to a fainted')) {
+        // Revival Blessing: pick first fainted non-active Pokemon
+        (sd as unknown as { clearChoice(): void }).clearChoice();
+        const faintedIdx = sd.pokemon.findIndex((m, i) => i > 0 && m.fainted);
+        if (faintedIdx >= 0) {
+          sd.choose(`switch ${faintedIdx + 1}`);
+        }
+      }
+    }
+    (b as unknown as { commitChoices(): void }).commitChoices();
     b.sendUpdates();
 
     // Parse protocol lines (filter split-protocol duplicates first)

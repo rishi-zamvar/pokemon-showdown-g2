@@ -187,6 +187,15 @@ export class AnimationEngine {
       return;
     }
 
+    // TRANSFORM: flash animation + sprite change, then text
+    if (entry.kind === 'TRANSFORM') {
+      await this.transformAnimation(entry.actor, entry, nextState, glass);
+      await this.typewriterText(fullText, glass, (text) => {
+        currentText = text;
+      }, () => updateDisplay());
+      return;
+    }
+
     const tasks: Promise<void>[] = [];
 
     // Typewriter text -- always runs
@@ -428,6 +437,75 @@ export class AnimationEngine {
     }
 
     // Final frame: sprite at home position
+    if (!this.cancelled) {
+      await updateImg(finalSprite);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Transform animation (flash → green → flash → cross → green → cross + sprite)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Play the transform animation when Ditto/Imposter copies the target:
+   *   1. blank → filled square → blank → checkbox → filled square → checkbox
+   *   2. During frames, ensure target sprite is cached
+   *   3. Slide in the new sprite
+   */
+  private async transformAnimation(
+    side: Side,
+    entry: TurnLogEntry,
+    nextState: BattleState,
+    glass: GlassAdapter,
+  ): Promise<void> {
+    const containerID = side === 'opponent'
+      ? CONTAINER_IDS.oppSprite
+      : CONTAINER_IDS.playerSprite;
+    const containerName = side === 'opponent'
+      ? CONTAINER_NAMES.oppSprite
+      : CONTAINER_NAMES.playerSprite;
+
+    const updateImg = async (data: Uint8Array): Promise<void> => {
+      await glass.updateImage(containerID, containerName, data);
+    };
+
+    // Resolve target species dex number and ensure sprite is cached
+    const targetSpecies = entry.detail.target as string | undefined;
+    const targetMon = getActiveMon(nextState, side);
+    const targetDexNum = getDexNum(targetSpecies ?? targetMon.species);
+    // Fire off sprite caching in background — will be ready by slide-in phase
+    const cachePromise = targetDexNum > 0
+      ? SpriteService.ensureCached(targetDexNum)
+      : Promise.resolve();
+
+    // Phase 1: Flash sequence — blank → filled → blank → checkbox → filled → checkbox
+    const blank = blankSprite();
+    const filled = getFilledSquareFrame();
+    const checkbox = getCheckboxFrame();
+
+    const frames = [blank, filled, blank, checkbox, filled, checkbox];
+    for (const frame of frames) {
+      if (this.cancelled) return;
+      await updateImg(frame);
+      await this.delay(ANIM.SWITCH_FRAME_MS);
+    }
+
+    // Ensure sprite caching finished before slide-in
+    await cachePromise;
+
+    // Phase 2: Slide in the new sprite (reuse switch slide logic)
+    const finalSprite = getSpriteForSide(nextState, side);
+    if (!finalSprite) return;
+
+    const size = SPRITE_CONFIG.SIZE;
+    for (let f = ANIM.SWITCH_SLIDE_FRAMES; f >= 1; f--) {
+      if (this.cancelled) return;
+      const offset = ANIM.SWITCH_SLIDE_PX * f;
+      const shifted = shiftSpriteBmp(finalSprite, -offset, size);
+      await updateImg(shifted);
+      await this.delay(ANIM.SWITCH_FRAME_MS);
+    }
+
     if (!this.cancelled) {
       await updateImg(finalSprite);
     }
