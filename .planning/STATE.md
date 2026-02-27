@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 5.3 of 6 (Switch Animation Polish)
-Plan: 2 of N in Phase 5.3
-Status: In progress — 05.3-02 complete
-Last activity: 2026-02-27 — Completed 05.3-02 (AnimationFrames BMP generators)
+Plan: 2 of N in Phase 5.3 (05.3-01 and 05.3-02 complete)
+Status: In progress — 05.3-01 and 05.3-02 complete
+Last activity: 2026-02-27 — Completed 05.3-01 (Protocol parser expansion)
 
-Progress: [███████████████████] ~83% (20/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 partial + 1 Phase 5.3)
+Progress: [████████████████████] ~85% (21/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 partial + 2 Phase 5.3)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
+- Total plans completed: 18
 - Average duration: ~2.5 min
-- Total execution time: ~42.5 min
+- Total execution time: ~44.5 min
 
 **By Phase:**
 
@@ -34,7 +34,7 @@ Progress: [███████████████████] ~83% (20/~
 | 05-screen-layer | 3 completed | ~6 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-03 (~2 min), 05.1-01 (~2 min), 05.1-02 (~2 min), 05.1-03 (~1.5 min), 05.3-02 (~1 min)
+- Last 5 plans: 05.1-01 (~2 min), 05.1-02 (~2 min), 05.1-03 (~1.5 min), 05.3-02 (~1 min), 05.3-01 (~2 min)
 - Trend: stable ~1.5 min per plan
 
 *Updated after each plan completion*
@@ -117,6 +117,9 @@ Recent decisions affecting current work:
 - [05.2-03]: SimBattleAdapter.getBattle() is bridge between ScreenController and SimAIOpponent — adapter is sole owner of Battle instance
 - [05.2-03]: Double-faint resolveSwitch calls SimAIOpponent.pickSwitch(battle) then single submitSwitch() with aiSwitchIndex — one makeChoices() covers both sides
 - [05.2-03]: Old engine files (BattleEngine, AIOpponent, DamageCalc, StatusEngine, TurnResolver) preserved but no longer imported — cleanup deferred to future phase
+- [05.3-01]: Weather upkeep ticks suppressed in LogParser — too verbose for glasses display
+- [05.3-01]: STAT_CLEAR kind reused for clearboost/clearallboost/swapboost/invertboost/copyboost with type discriminator
+- [05.3-01]: cant case expanded with flinch/recharge/taunt/disable handling instead of silent ignore
 - [05.3-02]: encodeBmp exported as additive change -- internal callers unaffected
 - [05.3-02]: Lazy caching via module-level null variables -- frames generated on first switch, reused forever
 
@@ -142,6 +145,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-27T15:50:00Z
-Stopped at: Completed 05.3-02-PLAN.md (AnimationFrames BMP generators)
+Last session: 2026-02-27T16:50:00Z
+Stopped at: Completed 05.3-01-PLAN.md (protocol parser expansion)
 Resume file: None
