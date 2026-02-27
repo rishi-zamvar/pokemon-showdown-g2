@@ -15,7 +15,7 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 - [x] **Phase 3: Battle Engine** - Pure turn-state machine with damage calc, status, and Terastallization
 - [x] **Phase 4: AI Opponent** - Heuristic AI that scores moves by expected damage and switches intelligently
 - [x] **Phase 5: Screen Layer** - All G2 screens and gesture navigation wired to battle state
-- [ ] **Phase 5.1: Battle Animations** (INSERTED) - Game Boy-style battle animations: typewriter text, sprite flash, HP drain
+- [x] **Phase 5.1: Battle Animations** (INSERTED) - Game Boy-style battle animations: typewriter text, sprite flash, HP drain
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
 
 ## Phase Details
@@ -118,9 +118,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 05.1-01-PLAN.md — Animation primitives: SpriteEffects, ANIM constants, updateImage on GlassAdapter, export formatEntry/formatHpBar
-- [ ] 05.1-02-PLAN.md — AnimationEngine class: async sequencer with typewriter, sprite flash, HP drain, and skip
-- [ ] 05.1-03-PLAN.md — ScreenController integration: wire animation into resolveTurn, gesture blocking, auto-transition
+- [x] 05.1-01-PLAN.md — Animation primitives: SpriteEffects, ANIM constants, updateImage on GlassAdapter, export formatEntry/formatHpBar
+- [x] 05.1-02-PLAN.md — AnimationEngine class: async sequencer with typewriter, sprite flash, HP drain, and skip
+- [x] 05.1-03-PLAN.md — ScreenController integration: wire animation into resolveTurn, gesture blocking, auto-transition
 
 ### Phase 6: Integration
 **Goal**: A complete battle plays from main menu to win/loss screen on actual G2 hardware without crashes, data errors, or navigation dead ends
@@ -149,7 +149,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 6
 | 3. Battle Engine | 4/4 | Complete | 2026-02-26 |
 | 4. AI Opponent | 1/1 | Complete | 2026-02-26 |
 | 5. Screen Layer | 3/3 | Complete | 2026-02-26 |
-| 5.1 Battle Animations | 0/3 | Not started | - |
+| 5.1 Battle Animations | 3/3 | Complete | 2026-02-27 |
 | 6. Integration | 0/2 | Not started | - |
 
 ---
