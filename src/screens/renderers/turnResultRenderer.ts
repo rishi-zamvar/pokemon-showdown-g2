@@ -65,18 +65,29 @@ export function formatEntry(entry: TurnLogEntry, state?: BattleState): string {
   const label = actorLabel(entry.actor, state);
 
   switch (entry.kind) {
+    // --- Original kinds (updated for PS-accurate text) ---
     case 'DAMAGE':
       return `${label} used ${moveDisplayName(d.move)}! ${d.damage} dmg`;
     case 'MISS':
       return `${label} used ${moveDisplayName(d.move)}... missed!`;
     case 'FAINT':
       return `${d.pokemon} fainted!`;
-    case 'STATUS_INFLICT':
-      return `${d.pokemon} was ${d.status}!`;
+    case 'STATUS_INFLICT': {
+      const status = String(d.status);
+      const name = String(d.pokemon);
+      if (status === 'brn') return `${name} was burned!`;
+      if (status === 'frz') return `${name} was frozen solid!`;
+      if (status === 'par') return `${name} is paralyzed! It may be unable to move!`;
+      if (status === 'psn') return `${name} was poisoned!`;
+      if (status === 'tox') return `${name} was badly poisoned!`;
+      if (status === 'slp') return `${name} fell asleep!`;
+      return `${name} was ${status}!`;
+    }
     case 'STATUS_TICK':
       return `${d.pokemon} took ${d.status} damage!`;
     case 'SWITCH':
-      return `Go! ${d.pokemon}!`;
+      if (entry.actor === 'player') return `Go! ${d.pokemon}!`;
+      return `Foe sent out ${d.pokemon}!`;
     case 'TERA':
       return `${label} Terastallized! [${d.teraType}]`;
     case 'WIN':
@@ -86,11 +97,225 @@ export function formatEntry(entry: TurnLogEntry, state?: BattleState): string {
     case 'PP_OUT':
       return `No PP left for ${moveDisplayName(d.move)}!`;
     case 'PARALYSIS_SKIP':
-      return `${d.pokemon} is paralyzed!`;
+      return `${d.pokemon} is paralyzed! It can't move!`;
     case 'FROZEN':
       return `${d.pokemon} is frozen solid!`;
     case 'ASLEEP':
-      return `${d.pokemon} is fast asleep!`;
+      return `${d.pokemon} is fast asleep.`;
+
+    // --- Type effectiveness ---
+    case 'SUPER_EFFECTIVE':
+      return "It's super effective!";
+    case 'RESISTED':
+      return "It's not very effective...";
+    case 'IMMUNE':
+      return `It doesn't affect ${d.pokemon}...`;
+
+    // --- Stat changes ---
+    case 'STAT_BOOST': {
+      const boostName = String(d.pokemon);
+      const boostStat = STAT_NAMES[String(d.stat)] ?? String(d.stat);
+      const boostAmt = Number(d.amount);
+      const boostVerb = boostAmt >= 3 ? 'rose drastically!' : boostAmt >= 2 ? 'rose sharply!' : 'rose!';
+      return `${boostName}'s ${boostStat} ${boostVerb}`;
+    }
+    case 'STAT_UNBOOST': {
+      const dropName = String(d.pokemon);
+      const dropStat = STAT_NAMES[String(d.stat)] ?? String(d.stat);
+      const dropAmt = Number(d.amount);
+      const dropVerb = dropAmt >= 3 ? 'fell severely!' : dropAmt >= 2 ? 'fell harshly!' : 'fell!';
+      return `${dropName}'s ${dropStat} ${dropVerb}`;
+    }
+    case 'STAT_CLEAR': {
+      const clearType = String(d.type);
+      const clearName = String(d.pokemon ?? '');
+      if (clearType === 'clearall') return 'All stat changes were eliminated!';
+      if (clearType === 'swap') return `${clearName} switched stat changes with its target!`;
+      if (clearType === 'invert') return `${clearName}'s stat changes were inverted!`;
+      if (clearType === 'copy') return `${clearName} copied ${d.target}'s stat changes!`;
+      return `${clearName}'s stat changes were removed!`;
+    }
+
+    // --- Volatiles ---
+    case 'VOLATILE_START': {
+      const vsName = String(d.pokemon);
+      const vol = String(d.volatile).toLowerCase();
+      if (vol.includes('confusion')) return `${vsName} became confused!`;
+      if (vol.includes('substitute')) return `${vsName} put in a substitute!`;
+      if (vol.includes('taunt')) return `${vsName} fell for the taunt!`;
+      if (vol.includes('encore')) return `${vsName} must do an encore!`;
+      if (vol.includes('disable')) return `${vsName}'s ${d.move || 'move'} was disabled!`;
+      if (vol.includes('leechseed')) return `${vsName} was seeded!`;
+      if (vol.includes('curse')) return `${vsName} is afflicted by the curse!`;
+      if (vol.includes('perishsong') || vol.includes('perish')) return 'All Pokemon hearing the song will faint in three turns!';
+      if (vol.includes('trapped') || vol.includes('partiallytrapped')) return `${vsName} can no longer escape!`;
+      if (vol.includes('destinybond')) return `${vsName} is hoping to take its attacker down with it!`;
+      if (vol.includes('futuresight') || vol.includes('doomdesire')) return `${vsName} foresaw an attack!`;
+      return `${vsName} is affected by ${d.volatile}!`;
+    }
+    case 'VOLATILE_END': {
+      const veName = String(d.pokemon);
+      const veVol = String(d.volatile).toLowerCase();
+      if (veVol.includes('confusion')) return `${veName} snapped out of its confusion!`;
+      if (veVol.includes('substitute')) return `${veName}'s substitute faded!`;
+      if (veVol.includes('taunt')) return `${veName} shook off the taunt!`;
+      if (veVol.includes('encore')) return `${veName}'s encore ended!`;
+      if (veVol.includes('disable')) return `${veName}'s move is no longer disabled!`;
+      if (veVol.includes('leechseed')) return `${veName} was freed from Leech Seed!`;
+      return `${veName} is no longer affected by ${d.volatile}!`;
+    }
+
+    // --- Weather ---
+    case 'WEATHER': {
+      const weatherKey = String(d.weather).toLowerCase();
+      const weatherPhase = String(d.phase);
+      const weatherLookup = WEATHER_TEXT[weatherKey];
+      if (!weatherLookup) {
+        return weatherPhase === 'end' ? 'The weather cleared.' : `The weather changed to ${d.weather}!`;
+      }
+      return weatherPhase === 'end' ? weatherLookup.end : weatherLookup.start;
+    }
+
+    // --- Terrain ---
+    case 'TERRAIN': {
+      const terrainRaw = String(d.terrain).replace(/^move:\s*/i, '').toLowerCase();
+      const terrainPhase = String(d.phase);
+      const terrainLookup = TERRAIN_TEXT[terrainRaw];
+      if (!terrainLookup) {
+        return terrainPhase === 'end' ? 'The terrain returned to normal.' : `${d.terrain} appeared!`;
+      }
+      return terrainPhase === 'end' ? terrainLookup.end : terrainLookup.start;
+    }
+
+    // --- Side conditions ---
+    case 'SIDE_START': {
+      const sideEffect = String(d.effect);
+      const sideTeam = teamLabel(entry.actor);
+      if (sideEffect.includes('Stealth Rock')) return `Pointed stones float in the air around ${sideTeam}!`;
+      if (sideEffect.includes('Spikes')) return `Spikes were scattered on the ground all around ${sideTeam}!`;
+      if (sideEffect.includes('Toxic Spikes')) return `Poison spikes were scattered on the ground all around ${sideTeam}!`;
+      if (sideEffect.includes('Sticky Web')) return `A sticky web spreads beneath ${sideTeam}!`;
+      if (sideEffect.includes('Reflect')) return `Reflect made ${sideTeam} stronger against physical moves!`;
+      if (sideEffect.includes('Light Screen')) return `Light Screen made ${sideTeam} stronger against special moves!`;
+      if (sideEffect.includes('Aurora Veil')) return `Aurora Veil made ${sideTeam} stronger against physical and special moves!`;
+      if (sideEffect.includes('Tailwind')) return `The Tailwind blew from behind ${sideTeam}!`;
+      return `${sideEffect} started on ${sideTeam}!`;
+    }
+    case 'SIDE_END': {
+      const endEffect = String(d.effect);
+      const endTeam = teamLabel(entry.actor);
+      if (endEffect.includes('Stealth Rock')) return `The pointed stones disappeared from around ${endTeam}!`;
+      if (endEffect.includes('Spikes')) return `The spikes disappeared from the ground around ${endTeam}!`;
+      if (endEffect.includes('Toxic Spikes')) return `The poison spikes disappeared from the ground around ${endTeam}!`;
+      if (endEffect.includes('Sticky Web')) return `The sticky web disappeared from beneath ${endTeam}!`;
+      if (endEffect.includes('Reflect')) return `${endTeam === 'your team' ? 'Your' : "The foe's"} team's Reflect wore off!`;
+      if (endEffect.includes('Light Screen')) return `${endTeam === 'your team' ? 'Your' : "The foe's"} team's Light Screen wore off!`;
+      if (endEffect.includes('Aurora Veil')) return `${endTeam === 'your team' ? 'Your' : "The foe's"} team's Aurora Veil wore off!`;
+      if (endEffect.includes('Tailwind')) return `${endTeam === 'your team' ? 'Your' : "The foe's"} team's Tailwind petered out!`;
+      return `${endEffect} ended on ${endTeam}!`;
+    }
+
+    // --- Heal ---
+    case 'HEAL': {
+      const healName = String(d.pokemon);
+      const healSource = String(d.source ?? '');
+      if (healSource.includes('Wish')) return `${healName}'s wish came true!`;
+      if (healSource.includes('Leftovers')) return `${healName} restored a little HP using its Leftovers!`;
+      if (healSource.includes('Grassy Terrain')) return `${healName}'s HP was restored.`;
+      if (healSource.includes('drain')) return `${healName} had its energy drained!`;
+      if (healSource) return `${healName} restored HP. (${healSource})`;
+      return `${healName} had its HP restored.`;
+    }
+
+    // --- Items ---
+    case 'ITEM_REVEAL':
+      return `[${d.pokemon}'s ${d.item}]`;
+    case 'ITEM_CONSUME':
+      if (d.eaten) return `${d.pokemon} ate its ${d.item}!`;
+      return `${d.pokemon} lost its ${d.item}!`;
+
+    // --- Abilities ---
+    case 'ABILITY':
+      if (d.ended) return `${d.pokemon}'s Ability was suppressed!`;
+      return `[${d.pokemon}'s ${d.ability}]`;
+
+    // --- Protect/Endure ---
+    case 'PROTECT': {
+      const protName = String(d.pokemon);
+      const protEffect = String(d.effect).toLowerCase();
+      if (protEffect.includes('protect') || protEffect.includes('baneful bunker') || protEffect.includes('silk trap') || protEffect.includes('burning bulwark'))
+        return `${protName} protected itself!`;
+      if (protEffect.includes('endure')) return `${protName} braced itself!`;
+      return `${protName} protected itself!`;
+    }
+
+    // --- Multi-hit ---
+    case 'HIT_COUNT': {
+      const hitCount = Number(d.count);
+      return hitCount === 1 ? 'The Pokemon was hit 1 time!' : `The Pokemon was hit ${hitCount} times!`;
+    }
+
+    // --- Move failure ---
+    case 'MOVE_FAIL':
+      return 'But it failed!';
+
+    // --- Charging/Prepare ---
+    case 'PREPARE': {
+      const prepName = String(d.pokemon);
+      const prepMove = String(d.move).toLowerCase();
+      if (prepMove.includes('solar')) return `${prepName} absorbed light!`;
+      if (prepMove.includes('fly')) return `${prepName} flew up high!`;
+      if (prepMove.includes('dig')) return `${prepName} burrowed its way under the ground!`;
+      if (prepMove.includes('bounce')) return `${prepName} sprang up!`;
+      if (prepMove.includes('dive')) return `${prepName} hid underwater!`;
+      if (prepMove.includes('phantom')) return `${prepName} vanished instantly!`;
+      if (prepMove.includes('meteor')) return `${prepName} became cloaked in a harsh light!`;
+      return `${prepName} is charging power!`;
+    }
+
+    // --- Recharge ---
+    case 'RECHARGE':
+      return `${d.pokemon} must recharge!`;
+
+    // --- Transform ---
+    case 'TRANSFORM':
+      return `${d.pokemon} transformed into ${d.target}!`;
+
+    // --- Status cure ---
+    case 'CURE_STATUS': {
+      const cureName = String(d.pokemon);
+      const cureStatus = String(d.status);
+      if (cureStatus === 'brn') return `${cureName}'s burn was healed!`;
+      if (cureStatus === 'frz') return `${cureName} thawed out!`;
+      if (cureStatus === 'par') return `${cureName} was cured of paralysis!`;
+      if (cureStatus === 'psn' || cureStatus === 'tox') return `${cureName} was cured of its poisoning!`;
+      if (cureStatus === 'slp') return `${cureName} woke up!`;
+      return `${cureName} was cured of ${cureStatus}!`;
+    }
+
+    // --- Cant expansions ---
+    case 'FLINCH_SKIP':
+      return `${d.pokemon} flinched and couldn't move!`;
+    case 'RECHARGE_SKIP':
+      return `${d.pokemon} must recharge!`;
+
+    // --- Activate (generic) ---
+    case 'ACTIVATE': {
+      const actName = String(d.pokemon);
+      const actEffect = String(d.effect).toLowerCase();
+      if (actEffect.includes('substitute')) return `The substitute took damage for ${actName}!`;
+      if (actEffect.includes('confusion')) return `${actName} is confused!`;
+      if (actEffect.includes('destiny bond')) return `${actName} took its attacker down with it!`;
+      if (actEffect.includes('taunt')) return `${actName} can't use ${d.move || 'the move'} after the taunt!`;
+      if (actEffect.includes('disable')) return `${actName}'s ${d.move || 'move'} is disabled!`;
+      if (actEffect.includes('trapped')) return `${actName} can't escape!`;
+      return `[${actName}: ${d.effect}]`;
+    }
+
+    // --- Generic text fallback ---
+    case 'TEXT':
+      return String(d.text ?? '');
+
     default:
       return '';
   }
