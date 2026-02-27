@@ -17,8 +17,8 @@
 import type { GlassAdapter, GestureEvent } from '../types/contracts.js';
 import type { BattleState, TurnLogEntry, PlayerAction } from '../types/battleState.js';
 import type { ScreenState } from './ScreenState.js';
-import { BattleEngine } from '../battle/BattleEngine.js';
-import { AIOpponent } from '../battle/AIOpponent.js';
+import { SimBattleAdapter } from '../battle/SimBattleAdapter.js';
+import { SimAIOpponent } from '../battle/SimAIOpponent.js';
 import { DataLoader } from '../data/DataLoader.js';
 import { AnimationEngine } from '../animation/AnimationEngine.js';
 import { renderMainMenu } from './renderers/mainMenuRenderer.js';
@@ -55,6 +55,9 @@ export class ScreenController {
 
   /** Render the main menu on glasses. Called once after construction. */
   async init(): Promise<void> {
+    // Bootstrap startup page with minimal single text container
+    await this.glass.bootstrapStartup();
+    // Now render the actual main menu (uses rebuildPageContainer)
     await this.render();
   }
 
@@ -141,8 +144,11 @@ export class ScreenController {
       case 0: // "Enter Battle"
         await this.startNewBattle();
         break;
-      case 1: // "Refresh Sprites"
-        this.state = { ...this.state, screen: 'SPRITE_REFRESH', cursorIndex: 0 };
+      case 1: // "Clear Sprites"
+        SpriteService.clearAllBitmapCache();
+        await this.glass.showMessage('All sprites cleared!');
+        await this.delay(1000);
+        this.state = { ...this.state, screen: 'MAIN_MENU', cursorIndex: 0 };
         await this.render();
         break;
     }
@@ -307,9 +313,35 @@ export class ScreenController {
   // ---------------------------------------------------------------------------
 
   private async startNewBattle(): Promise<void> {
+    try {
+      await this.startNewBattleInner();
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      console.error('[BATTLE] startNewBattle failed:', err);
+      console.error('[BATTLE] Stack:', err.stack);
+      const stackLines = (err.stack ?? '').split('\n').slice(0, 5).join('\n');
+      await this.glass.showMessage(`Error:\n${err.message}\n${stackLines}`);
+    }
+  }
+
+  private async startNewBattleInner(): Promise<void> {
     await this.glass.showMessage('Generating teams...');
 
-    const battleState = BattleEngine.startBattle();
+    console.log('[BATTLE] Step 1: calling SimBattleAdapter.startBattle()...');
+    let battleState;
+    try {
+      battleState = SimBattleAdapter.startBattle();
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      console.error('[BATTLE] startBattle() threw:', err);
+      console.error('[BATTLE] Stack:', err.stack);
+      // Show truncated stack on glasses for debugging
+      const stackLines = (err.stack ?? '').split('\n').slice(0, 6).join('\n');
+      await this.glass.showMessage(`TeamGen:\n${err.message}\n${stackLines}`);
+      return; // Don't rethrow — we've already shown the error
+    }
+    console.log('[BATTLE] Step 2: teams generated OK');
+    console.log('[BATTLE] Teams generated:', battleState.playerSide.team.map(m => m.name), 'vs', battleState.opponentSide.team.map(m => m.name));
     this.state = {
       screen: 'BATTLE_HUD',
       cursorIndex: 0,
@@ -322,7 +354,14 @@ export class ScreenController {
       ...battleState.opponentSide.team,
     ].map(mon => mon.species.toLowerCase());
 
-    await DataLoader.loadMatchData(allSlugs);
+    console.log('[BATTLE] Step 3: loading match data for:', allSlugs);
+    try {
+      await DataLoader.loadMatchData(allSlugs);
+    } catch (e) {
+      console.error('[BATTLE] loadMatchData threw:', e);
+      throw new Error(`Match data failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    console.log('[BATTLE] Step 4: match data loaded, showing sprites msg...');
     await this.glass.showMessage('Loading sprites...');
 
     // Collect dex numbers for sprite loading and refresh tracking
@@ -340,15 +379,34 @@ export class ScreenController {
       .filter(n => n > 0);
 
     // Fetch and cache bitmap sprites — front for opponents, back for player
-    await SpriteService.fetchAndCacheBitmaps(this.opponentDexNums, this.playerDexNums);
+    console.log('[SPRITES] Fetching sprites for opp:', this.opponentDexNums, 'player:', this.playerDexNums);
+    try {
+      await SpriteService.fetchAndCacheBitmaps(this.opponentDexNums, this.playerDexNums);
+    } catch (e) {
+      console.error('[SPRITES] fetchAndCacheBitmaps threw:', e);
+      // Continue without sprites — battle still works
+    }
 
+    // Debug: check what was cached
+    for (const num of this.opponentDexNums) {
+      const cached = SpriteService.getBitmapCached(num);
+      console.log(`[SPRITES] opp dex=${num} cached=${cached ? cached.length + ' bytes BMP' : 'NULL'}`);
+    }
+    for (const num of this.playerDexNums) {
+      const cached = SpriteService.getBackBitmapCached(num);
+      console.log(`[SPRITES] player dex=${num} back cached=${cached ? cached.length + ' bytes BMP' : 'NULL'}`);
+    }
+
+    console.log('[BATTLE] Step 5: rendering battle HUD...');
     await this.render();
+    console.log('[BATTLE] Step 6: render complete!');
   }
 
   private async resolveTurn(playerAction: PlayerAction): Promise<void> {
     const prevState = this.state.battleState!;
-    const aiAction = AIOpponent.pickAction(prevState);
-    const result = BattleEngine.submitAction(prevState, playerAction, aiAction);
+    const battle = SimBattleAdapter.getBattle()!;
+    const aiAction = SimAIOpponent.pickAction(battle);
+    const result = SimBattleAdapter.submitAction(prevState, playerAction, aiAction);
 
     this.lastTurnLog = result.log;
     this.state = {
@@ -400,41 +458,38 @@ export class ScreenController {
   private async resolveSwitch(toIndex: number): Promise<void> {
     let bs = this.state.battleState!;
     const log: TurnLogEntry[] = [];
+    const battle = SimBattleAdapter.getBattle()!;
 
-    // Check if opponent's active is also fainted (double faint) — auto-switch AI
+    // Check if opponent's active is also fainted (double faint)
     const opponentSide = bs.opponentSide;
     const opponentActive = opponentSide.team[opponentSide.activeIndex]!;
     if (opponentActive.fainted) {
-      // Find first alive non-active opponent Pokemon
-      const aiSwitchIndex = opponentSide.team.findIndex(
-        (mon, i) => i !== opponentSide.activeIndex && !mon.fainted,
-      );
-      if (aiSwitchIndex !== -1) {
-        const aiResult = BattleEngine.submitSwitch(bs, 'opponent', aiSwitchIndex);
-        log.push(...aiResult.log);
-        bs = aiResult.nextState;
-      }
+      // AI picks its switch target
+      const aiSwitchIndex = SimAIOpponent.pickSwitch(battle);
+      // Submit both switches together via the aiSwitchIndex parameter
+      const result = SimBattleAdapter.submitSwitch(bs, 'player', toIndex, aiSwitchIndex);
+      log.push(...result.log);
+      bs = result.nextState;
+    } else {
+      // Only player needs to switch
+      const result = SimBattleAdapter.submitSwitch(bs, 'player', toIndex);
+      log.push(...result.log);
+      bs = result.nextState;
     }
-
-    // Now submit the player's forced switch
-    const result = BattleEngine.submitSwitch(bs, 'player', toIndex);
-    log.push(...result.log);
-    const nextState = result.nextState;
 
     this.lastTurnLog = log;
     this.state = {
       ...this.state,
-      battleState: nextState,
+      battleState: bs,
       cursorIndex: 0,
     };
 
     // Determine next screen based on resulting phase
-    switch (nextState.phase) {
+    switch (bs.phase) {
       case 'WAITING_FOR_ACTION':
         this.state = { ...this.state, screen: 'BATTLE_HUD' };
         break;
       case 'WAITING_FOR_SWITCH':
-        // Still more switches needed — stay on switch screen
         this.state = { ...this.state, screen: 'SWITCH_SELECT' };
         break;
       case 'BATTLE_OVER':
@@ -481,13 +536,26 @@ export class ScreenController {
       }
       case 'BATTLE_HUD': {
         const result = renderBattleHud(this.state.battleState!);
-        await this.glass.showBattleHud(
-          result.oppText,
-          result.playerText,
-          result.status,
-          result.oppSprite,
-          result.playerSprite,
-        );
+        console.log('[RENDER] BATTLE_HUD oppSprite:', result.oppSprite ? `${result.oppSprite.length} bytes BMP` : 'NONE');
+        console.log('[RENDER] BATTLE_HUD playerSprite:', result.playerSprite ? `${result.playerSprite.length} bytes BMP` : 'NONE');
+        try {
+          await this.glass.showBattleHud(
+            result.oppText,
+            result.playerText,
+            result.status,
+            result.oppSprite,
+            result.playerSprite,
+          );
+        } catch (e: unknown) {
+          console.error('[RENDER] showBattleHud threw:', e);
+          // Retry without sprites to see if sprites are the issue
+          console.log('[RENDER] Retrying WITHOUT sprites...');
+          await this.glass.showBattleHud(
+            result.oppText,
+            result.playerText,
+            result.status,
+          );
+        }
         break;
       }
       case 'ACTION_MENU': {
@@ -513,7 +581,7 @@ export class ScreenController {
         break;
       }
       case 'TURN_RESULT': {
-        const result = renderTurnResult(this.lastTurnLog);
+        const result = renderTurnResult(this.lastTurnLog, this.state.battleState ?? undefined);
         await this.glass.showText(result.text, result.status);
         break;
       }
