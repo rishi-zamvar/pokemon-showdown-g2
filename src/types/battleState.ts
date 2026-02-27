@@ -44,6 +44,7 @@ export interface ActivePokemon extends BattlePokemon {
   teraActive: boolean;
   ppUsed: Record<string, number>;
   fainted: boolean;
+  volatiles: string[];  // Active volatile abbreviations e.g. ['CNF', 'TAUNT']
 }
 
 // ---------------------------------------------------------------------------
@@ -170,5 +171,6 @@ export function initActivePokemon(pokemon: BattlePokemon): ActivePokemon {
     teraActive: false,
     ppUsed: {},
     fainted: false,
+    volatiles: [],
   };
 }
