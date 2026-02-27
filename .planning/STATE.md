@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 5.3 of 6 (Switch Animation Polish)
-Plan: 2 of N in Phase 5.3 (05.3-01 and 05.3-02 complete)
-Status: In progress — 05.3-01 and 05.3-02 complete
-Last activity: 2026-02-27 — Completed 05.3-01 (Protocol parser expansion)
+Plan: 07 of N in Phase 5.3 (05.3-01, 05.3-02, 05.3-07 complete)
+Status: In progress — 05.3-07 complete (getDexNum baseSpecies fallback)
+Last activity: 2026-02-27 — Completed 05.3-07-PLAN.md (getDexNum forme fix)
 
 Progress: [████████████████████] ~85% (21/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 partial + 2 Phase 5.3)
 
@@ -122,6 +122,8 @@ Recent decisions affecting current work:
 - [05.3-01]: cant case expanded with flinch/recharge/taunt/disable handling instead of silent ignore
 - [05.3-02]: encodeBmp exported as additive change -- internal callers unaffected
 - [05.3-02]: Lazy caching via module-level null variables -- frames generated on first switch, reused forever
+- [05.3-07]: getDexNum baseSpecies fallback: strip forme suffix after first hyphen when exact slug fails — resolves Gastrodon-East, Indeedee-F, etc.
+- [05.3-07]: Four getDexNum sites updated: AnimationEngine, battleHudRenderer, ScreenController (startNewBattleInner + updatePokemonSlot)
 
 ### Pending Todos
 
@@ -145,6 +147,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-27T16:50:00Z
-Stopped at: Completed 05.3-01-PLAN.md (protocol parser expansion)
+Last session: 2026-02-27T16:57:00Z
+Stopped at: Completed 05.3-07-PLAN.md (getDexNum baseSpecies fallback)
 Resume file: None
