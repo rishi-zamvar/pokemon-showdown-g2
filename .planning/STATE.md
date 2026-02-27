@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 5.3 — Switch animation polish (pokeball frames, sprite slide, text polish).
+**Current focus:** Phase 6 — Integration (full loop from main menu to win/loss on device).
 
 ## Current Position
 
-Phase: 5.3 of 6 (Switch Animation Polish)
-Plan: 05b of N in Phase 5.3 (05.3-01, 05.3-02, 05.3-03, 05.3-04, 05.3-05, 05.3-05b, 05.3-07 complete)
-Status: In progress — 05.3-05b complete (resolveSwitch animation wiring)
-Last activity: 2026-02-27 — Completed 05.3-05b-PLAN.md (resolveSwitch animation playback)
+Phase: 6 of 6 (Integration)
+Plan: Not started
+Status: Phase 5.3 complete, ready for Phase 6
+Last activity: 2026-02-27 — Completed Phase 5.3 (Switch Animation & Text Polish)
 
-Progress: [████████████████████] ~85% (21/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 partial + 2 Phase 5.3)
+Progress: [█████████████████████████] ~92% (27/~29 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 + 8 Phase 5.3)
 
 ## Performance Metrics
 

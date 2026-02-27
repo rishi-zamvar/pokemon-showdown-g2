@@ -16,8 +16,8 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 - [x] **Phase 4: AI Opponent** - Heuristic AI that scores moves by expected damage and switches intelligently
 - [x] **Phase 5: Screen Layer** - All G2 screens and gesture navigation wired to battle state
 - [x] **Phase 5.1: Battle Animations** (INSERTED) - Game Boy-style battle animations: typewriter text, sprite flash, HP drain
-- [ ] **Phase 5.2: @pkmn/sim Integration** (INSERTED) - Replace custom battle engine with @pkmn/sim for accurate Gen 9 mechanics
-- [ ] **Phase 5.3: Switch Animation & Text Polish** (INSERTED) - Switch animation, complete protocol text, HUD volatiles
+- [x] **Phase 5.2: @pkmn/sim Integration** (INSERTED) - Replace custom battle engine with @pkmn/sim for accurate Gen 9 mechanics
+- [x] **Phase 5.3: Switch Animation & Text Polish** (INSERTED) - Switch animation, complete protocol text, HUD volatiles
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
 
 ## Phase Details
@@ -135,10 +135,12 @@ Plans:
   4. AI opponent uses @pkmn/sim's built-in RandomPlayerAI or the existing heuristic AI adapted to sim state
   5. All existing screens, animations, sprites, and gesture navigation continue to work without changes
   6. Team generation uses @pkmn/sim's built-in random team generation
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 5.2 to break down)
+- [x] 05.2-01-PLAN.md — SimBattleAdapter + LogParser integration with @pkmn/sim
+- [x] 05.2-02-PLAN.md — SimAIOpponent using sim request/choice system
+- [x] 05.2-03-PLAN.md — ScreenController wiring + old engine deprecation
 
 ### Phase 5.3: Switch Animation & Text Polish (INSERTED)
 **Goal**: Switching Pokemon plays a 3-frame pokeball animation sequence, then shows the new Pokemon sprite with a 2-3px slide effect and "YOU SENT OUT [POKEMON]" text. All animation entries (damage, status, faint, switch, tera) display proper descriptive text — no undefined or missing values.
@@ -154,14 +156,14 @@ Plans:
 **Plans**: 8 plans
 
 Plans:
-- [ ] 05.3-01-PLAN.md — Expand TurnLogEntry kinds + LogParser with all ~35 PS protocol message types
-- [ ] 05.3-02-PLAN.md — Create AnimationFrames.ts (pokeball/square/checkbox BMP) + export encodeBmp
-- [ ] 05.3-03-PLAN.md — Add PS-accurate formatEntry text for all new TurnLogEntry kinds
-- [ ] 05.3-04-PLAN.md — HUD volatile status display (ActivePokemon.volatiles + SimBattleAdapter + battleHudRenderer)
-- [ ] 05.3-05-PLAN.md — AnimationEngine SWITCH/HEAL effects (3-frame + sprite slide + heal drain)
-- [ ] 05.3-05b-PLAN.md — ScreenController resolveSwitch animation wiring (no preloadSprites)
-- [ ] 05.3-07-PLAN.md — Fix getDexNum forme normalization for variant species (Gastrodon-East etc.)
-- [ ] 05.3-06-PLAN.md — Build verification + human-verify checkpoint
+- [x] 05.3-01-PLAN.md — Expand TurnLogEntry kinds + LogParser with all ~35 PS protocol message types
+- [x] 05.3-02-PLAN.md — Create AnimationFrames.ts (pokeball/square/checkbox BMP) + export encodeBmp
+- [x] 05.3-03-PLAN.md — Add PS-accurate formatEntry text for all new TurnLogEntry kinds
+- [x] 05.3-04-PLAN.md — HUD volatile status display (ActivePokemon.volatiles + SimBattleAdapter + battleHudRenderer)
+- [x] 05.3-05-PLAN.md — AnimationEngine SWITCH/HEAL effects (3-frame + sprite slide + heal drain)
+- [x] 05.3-05b-PLAN.md — ScreenController resolveSwitch animation wiring (no preloadSprites)
+- [x] 05.3-07-PLAN.md — Fix getDexNum forme normalization for variant species (Gastrodon-East etc.)
+- [x] 05.3-06-PLAN.md — Build verification + human-verify checkpoint
 
 ### Phase 6: Integration
 **Goal**: A complete battle plays from main menu to win/loss screen on actual G2 hardware without crashes, data errors, or navigation dead ends
@@ -191,8 +193,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 | 4. AI Opponent | 1/1 | Complete | 2026-02-26 |
 | 5. Screen Layer | 3/3 | Complete | 2026-02-26 |
 | 5.1 Battle Animations | 3/3 | Complete | 2026-02-27 |
-| 5.2 @pkmn/sim Integration | 0/? | Not started | - |
-| 5.3 Switch Animation & Text Polish | 0/8 | Not started | - |
+| 5.2 @pkmn/sim Integration | 3/3 | Complete | 2026-02-27 |
+| 5.3 Switch Animation & Text Polish | 8/8 | Complete | 2026-02-27 |
 | 6. Integration | 0/2 | Not started | - |
 
 ---
