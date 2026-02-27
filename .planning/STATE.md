@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 5.2 of 6 (@pkmn/sim Integration) -- In progress
-Plan: 2 of ? in Phase 5.2
-Status: Plan 05.2-02 complete — SimAIOpponent created
-Last activity: 2026-02-27 — Completed 05.2-02-PLAN.md (SimAIOpponent)
+Plan: 2 of 3 in Phase 5.2
+Status: Plans 05.2-01 and 05.2-02 complete
+Last activity: 2026-02-27 — Completed 05.2-01-PLAN.md (SimBattleAdapter + LogParser)
 
 Progress: [█████████████████] ~76% (18/~24 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 2 Phase 5.2)
 
@@ -106,6 +106,10 @@ Recent decisions affecting current work:
 - [05.1-03]: prevState used for initial HUD display so animation drains from correct starting HP
 - [05.1-03]: Final showBattleHud(nextState) after animation ensures correct HP even if skipped mid-drain
 - [05.1-03]: TURN_RESULT kept for resolveSwitch — forced switches don't animate
+- [05.2-01]: filterSplitLines() strips |split|pX markers + following secret line; keeps shared line — prevents duplicate TurnLogEntry per event
+- [05.2-01]: HP percentage mod: targetHp/targetMaxHp in DAMAGE entries are log-string values (percentages for opponent) — only used for animation, not state
+- [05.2-01]: damage=0 set in LogParser (stateless); fillDamageValues() in SimBattleAdapter fills real damage from prevHp map diff
+- [05.2-01]: SimBattleAdapter.getBattle() exposes internal Battle instance to SimAIOpponent without coupling to adapter internals
 - [05.2-02]: SimAIOpponent casts activeRequest as any — ChoiceRequest union narrowed via wait/forceSwitch/active property checks
 - [05.2-02]: Random move selection replaces damage scoring — sim ChoiceRequest guarantees legal moves; matches PS RandomPlayerAI
 - [05.2-02]: Tera at 20% via canTerastallize field in request — sim tracks teraUsed internally, no flag needed in SimAIOpponent
@@ -132,6 +136,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-27T15:04:11Z
-Stopped at: Completed 05.2-02-PLAN.md (SimAIOpponent). Next: 05.2-03 (ScreenController wiring).
+Last session: 2026-02-27T15:06:57Z
+Stopped at: Completed 05.2-01-PLAN.md (SimBattleAdapter + LogParser). Plans 05.2-02 was already complete. Next: 05.2-03 (ScreenController wiring).
 Resume file: None
