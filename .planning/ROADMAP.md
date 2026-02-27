@@ -17,6 +17,7 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 - [x] **Phase 5: Screen Layer** - All G2 screens and gesture navigation wired to battle state
 - [x] **Phase 5.1: Battle Animations** (INSERTED) - Game Boy-style battle animations: typewriter text, sprite flash, HP drain
 - [ ] **Phase 5.2: @pkmn/sim Integration** (INSERTED) - Replace custom battle engine with @pkmn/sim for accurate Gen 9 mechanics
+- [ ] **Phase 5.3: Switch Animation & Text Polish** (INSERTED) - Switch animation, complete protocol text, HUD volatiles
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
 
 ## Phase Details
@@ -139,6 +140,27 @@ Plans:
 Plans:
 - [ ] TBD (run /gsd:plan-phase 5.2 to break down)
 
+### Phase 5.3: Switch Animation & Text Polish (INSERTED)
+**Goal**: Switching Pokemon plays a 3-frame pokeball animation sequence, then shows the new Pokemon sprite with a 2-3px slide effect and "YOU SENT OUT [POKEMON]" text. All animation entries (damage, status, faint, switch, tera) display proper descriptive text — no undefined or missing values.
+**Depends on**: Phase 5.2
+**Requirements**: (no new requirements — polish on existing ANIM and UI requirements)
+**Success Criteria** (what must be TRUE):
+  1. When a Pokemon switches in, a 3-frame sequence plays: pokeball frame → green filled square → green checkbox square → pokemon sprite appears
+  2. The new Pokemon sprite slides 2-3 pixels left-to-right on entry
+  3. Text displays "YOU SENT OUT [POKEMON]" during the switch animation
+  4. All animation entries show proper text — no "undefined" values for damage, status, faint, switch, or tera events
+  5. Player-side activeIndex updates correctly after forced switch (faint) — name, sprite, and moves reflect the new Pokemon
+  6. Species matching between sim and UI state handles all forme variations (cosmetic, gender, mid-battle changes)
+**Plans**: 6 plans
+
+Plans:
+- [ ] 05.3-01-PLAN.md — Expand TurnLogEntry kinds + LogParser with all ~35 PS protocol message types
+- [ ] 05.3-02-PLAN.md — Create AnimationFrames.ts (pokeball/square/checkbox BMP) + export encodeBmp
+- [ ] 05.3-03-PLAN.md — Add PS-accurate formatEntry text for all new TurnLogEntry kinds
+- [ ] 05.3-04-PLAN.md — HUD volatile status display (ActivePokemon.volatiles + SimBattleAdapter + battleHudRenderer)
+- [ ] 05.3-05-PLAN.md — AnimationEngine SWITCH/HEAL effects + ScreenController resolveSwitch animation wiring
+- [ ] 05.3-06-PLAN.md — Build verification + human-verify checkpoint
+
 ### Phase 6: Integration
 **Goal**: A complete battle plays from main menu to win/loss screen on actual G2 hardware without crashes, data errors, or navigation dead ends
 **Depends on**: Phase 5
@@ -157,7 +179,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -168,6 +190,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 6
 | 5. Screen Layer | 3/3 | Complete | 2026-02-26 |
 | 5.1 Battle Animations | 3/3 | Complete | 2026-02-27 |
 | 5.2 @pkmn/sim Integration | 0/? | Not started | - |
+| 5.3 Switch Animation & Text Polish | 0/6 | Not started | - |
 | 6. Integration | 0/2 | Not started | - |
 
 ---
