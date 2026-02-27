@@ -465,25 +465,28 @@ export class ScreenController {
   /**
    * Handle forced switch after a faint.
    * Also auto-switches the opponent if their active is fainted (double faint).
+   * Mirrors resolveTurn's animation pattern: prevState HUD -> playTurn -> nextState HUD.
    */
   private async resolveSwitch(toIndex: number): Promise<void> {
-    let bs = this.state.battleState!;
+    const prevState = this.state.battleState!;
     const log: TurnLogEntry[] = [];
     const battle = SimBattleAdapter.getBattle()!;
 
+    let bs: BattleState;
+
     // Check if opponent's active is also fainted (double faint)
-    const opponentSide = bs.opponentSide;
+    const opponentSide = prevState.opponentSide;
     const opponentActive = opponentSide.team[opponentSide.activeIndex]!;
     if (opponentActive.fainted) {
       // AI picks its switch target
       const aiSwitchIndex = SimAIOpponent.pickSwitch(battle);
       // Submit both switches together via the aiSwitchIndex parameter
-      const result = SimBattleAdapter.submitSwitch(bs, 'player', toIndex, aiSwitchIndex);
+      const result = SimBattleAdapter.submitSwitch(prevState, 'player', toIndex, aiSwitchIndex);
       log.push(...result.log);
       bs = result.nextState;
     } else {
       // Only player needs to switch
-      const result = SimBattleAdapter.submitSwitch(bs, 'player', toIndex);
+      const result = SimBattleAdapter.submitSwitch(prevState, 'player', toIndex);
       log.push(...result.log);
       bs = result.nextState;
     }
@@ -491,24 +494,31 @@ export class ScreenController {
     this.lastTurnLog = log;
     this.state = {
       ...this.state,
+      screen: 'ANIMATING',
       battleState: bs,
       cursorIndex: 0,
     };
 
-    // Determine next screen based on resulting phase
-    switch (bs.phase) {
-      case 'WAITING_FOR_ACTION':
-        this.state = { ...this.state, screen: 'BATTLE_HUD' };
-        break;
-      case 'WAITING_FOR_SWITCH':
-        this.state = { ...this.state, screen: 'SWITCH_SELECT' };
-        break;
-      case 'BATTLE_OVER':
-        this.state = { ...this.state, screen: 'END_SCREEN' };
-        break;
-    }
+    // Step 1: Show HUD with prevState (animation drains from correct starting HP)
+    const prevHud = renderBattleHud(prevState);
+    await this.glass.showBattleHud(
+      prevHud.oppText, prevHud.playerText, prevHud.status,
+      prevHud.oppSprite, prevHud.playerSprite,
+    );
 
-    await this.render();
+    // Step 2: Play switch animation
+    await this.animationEngine.playTurn(log, prevState, bs, this.glass);
+
+    // Step 3: Show HUD with final state
+    const finalHud = renderBattleHud(bs);
+    await this.glass.showBattleHud(
+      finalHud.oppText, finalHud.playerText, finalHud.status,
+      finalHud.oppSprite, finalHud.playerSprite,
+    );
+
+    // Step 4: Brief pause then transition
+    await this.delay(ANIM.POST_ANIM_DELAY_MS);
+    await this.transitionAfterTurn(bs);
   }
 
   private async transitionAfterTurn(nextState: BattleState): Promise<void> {
