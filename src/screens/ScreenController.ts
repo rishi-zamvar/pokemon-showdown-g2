@@ -365,10 +365,21 @@ export class ScreenController {
     await this.glass.showMessage('Loading sprites...');
 
     // Collect dex numbers for sprite loading and refresh tracking
+    // Handles forme variants (e.g. "Gastrodon-East") via baseSpecies fallback
     const getDexNum = (species: string): number => {
       const slug = species.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const entry = DataLoader.getPokemon(slug);
-      return entry?.num ?? 0;
+      const exact = DataLoader.getPokemon(slug);
+      if (exact?.num) return exact.num;
+
+      // Fallback: strip forme suffix (everything after first hyphen)
+      const hyphenIdx = species.indexOf('-');
+      if (hyphenIdx > 0) {
+        const baseSlug = species.slice(0, hyphenIdx).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const base = DataLoader.getPokemon(baseSlug);
+        if (base?.num) return base.num;
+      }
+
+      return 0;
     };
 
     this.playerDexNums = battleState.playerSide.team
@@ -682,11 +693,18 @@ export class ScreenController {
     fainted: boolean,
     prefix: 'opp' | 'player',
   ): void {
-    // Sprite
+    // Sprite — with baseSpecies fallback for forme variants
     const spriteEl = document.getElementById(`${prefix}-sprite`) as HTMLImageElement | null;
     if (spriteEl) {
       const slug = species.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const entry = DataLoader.getPokemon(slug);
+      let entry = DataLoader.getPokemon(slug);
+      if (!entry?.num) {
+        const hyphenIdx = species.indexOf('-');
+        if (hyphenIdx > 0) {
+          const baseSlug = species.slice(0, hyphenIdx).toLowerCase().replace(/[^a-z0-9]/g, '');
+          entry = DataLoader.getPokemon(baseSlug);
+        }
+      }
       const num = entry?.num ?? 0;
       if (num > 0) {
         spriteEl.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${num}.png`;
