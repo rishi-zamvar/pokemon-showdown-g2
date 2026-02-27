@@ -40,19 +40,11 @@ export const CONTAINER_NAMES = {
 } as const;
 
 export const SPRITE_CONFIG = {
-  /** Primary: PogoAssets pixel sprites (Gen 1-7, dex 1-809, transparent BG) */
-  POGO_URL: 'https://raw.githubusercontent.com/ZeChrales/PogoAssets/master/pixels',
-  /** Fallback: PokeAPI sprites (all gens, transparent BG) */
-  POKEAPI_URL: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon',
-  /** PokeAPI back-facing sprites (player's Pokemon faces the enemy) */
-  POKEAPI_BACK_URL: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back',
-  /** Max dex number covered by PogoAssets */
-  POGO_MAX_DEX: 809,
   /** Sprite display size in pixels on G2 display */
-  SIZE: 64,
+  SIZE: 96,
   /** Gap between sprite and adjacent text container */
   GAP: 8,
-  /** localStorage cache key prefix */
+  /** localStorage cache key prefix (legacy, used for cleanup) */
   CACHE_PREFIX: 'bitmap-sprite-',
 } as const;
 
@@ -75,6 +67,12 @@ export const ANIM = {
   MAX_HP_STEPS: 20,
   /** Delay after animation completes before returning control (ms). */
   POST_ANIM_DELAY_MS: 400,
+  /** Duration each switch-in transition frame is held (ms). */
+  SWITCH_FRAME_MS: 120,
+  /** Pixel offset for switch-in sprite slide effect (pixels shifted per frame). */
+  SWITCH_SLIDE_PX: 3,
+  /** Number of slide frames for switch-in sprite entrance. */
+  SWITCH_SLIDE_FRAMES: 2,
 } as const;
 
 export const DISPLAY_BUDGET = {

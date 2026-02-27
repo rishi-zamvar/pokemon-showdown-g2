@@ -20,9 +20,16 @@ import {
   ANIM,
   CONTAINER_IDS,
   CONTAINER_NAMES,
+  SPRITE_CONFIG,
 } from '../config/constants.js';
 import { SpriteService } from '../sprites/SpriteService.js';
 import { DataLoader } from '../data/DataLoader.js';
+import {
+  getPokeballFrame,
+  getFilledSquareFrame,
+  getCheckboxFrame,
+} from './AnimationFrames.js';
+import { encodeBmp } from '../sprites/SpriteBmpEncoder.js';
 
 type Side = 'player' | 'opponent';
 type FlashEffect = 'hit' | 'miss' | 'faint';
@@ -62,6 +69,43 @@ function getSpriteForSide(state: BattleState, side: Side): Uint8Array | null {
   return side === 'opponent'
     ? SpriteService.getBitmapCached(dexNum)
     : SpriteService.getBackBitmapCached(dexNum);
+}
+
+/**
+ * Generate a shifted version of a 1-bit BMP sprite.
+ * Reads pixels from the original BMP, shifts them by `offsetX` pixels to the
+ * right within the same canvas, then re-encodes to BMP via encodeBmp.
+ */
+function shiftSpriteBmp(original: Uint8Array, offsetX: number, size: number): Uint8Array {
+  const BMP_HEADER = 62;
+  const rowStride = Math.ceil(Math.ceil(size / 8) / 4) * 4;
+
+  // Decode BMP pixel data into a row-major pixel array (top-down)
+  const pixels = new Uint8Array(size * size);
+  for (let y = 0; y < size; y++) {
+    const srcRow = size - 1 - y; // BMP is bottom-up
+    const rowOffset = BMP_HEADER + y * rowStride;
+    for (let x = 0; x < size; x++) {
+      const byteIdx = rowOffset + Math.floor(x / 8);
+      const bitIdx = 7 - (x % 8);
+      if (original[byteIdx]! & (1 << bitIdx)) {
+        pixels[srcRow * size + x] = 1;
+      }
+    }
+  }
+
+  // Shift pixels right by offsetX
+  const shifted = new Uint8Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const srcX = x - offsetX;
+      if (srcX >= 0 && srcX < size) {
+        shifted[y * size + x] = pixels[y * size + srcX]!;
+      }
+    }
+  }
+
+  return encodeBmp(shifted, size, size);
 }
 
 export class AnimationEngine {
@@ -133,6 +177,16 @@ export class AnimationEngine {
       await glass.updateText(currentText, { left: hpStatus, right: '' });
     };
 
+    // SWITCH: animation runs BEFORE text (sequential, not concurrent)
+    if (entry.kind === 'SWITCH') {
+      const switchedSide: Side = entry.actor;
+      await this.switchAnimation(switchedSide, nextState, glass);
+      await this.typewriterText(fullText, glass, (text) => {
+        currentText = text;
+      }, () => updateDisplay());
+      return;
+    }
+
     const tasks: Promise<void>[] = [];
 
     // Typewriter text -- always runs
@@ -159,6 +213,21 @@ export class AnimationEngine {
       const faintedSide = this.findFaintedSide(faintedName, prevState);
       if (faintedSide) {
         tasks.push(this.spriteFlash(faintedSide, 'faint', prevState, glass));
+      }
+    } else if (entry.kind === 'HEAL') {
+      // Heal: reverse HP drain (bar fills up)
+      const healSide: Side = entry.actor;
+      tasks.push(this.hpHeal(
+        healSide, prevState, nextState, glass,
+        (status) => { hpStatus = status; },
+        () => updateDisplay(),
+      ));
+    } else if (entry.kind === 'STATUS_TICK') {
+      // Status tick damage: flash the affected pokemon
+      const tickSide: Side = entry.actor;
+      const tickDamage = entry.detail.targetHp as number | undefined;
+      if (tickDamage !== undefined && tickDamage >= 0) {
+        tasks.push(this.spriteFlash(tickSide, 'hit', prevState, glass));
       }
     }
 
@@ -298,6 +367,108 @@ export class AnimationEngine {
         ...mon,
         currentHp,
         fainted: currentHp <= 0,
+      };
+
+      setHpStatus(formatHpBar(tempMon));
+      await triggerUpdate();
+      await this.delay(ANIM.HP_FRAME_MS);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Switch-in animation (3-frame pokeball sequence + sprite slide)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Play the Game Boy-style switch-in animation:
+   *   1. Pokeball frame (ball being thrown)
+   *   2. Filled square (energy burst)
+   *   3. Checkbox (materialization)
+   *   4. Sprite slides in from left via shifted BMP frames
+   */
+  private async switchAnimation(
+    side: Side,
+    nextState: BattleState,
+    glass: GlassAdapter,
+  ): Promise<void> {
+    const containerID = side === 'opponent'
+      ? CONTAINER_IDS.oppSprite
+      : CONTAINER_IDS.playerSprite;
+    const containerName = side === 'opponent'
+      ? CONTAINER_NAMES.oppSprite
+      : CONTAINER_NAMES.playerSprite;
+
+    const updateImg = async (data: Uint8Array): Promise<void> => {
+      await glass.updateImage(containerID, containerName, data);
+    };
+
+    // Phase 1: 3-frame pokeball sequence
+    const frames = [getPokeballFrame(), getFilledSquareFrame(), getCheckboxFrame()];
+    for (const frame of frames) {
+      if (this.cancelled) return;
+      await updateImg(frame);
+      await this.delay(ANIM.SWITCH_FRAME_MS);
+    }
+
+    // Phase 2: Sprite slide — shifted BMP frames sliding left-to-right
+    const finalSprite = getSpriteForSide(nextState, side);
+    if (!finalSprite) return;
+
+    const size = SPRITE_CONFIG.SIZE;
+    const totalOffset = ANIM.SWITCH_SLIDE_PX * ANIM.SWITCH_SLIDE_FRAMES;
+
+    // Generate slide frames from offset to 0 (right-to-left shift decreasing)
+    for (let f = ANIM.SWITCH_SLIDE_FRAMES; f >= 1; f--) {
+      if (this.cancelled) return;
+      const offset = ANIM.SWITCH_SLIDE_PX * f;
+      // Negative offset = sprite appears shifted left, sliding right
+      const shifted = shiftSpriteBmp(finalSprite, -offset, size);
+      await updateImg(shifted);
+      await this.delay(ANIM.SWITCH_FRAME_MS);
+    }
+
+    // Final frame: sprite at home position
+    if (!this.cancelled) {
+      await updateImg(finalSprite);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // HP heal effect (reverse drain — bar fills up)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Animate HP bar filling up from prevState HP to nextState HP.
+   * Uses actual state HP values, not entry.detail percentages.
+   */
+  private async hpHeal(
+    side: Side,
+    prevState: BattleState,
+    nextState: BattleState,
+    glass: GlassAdapter,
+    setHpStatus: (status: string) => void,
+    triggerUpdate: () => Promise<void>,
+  ): Promise<void> {
+    const prevMon = getActiveMon(prevState, side);
+    const nextMon = getActiveMon(nextState, side);
+
+    const startHp = prevMon.currentHp;
+    const endHp = nextMon.currentHp;
+    const healAmount = endHp - startHp;
+
+    if (healAmount <= 0) return; // No healing occurred
+
+    const steps = Math.min(healAmount, ANIM.MAX_HP_STEPS);
+
+    for (let i = 0; i <= steps; i++) {
+      if (this.cancelled) break;
+
+      const currentHp = Math.round(startHp + (healAmount * i / steps));
+
+      const tempMon: ActivePokemon = {
+        ...prevMon,
+        currentHp,
+        fainted: false,
       };
 
       setHpStatus(formatHpBar(tempMon));
