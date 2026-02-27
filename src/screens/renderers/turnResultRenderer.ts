@@ -13,7 +13,7 @@ function actorLabel(actor: 'player' | 'opponent'): string {
   return actor === 'player' ? 'Your' : "Foe's";
 }
 
-function formatEntry(entry: TurnLogEntry): string {
+export function formatEntry(entry: TurnLogEntry): string {
   const d = entry.detail;
   const label = actorLabel(entry.actor);
 

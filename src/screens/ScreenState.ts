@@ -20,7 +20,9 @@ export type ScreenName =
   | 'SWITCH_SELECT'
   | 'TERA_CONFIRM'
   | 'TURN_RESULT'
-  | 'END_SCREEN';
+  | 'END_SCREEN'
+  | 'SPRITE_REFRESH'
+  | 'ANIMATING';
 
 // ---------------------------------------------------------------------------
 // ScreenState -- current screen + cursor position + battle context
@@ -35,6 +37,15 @@ export interface ScreenState {
 // ---------------------------------------------------------------------------
 // Renderer return types
 // ---------------------------------------------------------------------------
+
+/** Battle HUD screen -- opponent and player info with optional sprite data. */
+export interface BattleHudScreen {
+  oppText: string;
+  playerText: string;
+  status: { left: string; right: string };
+  oppSprite?: string;
+  playerSprite?: string;
+}
 
 /** Text screen -- static content with a two-part status bar. */
 export interface TextScreen {
