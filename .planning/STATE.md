@@ -9,27 +9,27 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 7 — Speed Config & Model Foundation — COMPLETE
-Plan: 3/3 complete
-Status: Phase verified, moving to Phase 8
-Last activity: 2026-03-01 — Phase 7 complete (3 plans, 1 wave, all verified)
+Phase: 8 — Animation Polish — In Progress
+Plan: 1/2 complete
+Status: In progress
+Last activity: 2026-03-01 — Completed 08-01-PLAN.md (Speed Scaling & Instant Mode)
 
 ```
 Milestone v1.1 Progress:
 [██        ] Phase 7  Speed Config & Model Foundation ✓
-[          ] Phase 8  Animation Polish
+[█         ] Phase 8  Animation Polish (1/2)
 [          ] Phase 9  Navigation & HUD Consolidation
 [          ] Phase 10 Overlay HUD Layouts
 [          ] Phase 11 Stats Screen
-20% complete
+30% complete
 ```
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 21
+- Total plans completed: 22
 - Average duration: ~2.3 min
-- Total execution time: ~44.5 min
+- Total execution time: ~46.9 min
 
 **By Phase:**
 
@@ -138,6 +138,10 @@ Recent decisions affecting current work:
 - [05.3-05]: Sprite slide uses shiftSpriteBmp with negative offset for left-to-right entrance effect
 - [05.3-05]: HEAL uses prevState/nextState HP diff, not entry.detail percentages — actual HP values are authoritative
 - [05.3-05b]: resolveSwitch mirrors resolveTurn animation pattern exactly — prevState HUD, playTurn, nextState HUD, transition
+- [08-01]: scaledDelay resolves immediately when multiplier is 0 — Instant mode completes all animation loops with 0 iterations
+- [08-01]: scaledFrameCount returns 0 for Instant, min 1 otherwise — prevents degenerate 0-frame animations at non-Instant speeds
+- [08-01]: Early return after TURN_RESULT in Instant branches — prevents fall-through to transitionAfterTurn which would overwrite text
+- [08-01]: Opening intro skipped entirely in Instant mode — cosmetic switch-in animations add no value at Instant speed
 
 ### v1.1 Research Context
 
@@ -180,6 +184,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-01T21:09:03Z
-Stopped at: Completed 07-02-PLAN.md (StatStages + ActivePokemon model extension + SimBattleAdapter wiring)
+Last session: 2026-03-01T21:48:22Z
+Stopped at: Completed 08-01-PLAN.md (Speed Scaling & Instant Mode)
 Resume file: None
