@@ -204,7 +204,12 @@ Plans:
   2. Selecting "Battle Speed" opens a list of four presets: Slow (0.5x), Normal (1x), Fast (2x), Instant (skip)
   3. Selected speed carries into the next battle without resetting — starting a new battle uses the last chosen speed
   4. Build succeeds with no TypeScript errors after old BattleEngine, DamageCalc, StatusEngine files are deleted and TERA_CONFIRM / ACTION_MENU screen types are removed
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — SpeedConfig singleton + main menu speed cycling integration
+- [ ] 07-02-PLAN.md — BattleState model extensions (stat stages, ability, held item on ActivePokemon)
+- [ ] 07-03-PLAN.md — Delete dead v0.1 engine files (BattleEngine, DamageCalc, StatusEngine, TurnResolver, AIOpponent)
 
 ### Phase 8: Animation Polish
 **Goal**: Battle animations display inside a visible text box frame, the attacking sprite lunges toward the target before hit, all timing scales with the speed setting, and Instant mode skips animations entirely
@@ -270,7 +275,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 | 5.2 @pkmn/sim Integration | 3/3 | Complete | 2026-02-27 |
 | 5.3 Switch Animation & Text Polish | 8/8 | Complete | 2026-02-27 |
 | 6. Integration | 0/2 | Not started | - |
-| 7. Speed Config & Model Foundation | 0/TBD | Not started | - |
+| 7. Speed Config & Model Foundation | 0/3 | Not started | - |
 | 8. Animation Polish | 0/TBD | Not started | - |
 | 9. Navigation & HUD Consolidation | 0/TBD | Not started | - |
 | 10. Overlay HUD Layouts | 0/TBD | Not started | - |
