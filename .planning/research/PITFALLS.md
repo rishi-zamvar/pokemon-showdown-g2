@@ -1,409 +1,588 @@
-# Pitfalls Research
+# Domain Pitfalls
 
-**Domain:** Pokemon battle simulator for G2 smart glasses (text-only constrained display)
-**Researched:** 2026-02-26
-**Confidence:** HIGH — several pitfalls verified against actual project data files on disk
+**Domain:** Pokemon battle simulator UI enhancement for G2 smart glasses
+**Researched:** 2026-03-01
+**Milestone:** v1.1 UI Enhancement & Polish
+**Confidence:** HIGH — pitfalls derived from direct codebase inspection, verified against Nick Ustinov's G2 notes, SDK source, and existing working system behavior
+
+---
+
+## How This File Is Organized
+
+Pitfalls are grouped by the specific feature being added in v1.1:
+
+1. Consolidating ACTION_MENU onto BATTLE_HUD
+2. Preserving HUD visibility during ATTACK_SELECT and SWITCH_SELECT
+3. Stats screen (abilities, modifiers, opponent speed range)
+4. Speed controls (animation + text streaming)
+5. Removing back buttons (double-tap only navigation)
+6. Integration pitfalls (surgery on a working system)
+
+Each pitfall maps to the phase where it is most likely to surface.
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Downloaded Data Files Are 404 HTML Pages
+Mistakes that cause rewrites or break battles entirely.
+
+---
+
+### Pitfall C1: HUD Context Lost When Adding Moves/Switch to Same Screen
 
 **What goes wrong:**
-Three of the six "downloaded" data files in `src/data/` are not valid JSON — they are HTML 404 error pages from the Pokemon Showdown CDN. Specifically:
+The v1.1 goal is to show Attack/Switch/Tera as a list ON the battle screen while simultaneously showing sprites and HP bars. The current architecture separates these because the SDK supports max 4 containers per page and the battle HUD already uses all 4: oppSprite, playerSprite, oppInfo, playerInfo.
 
-- `abilities.json` — 3803 bytes, starts with `<!DOCTYPE html>` ("Not Found - Pokemon Showdown!")
-- `items.json` — 3803 bytes, starts with `<!DOCTYPE html>` ("Not Found - Pokemon Showdown!")
-- `typechart.json` — 3803 bytes, starts with `<!DOCTYPE html>` ("Not Found - Pokemon Showdown!")
-
-These files will parse as undefined in JavaScript's `import` (Vite will fail) or throw a SyntaxError at runtime. Any code that reads type effectiveness, ability names, or item data will crash immediately.
+If you try to add a list container to the battle HUD screen you immediately exceed the 4-container limit. The SDK silently discards extra containers — `rebuildPageContainer` returns `false` but no error is thrown and no crash occurs. The display simply does not show the list.
 
 **Why it happens:**
-The original download script hit incorrect CDN paths. The Pokemon Showdown CDN serves HTML 404 pages at non-existent paths instead of returning a proper HTTP 404 status, so the downloader saved the HTML content without noticing the error.
+Developers count containers in their head ("I just add a list") without checking the actual container allocation in `glassAdapter.ts`. The current `showBattleHud()` creates: 1 text container (combined oppText + playerText), 1 status container, 1 oppSprite image container, 1 playerSprite image container = 4 containers exactly.
 
-**How to avoid:**
-Fetch data from the correct authoritative sources:
-- **Type chart**: `https://play.pokemonshowdown.com/data/typechart.js` (not `.json`). Extract the object after `exports.BattleTypeChart =`.
-- **Abilities**: `https://play.pokemonshowdown.com/data/abilities.js`. Extract after `exports.BattleAbilities =`.
-- **Items**: `https://play.pokemonshowdown.com/data/items.js`. Extract after `exports.BattleItems =`.
+**Consequences:**
+- The "consolidated" battle menu never appears on glasses
+- The action list renders correctly in browser but silently fails on device
+- No error — debugging this wastes hours
 
-Alternatively, use the raw GitHub files: `https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/typechart.ts` and strip the TypeScript exports manually. The `@pkmn/dex` npm package also provides these as pre-processed JSON.
+**Prevention:**
+Before designing the merged screen, map out the exact container slots available. The SDK limit is 4 containers per `rebuildPageContainer` call. To fit sprites + HP + action list, one of these approaches is required:
 
-Validate all JSON files at import time with a startup check:
+Option A — Merge oppText and playerText into one text block alongside the list (use the left portion of the display for combined text, right portion for sprites, bottom list):
+```
+Container 1: text (names + HP bars, left side)
+Container 2: image (oppSprite, right top)
+Container 3: image (playerSprite, right bottom)
+Container 4: list (Attack / Switch / Tera / Stats)
+```
+This eliminates the status bar container to make room for the list.
+
+Option B — Use a text container with embedded action items (fake-list using newlines), and read taps from the `listIndex` or use `textEvent`. This loses swipe-scroll highlighting but stays within limits.
+
+Option C — Keep the two-step navigation (tap HUD → action menu) but redesign the action menu to show HUD data inline in the status bar. This preserves the 4-container architecture and is the lowest-risk approach.
+
+**Warning signs:**
+- List items appear in browser companion but not on glasses
+- `rebuildPageContainer` logs show `false` return on device
+- Sprites disappear when action list appears (list displaced sprite containers)
+
+**Phase to address:** First phase of v1.1 (consolidated battle menu)
+
+---
+
+### Pitfall C2: List Selection Indices Break When Screen Structure Changes
+
+**What goes wrong:**
+The current `handleActionMenu()` maps tap indices to actions: `idx=0` → Back, `idx=1` → Attack, `idx=2` → Switch, `idx=3` → Terastallize.
+
+When the consolidated HUD merges the action menu into the battle screen, these indices must be recalculated. If you copy the action handler logic without updating the index map, adding "Stats" as a new option at index 1 shifts all others. Attack becomes idx 2, Switch becomes idx 3, Tera becomes idx 4. The existing `handleActionMenu()` code processes `idx=2` as Switch — now that index is actually Attack. Wrong action fires for every tap.
+
+**Why it happens:**
+Index maps are implicit (not defined in a typed structure). Developers update the renderer's item list but forget to update the corresponding `switch(idx)` block. The renderer and handler are two separate files with no enforced contract between them.
+
+**Consequences:**
+- Tapping "Attack" switches the Pokemon instead
+- Tapping "Switch" tries to use Terastallize
+- Silent wrong behavior — no crash, no error, just wrong actions
+
+**Prevention:**
+Define the menu items as a typed enum or named constant object, not a positional array:
 ```typescript
-function assertValidJSON(name: string, data: unknown): void {
-  if (typeof data !== 'object' || data === null) {
-    throw new Error(`Data file ${name} failed validation — likely a 404 HTML page`);
-  }
+const CONSOLIDATED_ACTIONS = ['Attack', 'Switch', 'Terastallize', 'Stats'] as const;
+type ConsolidatedAction = typeof CONSOLIDATED_ACTIONS[number];
+
+// In renderer — derive items from the same constant
+const items = Array.from(CONSOLIDATED_ACTIONS);
+
+// In handler — derive index from the same constant
+const action = CONSOLIDATED_ACTIONS[idx] as ConsolidatedAction;
+switch (action) {
+  case 'Attack': ...
+  case 'Switch': ...
+}
+```
+This makes renderer and handler derived from the same source. Reordering the list is a single change.
+
+**Warning signs:**
+- Wrong screen appears after tapping an action
+- Occasional "correct" behavior only when testing specific tap sequences that happen to work by chance
+- Tests pass in browser where you tap deliberately, fail on glasses where swipe positioning differs
+
+**Phase to address:** Consolidated battle menu phase. Write the enum before writing any renderer or handler code.
+
+---
+
+### Pitfall C3: rebuildPageContainer Loses Scroll Position on Every Update
+
+**What goes wrong:**
+When the consolidated HUD shows both HP info and the action list simultaneously, any state update (HP changes, animation frame) triggers `rebuildPageContainer`. Every rebuild resets the list cursor to item 0. If the player is hovering over "Switch" (idx 2) and a turn animation fires in the background, the next tap selects "Attack" (idx 0) instead.
+
+The existing architecture avoids this because list screens (ACTION_MENU, ATTACK_SELECT) are never updated while visible — animations only run on BATTLE_HUD which has no list. But a merged screen that has both a list AND gets animation updates would hit this constantly.
+
+**Why it happens:**
+`rebuildPageContainer` is the only way to change a list container's items. There is no `listContainerUpgrade` equivalent (unlike `textContainerUpgrade`). So any change to visible information on a screen containing a list requires a full rebuild and position reset.
+
+**Consequences:**
+- Player's cursor jumps to top during or after animations
+- Player taps immediately after watching animation, selects wrong item
+- Effectively prevents animation playback on any screen containing a list
+
+**Prevention:**
+Do not animate screens that contain list containers. This is a hard architectural rule. Choose one of:
+
+1. Keep the animation on BATTLE_HUD (text-only), then transition to the action list AFTER animation completes. This is the current v0.1 pattern and it works.
+
+2. For the "merged HUD" goal, accept that no HP-drain animation runs on the merged screen — animation plays on a dedicated ANIMATING state that uses text-only display, then snaps back to the consolidated HUD.
+
+3. Use in-place text updates (`textContainerUpgrade`) for live animation while the action list is visible — but this only updates text containers, not list containers. The list stays frozen while HP drains in the text area.
+
+**Warning signs:**
+- Cursor resets to top during battle animations
+- Player reports "I selected Switch but the game attacked"
+- Animation-then-list pattern feels unreliable
+
+**Phase to address:** Consolidated battle menu phase. Decide the animation strategy BEFORE writing any merged screen code.
+
+---
+
+### Pitfall C4: Stats Screen Exceeds Character Budget with Stat Modifiers + Abilities + Speed Range
+
+**What goes wrong:**
+The stats screen needs to show: ability name, current stat stage modifiers (+1 Atk, -1 Def, etc.), volatile conditions, opponent's speed range, and possible opponent abilities. That is approximately:
+
+```
+Ability: Intimidate                  25 chars
+Status: Burn                         12 chars
+Atk: +1  Def: 0  SpA: -1  SpD: 0    33 chars
+Speed: 95  Opp speed: 76-152         30 chars
+Opp ability: Blaze/Solar Power       32 chars
+```
+
+Total: ~132 chars for a compact layout. With proper labels and newlines: ~200 chars. That is within the 900-char safe budget for one Pokemon. But if the stats screen shows both Pokemon's data, or includes volatile details, or uses verbose labels, it grows to 400-600 chars before any safety margin.
+
+The real danger is the opponent's possible abilities. The opponent might have 2-3 possible abilities from its pokedex entry (e.g., Charizard: Blaze / Solar Power). Listing them properly: "Opp abilities: Blaze, Solar Power" = 35 chars. For a Pokemon with 3 abilities, longer names can reach 70 chars for that line alone.
+
+**Why it happens:**
+Stats screen is built in isolation and looks fine in browser at any length. Character budget is only verified on device. The budget violation happens silently (content truncates, no error).
+
+**Prevention:**
+Define strict labels and max-length rules for the stats screen before writing any code:
+```typescript
+const STATS_SCREEN_BUDGET = 700; // leave 200-char safety margin
+
+// Enforce abbreviations:
+// "Atk+1 Def0 SpA-1 SpD0 Spe0" instead of full labels — saves 20+ chars
+// "Opp spd: 76-152" instead of "Opponent speed range: 76-152"
+// "Ability: Blaze/SolarPwr" (truncate to 12 chars each) if needed
+```
+
+Write a unit test for `renderStatsScreen()` that asserts `output.length < STATS_SCREEN_BUDGET` for a Pokemon with a 3-ability entry, +6/-6 stat stages, 3 volatile conditions, and a 200-speed opponent.
+
+**Warning signs:**
+- Stats screen looks complete in browser but cuts off midway on glasses
+- "Opp abilities:" line missing from device view
+- Stat modifiers show but speed range is cut off
+
+**Phase to address:** Stats screen phase. Budget test before first device test.
+
+---
+
+## Moderate Pitfalls
+
+Mistakes that cause user confusion or require rework but don't break battles.
+
+---
+
+### Pitfall M1: Double-Tap as "Back" Is Ambiguous — Fires on Accidental Second Tap
+
+**What goes wrong:**
+The v1.1 goal is to remove all `< Back` items from lists and use double-tap only for navigation. The existing SDK maps `DOUBLE_CLICK_EVENT` to a TAP gesture in `glassAdapter.ts`. If double-tap is the only way back, any accidental double-tap while trying to scroll or select an item exits the current screen unexpectedly.
+
+The current gesture handler in `mapEventToGesture()` treats `DOUBLE_CLICK_EVENT` identically to `CLICK_EVENT` — both map to `{ kind: "TAP" }`. To implement "double-tap = back," the controller must distinguish single from double tap, which requires timing logic: fire single-tap only if a second tap doesn't arrive within ~300ms.
+
+**Why it happens:**
+The existing code doesn't need to distinguish single vs double tap because `< Back` is a list item. Removing `< Back` from lists and relying on double-tap means the gesture layer needs a new state machine: pending → confirm vs cancel.
+
+**Consequences:**
+- Players accidentally exit ATTACK_SELECT while scrolling moves quickly
+- No visible affordance that double-tap exits (new players confused)
+- Distinguishing single vs double adds 300ms latency to ALL single taps if implemented naively
+
+**Prevention:**
+If you remove `< Back` from list items, implement double-tap detection with a short window (250-300ms) and visual feedback. Do not just relabel DOUBLE_CLICK_EVENT as "back" — it will conflict with single-tap handlers and the 300ms cooldown will make the entire UI feel slow.
+
+Alternatively, consider a hybrid: remove `< Back` only from top-level navigation (BATTLE_HUD → MAIN_MENU) where accidental back is low-risk, but keep `< Back` in sub-screens (ATTACK_SELECT, SWITCH_SELECT) where wrong navigation during battle has consequences.
+
+**Warning signs:**
+- Players report "I accidentally went back to main menu"
+- All taps feel slow if 300ms double-tap window is added to every gesture
+- Single-tap to select + double-tap to back causes occasional "phantom back" when a move is selected and a second tap arrives within the window
+
+**Phase to address:** Navigation redesign phase. Decide: full double-tap, hybrid, or keep `< Back` before writing a single line of navigation code.
+
+---
+
+### Pitfall M2: Speed Controls Are a Global Singleton — Animation Engine Uses Hardcoded Constants
+
+**What goes wrong:**
+Animation timing is currently hardcoded in `src/config/constants.ts` under the `ANIM` object: `CHAR_DELAY_MS: 45`, `ENTRY_PAUSE_MS: 500`, `FLASH_FRAME_MS: 75`, etc. These constants are imported directly by `AnimationEngine.ts`.
+
+Speed controls require that these values change at runtime based on user selection. If you just update the constants file, nothing changes at runtime (TypeScript constants are compiled to literal values). If you add a `speedMultiplier` variable and multiply every delay by it inside `AnimationEngine.ts`, you must ensure that every `delay()` call reads the multiplier at the moment of execution, not at construction time.
+
+The current `AnimationEngine` class is instantiated once in `ScreenController` (line: `private readonly animationEngine = new AnimationEngine()`). If the speed multiplier is passed as a constructor argument, changing speed mid-battle requires re-instantiation and loss of in-flight animation state.
+
+**Why it happens:**
+Speed controls appear simple — "just multiply delays." But the implementation must handle: (a) reading speed at each delay call not at animation start, (b) applying to all 7+ delay sites in `AnimationEngine.ts` consistently, (c) persisting the setting across battles, (d) showing the current speed on the menu screen.
+
+**Consequences:**
+- Speed setting appears in menu but has no effect on animations (common mistake: constant was captured at build time)
+- Speed only affects text streaming but not HP drain, or vice versa (partial implementation)
+- Changing speed mid-animation causes abrupt frame-rate changes
+
+**Prevention:**
+Implement speed as a module-level or service-level singleton getter, not a passed parameter:
+```typescript
+// speedSettings.ts
+export type SpeedSetting = 'slow' | 'normal' | 'fast';
+let _speed: SpeedSetting = 'normal';
+
+export function setSpeed(s: SpeedSetting): void { _speed = s; }
+export function getSpeed(): SpeedSetting { return _speed; }
+
+export function getCharDelay(): number {
+  const base = ANIM.CHAR_DELAY_MS;
+  return _speed === 'fast' ? Math.floor(base / 3) : _speed === 'slow' ? base * 2 : base;
+}
+```
+
+Then replace all `ANIM.CHAR_DELAY_MS` direct usages in `AnimationEngine.ts` with `getCharDelay()` etc. This way the speed is read at execution time, not compilation time, and changing it in the menu takes effect immediately on the next animation frame.
+
+**Warning signs:**
+- Speed menu shows "Fast" selected but animations run at the same speed as before
+- Changing speed works on first battle but reverts on subsequent battles (if speed is stored in component state instead of singleton)
+- HP drain is affected by speed but typewriter text is not, or vice versa
+
+**Phase to address:** Speed controls phase. Write `speedSettings.ts` as a dedicated module before touching `AnimationEngine.ts`.
+
+---
+
+### Pitfall M3: Tera Without Confirmation Screen Breaks the "Tera Is Irreversible" Signal
+
+**What goes wrong:**
+Currently TERA_CONFIRM shows the Tera type and requires "Confirm" tap before executing. The v1.1 goal is to remove this confirmation screen and show only a notifier (brief message) before the Tera executes immediately.
+
+The problem: Terastallization is irreversible for the entire battle. The confirmation screen is not just a UX formality — it is the only moment the player verifies they selected Tera and not Attack or Switch accidentally. Without confirmation, an accidental tap on "Terastallize" in the consolidated menu fires Tera immediately, wasting the one-time mechanic permanently.
+
+This is especially risky on the G2 because list items can have their cursor index off by one due to scroll position — if the player's cursor was on "Terastallize" without knowing it and they tap, Tera is consumed.
+
+**Why it happens:**
+Developers conflate "simpler = fewer screens" with "simpler = better." Removing confirmation screens is correct for low-cost, reversible actions (back navigation, move selection). It is wrong for irreversible one-time-per-battle actions.
+
+**Consequences:**
+- Player uses Tera accidentally in an unimportant battle turn
+- No way to undo — the mechanic is permanently spent
+- Player frustration at what feels like a bug, not a feature
+
+**Prevention:**
+If the goal is to remove a dedicated TERA_CONFIRM screen, replace it with a notifier pattern: briefly show "Tera: Fire ready! Tap a move" before going to ATTACK_SELECT with an indicator active. This preserves the "you're about to do something irreversible" signal without a full confirmation screen.
+
+Do not eliminate the two-step tera selection entirely — the two steps (select tera, then select move) serve as natural confirmation by requiring deliberate sequential input.
+
+**Warning signs:**
+- Playtesting reports "I accidentally Terastallized on Turn 1 with a bad type"
+- Tera described as "too easy to do accidentally" in feedback
+- Player skill felt diminished by unintended Tera usage
+
+**Phase to address:** Consolidated battle menu phase. Mark Tera as "notifier, not single-tap" explicitly in the screen design.
+
+---
+
+### Pitfall M4: showBattleHud Sends Two Sequential BMP Writes — Each Triggers a rebuildPageContainer First
+
+**What goes wrong:**
+The current `showBattleHud()` flow:
+1. Call `rebuildPageContainer` with text + image container definitions
+2. Send oppSprite BMP via `updateImageRawData`
+3. Send playerSprite BMP via `updateImageRawData`
+
+Each call to `showBattleHud()` sends 3 sequential async SDK calls. In v1.1, the battle screen will be updated more frequently (animation text in box + HP bars during action selection). If `showBattleHud` is called with every animation frame, the device receives 3 calls per frame instead of 1.
+
+At `CHAR_DELAY_MS: 45ms` (typewriter speed), that is 22 calls/second × 3 SDK calls = 66 SDK calls/second during a busy animation. The G2 bridge communicates over Bluetooth, and there is no documented call-rate limit but community reports indicate that firing >20 SDK calls/second causes queue buildup that manifests as visible animation lag 2-3 seconds after it starts.
+
+**Why it happens:**
+The original code accepted 3 calls per update because animations on BATTLE_HUD used `textContainerUpgrade` (1 call), not the full `showBattleHud`. The 3-call path is only used on full redraws. If the merged screen makes `showBattleHud` the update method for animations, each animation frame becomes 3 calls.
+
+**Consequences:**
+- Animation starts smoothly, then develops increasing lag 2-3 seconds in
+- On fast speed setting, lag is immediately obvious
+- Switching back to main menu after a laggy battle may leave queued SDK calls that affect the next screen's render
+
+**Prevention:**
+Do not call `showBattleHud` for animation frame updates. Instead:
+- Animation frames should use `textContainerUpgrade` for text changes (1 call, no rebuild)
+- Sprite updates during animation should use `updateImage` directly (1 call)
+- Only call `showBattleHud` (full rebuild) on screen transitions, not per-frame
+
+This is already how the v0.1 `AnimationEngine` works (it calls `glass.updateText()` and `glass.updateImage()` separately). Preserve this separation in v1.1 even if the screen layout changes.
+
+**Warning signs:**
+- Animation feels smooth in first 1-2 seconds, then gets progressively choppier
+- Fast speed setting makes lag worse, not better (paradox: more calls/sec → more queue buildup)
+- Console logs show BMP send calls interleaved with text update calls during animation
+
+**Phase to address:** Any phase that changes animation rendering. Enforce in code review: `showBattleHud()` must not be called inside any animation loop.
+
+---
+
+### Pitfall M5: Stats Screen Needs @pkmn/sim Battle Data That Is Not in BattleState
+
+**What goes wrong:**
+The stats screen goal includes: "stat modifiers, opponent speed range, possible abilities." These require data that is not currently stored in the `BattleState` type:
+
+- **Stat modifiers** (+1 Atk, -2 Def): Stored internally by `@pkmn/sim` in `battle.sides[n].active[0].boosts` but not exposed in the current `ActivePokemon` type in `battleState.ts`. The `SimBattleAdapter` parses log entries to build `BattleState` but does not extract boost data.
+
+- **Opponent speed range**: Requires knowing the opponent's base speed stat and current boost stage. Base speed is in `@pkmn/dex` (already loaded in DataLoader), but the opponent's boost stage is not tracked in `ActivePokemon`.
+
+- **Possible abilities**: The opponent's actual ability is hidden (random battle). The displayed "possible abilities" are the 2-3 abilities listed in the pokedex entry for that species. These come from `DataLoader.getPokemon(slug).abilities` which already exists but the stats screen renderer needs to call it.
+
+**Why it happens:**
+The stats screen is planned at the feature level ("show abilities and modifiers") without mapping each data point back to where it lives in the current architecture. Some data requires parser changes to `SimBattleAdapter`, some requires type changes to `BattleState`, and some is already available via `DataLoader`.
+
+**Consequences:**
+- Stats screen renders but shows "Atk: 0" for all modifiers (zero-initialized because boost data was never extracted from sim)
+- Speed range shows only base speed, not accounting for current boosts
+- Abilities field is populated but shows wrong species abilities because slug normalization fails for forme variants
+
+**Prevention:**
+Before writing `renderStatsScreen()`, map every data point to its source:
+
+| Data Field | Where It Lives | Work Needed |
+|------------|----------------|-------------|
+| Ability name | `ActivePokemon.ability` (not in current type) | Add to BattleState type + SimBattleAdapter parser |
+| Stat boosts | `@pkmn/sim battle.sides[n].active[0].boosts` | Add boosts field to ActivePokemon, extract in SimBattleAdapter |
+| Base speed | `DataLoader.getPokemon(slug).baseStats.spe` | Already available |
+| Boosted speed | base + boost stage formula | Needs boost data from above |
+| Opp speed range | Requires knowing possible EV/IV range in randbats | Use @pkmn/randbats range data or assume 0-252 EVs at level 100 |
+| Possible opp abilities | `DataLoader.getPokemon(slug).abilities` | Already available — just needs slug normalization |
+| Volatiles | `ActivePokemon.volatiles` | Already in type |
+| Status | `ActivePokemon.status` | Already in type |
+
+Do this mapping before writing any renderer code. Data fields that require `SimBattleAdapter` changes must be addressed in an earlier plan than the renderer.
+
+**Warning signs:**
+- Stats screen renders but all modifier values are 0
+- Ability shows "undefined" or a wrong Pokemon's ability name
+- Speed range shows a nonsensical number (did not apply boost multiplier)
+
+**Phase to address:** Stats screen phase — begin with a data-availability audit, then add fields to `BattleState`, then write the renderer.
+
+---
+
+## Minor Pitfalls
+
+Mistakes that cause visual glitches or minor annoyance but are easy to fix.
+
+---
+
+### Pitfall N1: Animation Text Box Overlaps Sprite Content Area
+
+**What goes wrong:**
+The v1.1 goal includes showing animation text "in a box" during battle resolution. The current `AnimationEngine` writes text to the full-height text container, which overlaps the region where sprites are displayed (both occupy the same `GLASS_LAYOUT` area at `x:8, y:4, width:560, height:248`).
+
+In v0.1 this is acceptable because text and sprites are different container types and the SDK renders them in independent display layers. However, if the "animation text box" is intended to be visually distinct (bordered, positioned below the sprites), a new text container positioned in the lower half of the display must be created during battle HUD setup. This requires one of the 4 container slots — which means either oppSprite or playerSprite must be sacrificed, or the text box must be simulated using newlines in the existing text container.
+
+**Why it happens:**
+"Text in a box" sounds like a CSS/styling feature. On G2, boxes are only achievable via container borders (`borderWidth`, `borderColor` on TextContainerProperty) or by careful content positioning. There is no free-floating overlay.
+
+**Prevention:**
+Clarify what "in a box" means for this display before building:
+- Bordered text container (uses a container slot, reduces sprites to 1)
+- Text with a visible separator line drawn using block characters (`═══ BATTLE ═══`) — uses zero extra containers
+- Status bar repurposed as the "battle text" line (always visible, no extra container)
+
+Recommend: separator line approach costs nothing and works within the existing 4-container limit.
+
+**Warning signs:**
+- "Battle text box" feature requires adding a 5th container — SDK silently ignores it
+- Battle text and HP text appear merged without visual separation
+
+**Phase to address:** Animation polish phase. Decide the "box" implementation before any visual redesign work.
+
+---
+
+### Pitfall N2: Speed Setting Persists to Battery-Draining "Slow" After Device Sleep
+
+**What goes wrong:**
+If speed settings are stored in memory (module singleton), they reset to "normal" whenever the WebView is killed or the Even app goes to background. If stored in `localStorage`, they persist across sessions. "Slow" mode at `CHAR_DELAY_MS * 2` means the typewriter delay is 90ms/char and `ENTRY_PAUSE_MS` is 1 second — adding up to 3-4 seconds of delays per turn event. A full 10-turn battle in slow mode adds ~30-40 seconds of animation time and keeps the WebView, CPU, and Bluetooth radio active proportionally longer.
+
+**Prevention:**
+Default to "normal" speed on every app launch regardless of stored setting. Allow the user to change speed per-session. Do not persist "slow" to localStorage — or if you do, reset to "normal" on next launch with a note in the menu showing the previous session's setting.
+
+**Warning signs:**
+- Battery drains unusually fast in playtest sessions
+- Users complain battle "feels broken" after switching from slow to normal (they forgot they set slow)
+
+**Phase to address:** Speed controls phase. Define the persistence strategy explicitly before implementation.
+
+---
+
+### Pitfall N3: `< Back` Removal Breaks the Forced-Switch Screen (Which Must Not Allow Back)
+
+**What goes wrong:**
+Currently `handleSwitchSelect()` checks `this.forcedSwitch` before allowing the `< Back` item to work:
+```typescript
+if (idx === 0) {
+  if (this.forcedSwitch) return; // Can't go back during forced switch
+  ...
+}
+```
+
+If `< Back` is removed from all screens, the forced switch screen loses its "can't escape" behavior but a double-tap would fire the "back" gesture. On a forced switch screen, double-tap must be blocked (the player MUST choose a Pokemon). If double-tap is wired to "go back," a player in a forced switch situation could double-tap their way back to the battle HUD where their fainted Pokemon is still active — causing the battle to reach an invalid state.
+
+**Prevention:**
+When implementing double-tap as back navigation, maintain a `backAllowed` flag per screen state. Forced-switch, end screen (before choosing "new battle" or "main menu"), and "animating" states must all block double-tap-back explicitly:
+```typescript
+private isBackAllowed(): boolean {
+  if (this.forcedSwitch) return false;
+  if (this.state.screen === 'ANIMATING') return false;
+  if (this.state.screen === 'END_SCREEN') return false;
+  return true;
 }
 ```
 
 **Warning signs:**
-- File size exactly 3803 bytes for any data file
-- File content starts with `<!DOCTYPE`
-- TypeScript build error: "JSON object is not valid"
-- Runtime error: "Cannot read property 'X' of undefined" when looking up type matchups
+- During forced switch, double-tap returns to battle HUD showing a fainted Pokemon
+- Battle freezes because the sim expects a switch choice but the ScreenController is back on BATTLE_HUD
+- `@pkmn/sim` throws an error about an illegal action on the next turn
 
-**Phase to address:** Data wiring phase (Phase 1). This must be resolved before any game logic can run.
+**Phase to address:** Navigation redesign phase. Define `backAllowed` logic before removing any `< Back` items from list screens.
 
 ---
 
-### Pitfall 2: Variable-Power Moves Treated as Zero Damage
+## Integration Pitfalls
+
+Risks specific to modifying a working system.
+
+---
+
+### Pitfall I1: ScreenController Is a 870-Line God Object — Adding Features Compounds Its Complexity
 
 **What goes wrong:**
-`moves.json` stores `basePower: 0` for moves whose power is computed at runtime (e.g., Gyro Ball, Electro Ball, Endeavor, Crush Grip, Beat Up, Counter, Bide, Dragon Rage, Fissure). A naive damage calculator that reads `basePower` directly will deal 0 damage for these moves every time, silently — no crash, no error.
+`ScreenController.ts` currently handles: gesture routing, battle state management, animation orchestration, sprite loading, phone companion rendering, and error display. It is 870 lines. The v1.1 changes require adding: consolidated menu handling, stats screen state, speed controls, and revised navigation logic.
 
-There are at minimum 10+ such moves in the data (confirmed from file inspection). For a random battle, any of these can appear legitimately in a generated moveset.
+Each added feature increases the state combinations that `ScreenController` must handle. The current screen state enum already has 9 values. Adding `STATS_SCREEN` makes 10. Every new screen state multiplies the number of gesture + screen + battle-phase combinations that must be tested. A bug in one feature can manifest as a symptom in a completely unrelated screen transition because everything shares the same `this.state` object.
 
-**Why it happens:**
-`basePower: 0` is the Showdown convention for "compute this at battle time," not "the move does no damage." Developers unfamiliar with this convention write `damage = calcDamage(move.basePower, ...)` and test with Tackle (which has real basePower: 40) but never test with Gyro Ball.
+**Prevention:**
+Before adding new screens in v1.1, extract PhoneCompanionRenderer into its own class (it already has a clear boundary — it only reads `this.state.battleState`). This alone reduces `ScreenController` by ~100 lines and makes the companion logic testable in isolation.
 
-**How to avoid:**
-Add a lookup table mapping variable-power moves to their computation type. For v0.1 (simplified simulator), resolve these to fixed approximations:
-```typescript
-const VARIABLE_POWER_FALLBACK: Record<string, number> = {
-  'electroball': 60,   // average-ish
-  'gyroball': 60,
-  'endeavor': 1,       // deals (target HP - user HP), cap at 1 for safety
-  'crushgrip': 60,
-  'counter': 0,        // physical reflect — skip in AI
-  'dragonrage': 40,    // always deals 40 HP
-  'bide': 0,           // charge move — skip in AI
-  'beatup': 20,        // per hit; simplify
-};
-```
-Alternatively, filter these moves out of randomly generated movesets for v0.1.
+For new screens (STATS_SCREEN, SPEED_MENU), follow the existing renderer pattern exactly: create `statsScreenRenderer.ts` and `speedMenuRenderer.ts` before touching `ScreenController`. The controller should add only: one case in the screen type union, one case in `render()`, and one handler method. All logic stays in the renderer.
 
 **Warning signs:**
-- A Pokemon deals 0 damage repeatedly with a specific move but not others
-- Battle feels one-sided — one Pokemon never KOs the other
+- A PR that touches `ScreenController.ts` changes more than 80 lines
+- Stats screen handler code is inside `ScreenController` rather than in a dedicated renderer file
+- A speed-settings change causes a navigation bug on a completely unrelated screen
 
-**Phase to address:** Battle engine phase (damage calculation). Flag in code review checklist.
+**Phase to address:** All v1.1 phases. Apply the renderer-first discipline from the start of v1.1, not after the fact.
 
 ---
 
-### Pitfall 3: isNonstandard Entries Pollute Team Generation
+### Pitfall I2: Removing a Screen That Existing State Machine Transitions Point To
 
 **What goes wrong:**
-`pokedex.json` contains 1,515 entries but only 913 are "real" standard Pokemon. 602 entries are marked with `isNonstandard` values:
-- 452 tagged `"Past"` (Mega evolutions, G-Max forms — not available in current gen)
-- 80 tagged `"CAP"` (fan-made Create-A-Pokemon project)
-- 49 tagged `"Future"` (unreleased)
-- 19 tagged `"Custom"` (custom formats)
-- 2 tagged `"LGPE"` (Let's Go Pikachu/Eevee exclusives)
+The v1.1 plan removes `TERA_CONFIRM` as a separate screen (Tera without confirmation). The current state machine has:
+- `ACTION_MENU` → tap Terastallize → `TERA_CONFIRM`
+- `TERA_CONFIRM` → confirm → `ATTACK_SELECT`
+- `TERA_CONFIRM` → back → `ACTION_MENU`
 
-A random team generator that picks from all 1,515 entries will generate CAP Pokemon, unreleased forms, and Mega evolutions that don't exist in normal random battles. Additionally, 87 "battle-only" formes (like Meloetta-Pirouette, Darmanitan-Zen, Cherrim-Sunshine) exist in the data but cannot be sent out at battle start — they transform mid-battle.
+Removing `TERA_CONFIRM` from the union type causes TypeScript to flag it as an error everywhere it appears — which is the correct behavior. However, developers often take a shortcut: comment out the screen type instead of removing it. This leaves dead state transitions that can still be reached if a gesture arrives in an unexpected order.
 
-**Why it happens:**
-The pokedex file is a flat dictionary. Nothing stops a random picker from selecting `venusaurmega`, `syclar` (CAP), or `darmanitanzen` (battle-only). The data does have `isNonstandard` and `battleOnly` fields — but only if you read them.
+Also: `teraQueued` boolean flag exists specifically for the TERA_CONFIRM → ATTACK_SELECT flow. If TERA_CONFIRM is removed, `teraQueued` must be set at the point where Tera is selected in the consolidated menu, and the path through ATTACK_SELECT that reads `teraQueued` must be verified to still fire correctly.
 
-**How to avoid:**
-Pre-filter the pool at startup to a valid battlable set:
-```typescript
-const battleableSpecies = Object.entries(pokedex)
-  .filter(([id, data]) => {
-    if (data.isNonstandard) return false;           // exclude Past/CAP/Future/Custom/LGPE
-    if (data.battleOnly) return false;             // exclude battle-only formes
-    if (data.num <= 0) return false;               // exclude placeholder entries (num=-1 etc)
-    return true;
-  })
-  .map(([id]) => id);
-```
+**Prevention:**
+When removing a screen:
+1. Delete the `ScreenState` union member — TypeScript will find all usages
+2. Fix all TypeScript errors exhaustively before running anything
+3. Verify `teraQueued` is still set at the right point (consolidated menu tap handler)
+4. Test the tera → attack path specifically: select tera, select a move, verify `TERA_ATTACK` action fires
 
-Also: cosmetic formes (like Unown-B through Unown-Z) are NOT in `pokedex.json` at all — they are generated from base formes. Do not assume pokedex.json is exhaustive for cosmetic variants.
+Do not comment out the screen type to suppress TypeScript errors. TypeScript's exhaustive checking is the only automated guard against dead branches in a switch statement.
 
 **Warning signs:**
-- Generated teams contain Pokemon with names like "Venusaur-Mega" or unknown names
-- Battle crashes when looking up a Pokemon's sprite (no sprite exists for CAP Pokemon on CDN)
-- "Syclar" or "Equilibra" appearing in teams (CAP Pokemon with real-sounding names)
+- TypeScript reports "Property 'TERA_CONFIRM' does not exist on type ScreenState" — good, handle it
+- `teraQueued` is still set but Tera never executes (path broken silently)
+- Tapping Terastallize in the consolidated menu takes the player to a screen they can't get out of
 
-**Phase to address:** Team generation phase. Must be handled before first battle can run.
+**Phase to address:** Screen consolidation phase. Use TypeScript's type checking as your regression test harness.
 
 ---
 
-### Pitfall 4: Type Effectiveness Lookup Requires Non-Trivial Logic
+### Pitfall I3: Adding Features in Parallel Branches Causes Double-Tap Meaning to Conflict
 
 **What goes wrong:**
-Without a valid `typechart.json` (currently a 404 page — see Pitfall 1), type effectiveness returns undefined for all matchups. But even with a valid type chart, dual-type Pokemon require multiplying two separate lookup values, and common mistakes are:
+If "remove back buttons" and "stats screen" are developed in separate branches and merged, the double-tap handler may be defined twice. One branch wires double-tap to "back navigation." The other branch may wire double-tap to "close stats screen and return." When merged, the event handler fires both, causes a race condition, and the screen transitions twice in one gesture.
 
-1. Only checking the first type, ignoring the second
-2. Multiplying before flooring (should floor after each individual multiplication in Gen 1, but not in Gen 2+)
-3. Not handling immunity (0x effectiveness) — if any type matchup returns 0, the move does zero damage regardless of the other type
-4. Getting the direction wrong: you look up Attacking Type vs Defending Type, not the other way
+In the current `GlassAdapterImpl`, `DOUBLE_CLICK_EVENT` maps to a TAP event with `listIndex` value. If two gesture handlers are registered via `onGesture()`, both fire for every event. The `ScreenController` only registers one handler — but if a stats overlay is implemented with its own gesture listener, the overlay and the main controller both process the same double-tap.
 
-The type chart structure in Showdown is keyed by **defending type** with nested values by attacking type (or vice versa — verify before use).
-
-**Why it happens:**
-Type charts are habitually implemented from memory. "I know Fire beats Grass" leads to handcoded tables that miss edge cases (Freeze-Dry vs Water type, Ghost vs Normal immunity, etc.).
-
-**How to avoid:**
-Fetch the actual Showdown type chart and use it as the canonical source. Implement a single `getTypeEffectiveness(attackType: string, defendTypes: string[]): number` function and write unit tests for known matchups before building the damage calculator:
-```typescript
-// Known test cases to verify
-getTypeEffectiveness('Water', ['Fire'])          // => 2
-getTypeEffectiveness('Normal', ['Ghost'])        // => 0
-getTypeEffectiveness('Ground', ['Flying'])       // => 0
-getTypeEffectiveness('Electric', ['Water', 'Flying']) // => 4
-getTypeEffectiveness('Ice', ['Water', 'Ground']) // => 2 (1x * 2x)
-```
+**Prevention:**
+Maintain a single gesture routing point. The `ScreenController.handleGesture()` is the single entry point — keep it that way. Stats screen must not register its own gesture listener. Navigation changes must go through the centralized gesture handler. Adding a feature should mean adding a case in `ScreenController`, not adding a new `onGesture()` subscription.
 
 **Warning signs:**
-- All moves doing "normal" damage regardless of type
-- Ghost-type Pokemon taking damage from Normal moves
-- Legendary battles feeling wrong (Zapdos should wreck Water types)
+- A gesture fires actions on two different screens simultaneously
+- The stats screen works correctly but double-tap on the stats screen also navigates away from the battle
+- Console shows two gesture handler invocations for one physical tap
 
-**Phase to address:** Battle engine phase (damage calculation). Write type effectiveness tests before integrating into damage formula.
-
----
-
-### Pitfall 5: Damage Formula Modifier Order and Integer Rounding
-
-**What goes wrong:**
-The Pokemon damage formula applies multiple modifiers (STAB, type effectiveness, weather, critical hits, random roll) and requires specific integer truncation at specific steps. Getting the order wrong or floating-point rounding incorrectly produces damage values that diverge from real Pokemon games:
-
-- The random roll (85-100%) must be applied AFTER type effectiveness, not before
-- Each modifier is typically a 4096-denominator fraction in modern gens (Gen V+) to avoid compounding rounding errors
-- STAB is 1.5x in most gens (floor to nearest integer after applying)
-- Critical hits in Gen VIII+ are 1.5x, not 2x
-- Spread moves in doubles get a 0.75x multiplier applied to the final damage, not to base power
-
-A common mistake: applying `Math.floor()` after every single multiplication. The correct approach is to chain modifiers and floor only at the intermediate stages Showdown specifies.
-
-**Why it happens:**
-Developers implement the formula from Bulbapedia without noticing the specific truncation points. "Multiply by STAB and round" looks right but produces wrong values for edge cases.
-
-**How to avoid:**
-For v0.1 simplified combat, use this proven structure:
-```typescript
-function calcDamage(
-  attackerLevel: number, attackStat: number, defenseStat: number,
-  movePower: number, stab: boolean, effectiveness: number
-): number {
-  // Base damage (Gen V+ formula, simplified)
-  const base = Math.floor(
-    Math.floor((2 * attackerLevel / 5 + 2) * movePower * attackStat / defenseStat / 50) + 2
-  );
-  // Apply STAB
-  const withStab = stab ? Math.floor(base * 1.5) : base;
-  // Apply type effectiveness
-  const withType = Math.floor(withStab * effectiveness);
-  // Apply random roll (85-100%)
-  const roll = (Math.floor(Math.random() * 16) + 85) / 100;
-  return Math.max(1, Math.floor(withType * roll));
-}
-```
-This is a deliberate simplification that matches Showdown output for typical cases. Do NOT attempt full Gen IX modifier chains for v0.1 — it's out of scope.
-
-**Warning signs:**
-- Damage output off by 1-3 HP compared to online calculators
-- STAB bonus not applying (STAB multiplier of 1.5 rounds to 1 if applied prematurely)
-- All moves doing the same damage regardless of type effectiveness
-
-**Phase to address:** Battle engine phase. Write verification against known Showdown calc outputs.
+**Phase to address:** Navigation redesign phase and stats screen phase. Enforce: one `onGesture()` listener, always.
 
 ---
 
-### Pitfall 6: G2 Content Limit Silently Truncates Battle State
+## Phase-Specific Warnings
 
-**What goes wrong:**
-The G2 SDK allows a maximum of 1000 characters on page creation and 2000 characters on in-place updates. A battle status screen that tries to render both Pokemon names, HP bars, move names, and status info can easily exceed these limits. When the limit is exceeded, content is silently clipped — no error is thrown, display just cuts off mid-line.
-
-For context: a typical battle HUD might look like:
-```
-Charizard  HP: 68%  [Tera: Fire]
-vs
-Blastoise  HP: 45%
-
-> Flamethrower (90)
-  Fly (90)
-  Fire Blast (110)
-  Slash (70)
-```
-That is approximately 140 characters. But if Pokemon names are long (e.g., "Fletchinder", "Talonflame") and move names are long ("Hydro Pump", "Psychic"), and you add turn counter + status conditions, you approach 300-400 characters easily. A full team listing (6 Pokemon with HP%) exceeds 500 characters.
-
-**Why it happens:**
-Developers build the display on desktop where content limits don't apply, then test on device and find the screen is half-blank. There's no visual error — just missing content.
-
-**How to avoid:**
-Define a strict character budget per screen:
-- Battle HUD: max 400 chars (leave 600 as safety margin)
-- Move selection list: each item should be under 30 chars ("Flamethrower 90 Fire" = 20 chars — fine)
-- Team list: each item under 25 chars ("Charizard HP:68%" = 16 chars — fine)
-- Never include full descriptions, flavor text, or move descriptions on the glasses display
-
-Implement a content length assertion in development:
-```typescript
-function sendToGlasses(content: string, context: string): void {
-  if (content.length > 900) {
-    console.warn(`[G2] Content for "${context}" is ${content.length} chars — approaching 1000 limit`);
-  }
-  // ... send
-}
-```
-
-**Warning signs:**
-- Battle screen shows top content but bottom is cut off
-- Switch screen shows some Pokemon but not all six
-- Content looks fine in browser dev tools but truncated on actual glasses
-
-**Phase to address:** Display/rendering phase. Enforce character budgets from the first screen built.
+| Phase Topic | Pitfall to Watch | Mitigation |
+|-------------|-----------------|------------|
+| Consolidated battle menu | Container count exceeds 4 (C1) | Map container slots BEFORE writing code |
+| Consolidated battle menu | Action index shifting breaks handlers (C2) | Use typed enum for action items |
+| Consolidated battle menu | Animation resets list cursor (C3) | Keep animation in text-only ANIMATING state |
+| Consolidated battle menu | Tera fired accidentally (M3) | Keep two-step tera; use notifier not single-tap |
+| Stats screen | Budget overflow (C4) | Write budget assertion test before device test |
+| Stats screen | Missing data fields (M5) | Audit data sources before writing renderer |
+| Speed controls | Constants not read at runtime (M2) | Use module-level getter, not const values |
+| Speed controls | Slow mode persists to next session (N2) | Do not persist "slow" to localStorage |
+| Back button removal | Double-tap ambiguity (M1) | Define back-allowed list per screen state first |
+| Back button removal | Forced switch allows back (N3) | backAllowed flag must block forced-switch screen |
+| Animation text box | 5th container silently ignored (N1) | Use separator characters, not extra container |
+| ScreenController additions | God object grows (I1) | Extract PhoneCompanion, enforce renderer-first |
+| Removing TERA_CONFIRM | Dead transitions remain (I2) | Delete type union member, fix all TS errors |
+| Parallel feature branches | Duplicate gesture listeners (I3) | Single onGesture entry point, always |
+| Any animation change | SDK call rate causes lag (M4) | Never call showBattleHud inside animation loop |
 
 ---
 
-### Pitfall 7: learnsets.json Is 3MB but Only ~10% Is Needed for One Battle
+## "Looks Done But Isn't" Checklist for v1.1
 
-**What goes wrong:**
-`learnsets.json` is 3.19MB (the largest file in the project at 76% of total data size). Vite bundles it as a static import, meaning the browser must parse the entire 3.19MB JSON object before any game logic can run. On a mid-range Android phone through the Even App WebView, parsing 3.19MB of JSON can take 800-1500ms.
+Things that appear complete in browser but have critical gaps on device:
 
-The typical Vite dev build will inline this as a string literal in a chunk, and the production bundle will have it as a separate chunk — but even with code splitting, it must be parsed synchronously when the module loads.
-
-**Why it happens:**
-Developers do `import learnsets from './data/learnsets.json'` and Vite handles the rest. It works in dev (Chrome on desktop is fast). It works in CI. It only fails noticeably on the actual mobile WebView under real conditions.
-
-**How to avoid:**
-For v0.1 (random battles only), learnsets.json is used only during team generation (one-time at battle start). Strategies:
-
-Option A — Lazy load on first use:
-```typescript
-let _learnsets: Record<string, any> | null = null;
-async function getLearnsets() {
-  if (!_learnsets) {
-    const m = await import('./data/learnsets.json');
-    _learnsets = m.default;
-  }
-  return _learnsets;
-}
-```
-
-Option B — Pre-extract a randbats subset. The `@pkmn/randbats` project maintains a pre-extracted set of random battle sets (~80KB vs 3.19MB). Using this instead of computing from learnsets eliminates the need for learnsets.json entirely at runtime.
-
-Option C — Compute the pre-filtered battle pool at build time using a Vite plugin that produces a small `randbats-pool.json` with only the data needed.
-
-**Warning signs:**
-- App feels "frozen" for 1-2 seconds after tapping "Enter Battle"
-- Lighthouse performance score drops significantly
-- Even App WebView process memory spikes on battle start
-
-**Phase to address:** Data wiring phase. Decide on lazy-loading or pre-extraction before committing to import strategy.
-
----
-
-## Technical Debt Patterns
-
-Shortcuts that seem reasonable but create long-term problems.
-
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Hardcode type chart as TypeScript object | No need to fix typechart.json | Incorrect if Showdown updates types (new Fairy additions, etc.) | Acceptable for v0.1 — type chart is stable |
-| Use basePower=60 for all variable-power moves | Simplifies damage calc | Flavour-incorrect but functionally acceptable for random battles | Acceptable for v0.1 — mark TODO |
-| Skip abilities/items entirely for v0.1 | Huge scope reduction | Battles feel less realistic | Explicitly in scope as "defer to v0.2" |
-| Fixed random roll instead of 85-100% range | Deterministic testing | Battles feel same every time | Never in production — use for unit tests only |
-| Not filtering `isNonstandard` from team pool | Faster implementation | CAP/Mega Pokemon appear in teams, sprites missing | Never — easy fix, no reason to skip |
-
----
-
-## Integration Gotchas
-
-Common mistakes when connecting to external services.
-
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| Showdown CDN for sprites | Hardcoding `/sprites/gen5/charizard.png` — Gen 5 sprites only exist for original 151-649 | Check which generation a Pokemon was introduced, use appropriate sprite path or fall back to Gen 5 animated |
-| Showdown data files (.ts vs .js vs .json) | Fetching `.json` endpoints that don't exist (see Pitfall 1) | Fetch `.js` format from `play.pokemonshowdown.com/data/` and strip the CommonJS wrapper |
-| G2 EvenAppBridge | Calling bridge methods before the WebView signals readiness | Listen for the `evenapp:ready` event before sending any display commands |
-| learnsets.json move codes | Treating `"8L9"` as a pure move ID | The prefix is encoded data: `8` = gen, `L` = learned by level, `9` = level number. Strip to get move ID |
-
----
-
-## Performance Traps
-
-Patterns that work at small scale but fail on constrained hardware.
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Importing all 6 data files at module level | 1-2s load time on mobile WebView | Lazy-load learnsets.json specifically; keep pokedex/moves eager | On first load on mid-range Android |
-| Rendering full move descriptions on glasses | Content truncated to 1000 char limit | Show only move name + base power + type (20-25 chars max) | Every time — display limit is always hit |
-| Calling `Object.keys(pokedex).filter(...)` on every turn | UI jank every time player opens switch screen | Pre-compute battle pool once at team generation time | At 60fps if called in render loop |
-| Storing full Pokemon objects (with all learnset data) in battle state | Memory bloat | Store only battle-relevant fields: name, types, stats, currentHP, moves | On lower-memory devices |
-
----
-
-## UX Pitfalls
-
-Common user experience mistakes specific to this display platform.
-
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| Showing "HP: 234/340" on glasses | Too long for constrained display, hard to read at glance | Show "HP: 68%" — percentage is all a player needs mid-battle |
-| Listing move names only without type/power | Player can't make informed choices | Format as "Flamethrower Fire 90" or "Flamethrower (90)" — fits in ~25 chars |
-| Showing "Use move" as only battle option | Players may want to switch or Terastallize | Present three top-level options first: Attack / Switch / Terastallize |
-| Waiting for full animation timing (simulating real Pokemon timing) | G2 is text-only — artificial delays feel broken | Show results immediately, then poll for next input |
-| Displaying full evolution chains or Pokedex flavor text | Wastes character budget, buries useful info | No flavor text anywhere on glasses — game-relevant data only |
-
----
-
-## "Looks Done But Isn't" Checklist
-
-Things that appear complete in browser but have critical gaps on device.
-
-- [ ] **Data files**: Verify each `.json` file actually parses as JSON (`JSON.parse(fs.readFileSync(...))` in a test script) — abilities.json, items.json, and typechart.json are currently broken
-- [ ] **Type effectiveness**: Run known matchup unit tests before integrating into damage calc — normal/ghost immunity, dual-type multipliers
-- [ ] **Team generation**: Generate 20+ teams and inspect for CAP Pokemon, Mega formes, and battle-only formes appearing
-- [ ] **Variable-power moves**: Check that at least Gyro Ball, Endeavor, Counter are handled (not dealing 0 damage)
-- [ ] **Character budget**: Measure every screen's character count in the actual JSON payload sent to glasses — not the rendered HTML
-- [ ] **Fainting detection**: Test case where both Pokemon faint simultaneously (e.g., recoil damage + attacker KO)
-- [ ] **PP depletion**: Verify that after 4 PP moves are used, Struggle activates (or moves are blocked) — not a silent infinite loop
-- [ ] **Full 6v6 battle**: Complete a full 12-Pokemon battle to end screen without crash — happy path test
-
----
-
-## Recovery Strategies
-
-When pitfalls occur despite prevention, how to recover.
-
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| Broken data files (404 HTML) | LOW | Re-fetch from correct CDN paths; validate with JSON.parse before committing |
-| Variable-power move deals 0 damage | LOW | Add to fallback table; no state migration needed |
-| isNonstandard Pokemon in team | LOW | Add filter; regenerate team |
-| Content truncation on glasses | MEDIUM | Audit all screen renders, apply character budget; may require restructuring display components |
-| learnsets.json blocking initial load | MEDIUM | Switch from static import to dynamic import(); no logic changes needed |
-| Damage formula rounding error | MEDIUM | Fix formula, verify against calc.pokemonshowdown.com reference; existing battles in flight are invalid |
-| Battle state corruption (invalid turn) | HIGH | Requires battle engine rewrite if state machine was not built with explicit transitions; mitigate by using explicit state enum from day one |
-
----
-
-## Pitfall-to-Phase Mapping
-
-How roadmap phases should address these pitfalls.
-
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| Broken data files (404 HTML) | Data wiring (Phase 1) | `node -e "JSON.parse(require('fs').readFileSync('./src/data/X.json','utf8'))"` passes for all 6 files |
-| Variable-power moves as 0 damage | Battle engine (damage calc phase) | Unit test: `calcDamage('endeavor', ...)` returns > 0 |
-| isNonstandard Pokemon in teams | Team generation phase | Generate 100 teams, confirm zero CAP/Mega entries |
-| Type effectiveness lookup | Battle engine (damage calc phase) | 10-point unit test suite of known matchups all pass |
-| Damage formula rounding | Battle engine (damage calc phase) | Output matches calc.pokemonshowdown.com for 5 reference matchups |
-| G2 content limit truncation | Display/rendering phase | Assert `content.length < 900` for every screen type |
-| learnsets.json load perf | Data wiring (Phase 1) | Measure time-to-interactive on actual phone; must be under 500ms |
-| Battle-only formes in teams | Team generation phase | Check `battleOnly` field filter in team generator |
-| Battle state invalid transitions | Battle engine (state machine phase) | Enumerate all valid state transitions in code as typed enum; no raw string states |
+- [ ] **Consolidated menu**: Container count logged and verified <= 4 on real device
+- [ ] **Action indices**: Enum-driven renderer and handler tested with "wrong position" scenario (cursor at wrong item + tap)
+- [ ] **Stats screen**: Character budget assertion passes for worst-case Pokemon (3 abilities, 6 volatiles, +6/-6 all stats)
+- [ ] **Stats screen data**: Every displayed field traced to its source data path (no "undefined" values)
+- [ ] **Speed controls**: Changing speed mid-battle on real device takes effect immediately (not on next battle)
+- [ ] **Speed controls**: "Slow" speed does not persist to next launch
+- [ ] **Double-tap back**: Forced switch screen blocks double-tap-back — confirmed with a Pikachu vs Golem battle where player's active faints immediately
+- [ ] **Tera without confirmation**: Two-step tera (select tera → select move) verified: correct `TERA_ATTACK` action fires, teraUsed flag flips exactly once
+- [ ] **Animation text box**: Text and sprites do not render on top of each other in an unreadable way on device
+- [ ] **Full regression**: After all v1.1 changes, run 3 complete 6v6 battles including: voluntary switch, forced switch, tera use, double faint, speed change mid-battle, stats screen view during battle
 
 ---
 
 ## Sources
 
-- Direct inspection of `src/data/*.json` files in this project (HIGH confidence — primary source)
-- [Bulbapedia: Damage calculation formula Gen V+](https://bulbapedia.bulbagarden.net/wiki/Damage) — modifier order and rounding rules (HIGH confidence)
-- [Pokemon Showdown FORMES.md](https://github.com/smogon/pokemon-showdown/blob/master/data/FORMES.md) — battleOnly and cosmetic forme quirks (HIGH confidence)
-- [Pokemon Showdown DEX.md](https://github.com/smogon/pokemon-showdown/blob/master/sim/DEX.md) — isNonstandard field values and exists behavior (HIGH confidence)
-- [Smogon Damage Calculator forum](https://www.smogon.com/forums/threads/pok%C3%A9mon-showdown-damage-calculator.3593546/) — real-world bugs in damage implementations (MEDIUM confidence)
-- [DeepWiki: PS Random Team Generation](https://deepwiki.com/smogon/pokemon-showdown/3.3-random-team-generation) — team generation edge cases (MEDIUM confidence)
-- [GitHub Issue #10187: Invalid Generated Team For Format](https://github.com/smogon/pokemon-showdown/issues/10187) — format-specific team validation failures (MEDIUM confidence)
-- [even-g2-notes/G2.md](https://github.com/nickustinov/even-g2-notes/blob/main/G2.md) — G2 display constraints, content limits, input event quirks (HIGH confidence)
-- [pkmn/randbats](https://github.com/pkmn/randbats) — pre-extracted random battle sets as alternative to learnsets.json (MEDIUM confidence)
+- Direct inspection of `src/screens/ScreenController.ts`, `src/adapters/glassAdapter.ts`, `src/config/constants.ts`, `src/animation/AnimationEngine.ts` in this project (HIGH confidence — primary source)
+- [Nick Ustinov's G2 Community Notes](https://github.com/nickustinov/even-g2-notes/blob/main/G2.md) — Container limits (max 4), character budgets, rebuildPageContainer cursor reset behavior (HIGH confidence)
+- [Even Realities G2 SDK Architecture Notes](https://www.evenrealities.com/blog/how-we-rebuilt-g2-from-the-inside-out) — Display pipeline behavior (MEDIUM confidence)
+- [Navigating Pitfalls: The Do's and Don'ts of Gestural Interfaces](https://www.createwithswift.com/navigating-pitfalls-the-dos-and-donts-of-gestural-interfaces/) — Gesture discoverability, double-tap accidental activation, system gesture conflicts (MEDIUM confidence)
+- [Bad UI in Games: Common Pitfalls](https://mainleaf.com/bad-ui-in-games/) — Menu consolidation cognitive load, information hierarchy on small screens (MEDIUM confidence)
+- [Minimize Cognitive Load in Game UI](https://www.wayline.io/blog/minimize-cognitive-load-game-ui) — Information prioritization patterns for constrained game displays (MEDIUM confidence)
+- G2 SDK observed behavior in the existing working v0.1 codebase: rebuildPageContainer cursor reset, 4-container limit, sequential BMP write pattern (HIGH confidence — validated by running code)
 
 ---
-*Pitfalls research for: Pokemon Showdown random battle simulator on G2 glasses*
-*Researched: 2026-02-26*
+
+*Pitfalls research for: Pokemon Showdown G2 v1.1 UI Enhancement milestone*
+*Researched: 2026-03-01*

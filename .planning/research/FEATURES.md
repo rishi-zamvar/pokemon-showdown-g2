@@ -1,335 +1,612 @@
-# Feature Research
+# Feature Landscape: v1.1 UI Enhancement & Polish
 
-**Domain:** Pokemon Showdown Random Battle Simulator for G2 Glasses
-**Researched:** 2026-02-26
-**Confidence:** MEDIUM — Core battle mechanics verified via Bulbapedia and Smogon official sources; random battle team generation verified via Showdown source code (teams.ts). Some implementation details (e.g. exact Tera type assignment in random battles) rely on secondary sources.
-
----
-
-## How Random Battles Work
-
-This section answers the upstream research questions before mapping features.
-
-### 1. Random Team Generation
-
-**Source: Showdown teams.ts source (HIGH confidence), Smogon randbats docs (MEDIUM confidence)**
-
-- **Team size:** 6 Pokemon per side
-- **Pokemon pool:** All fully evolved Pokemon + some viable NFE (e.g. Chansey, Porygon2). Gen 9 random battle uses OU, UU, RU, NU, PU tiers — no Ubers by default in standard randbats
-- **Levels:** Tier-based scaling. Approximate mapping: Uber=76, OU=80, UU=82, RU=84, NU=86, PU/NFE=88. Monthly win-rate adjustments (±1-3 levels per month) keep all Pokemon near 50% win rate on ladder
-- **EVs:** 85 in every stat, neutral nature (unless 0 Atk/Spe IVs beneficial). HP EVs may be adjusted to optimize Stealth Rock switch-in counts
-- **IVs:** 31 in all stats (perfect IVs standard)
-- **Moves:** 4 moves per Pokemon. Selected via role system ("Wallbreaker," "Bulky Attacker," etc.) — enforces STAB moves first, then coverage, setup, or recovery based on role. Some Pokemon have hardcoded rules (e.g. Dragonite always gets Outrage)
-- **Abilities:** Filtered to synergize with assigned moves and role. Weather abilities excluded if no weather setter on team
-- **Items:** Priority items assigned first (Assault Vest for certain builds). Remaining assigned by move synergy and stats. Rules: 2 or fewer attacks → Leftovers (Black Sludge if Poison-type); 3 attacks with weak bulk → Life Orb; Trick/Switcheroo users → Choice item; specific speed range → Choice Scarf
-- **Tera types:** In Gen 9 randbats, each Pokemon has a pre-assigned Tera type from its role's set options (sourced from the hourly simulation that generates 100,000 teams). Tera type is known to the player holding the Pokemon
-
-### 2. Battle Flow
-
-**Source: Bulbapedia damage article (HIGH confidence), Cave of Dragonflies mechanics (HIGH confidence)**
-
-**Turn structure (each turn):**
-1. Both sides choose an action (move or switch)
-2. Switches resolve first (before any moves)
-3. Moves execute in priority bracket order:
-   - Higher priority value = moves first (e.g. Quick Attack +1 > normal 0 > Trick Room -7)
-   - Within same priority: higher Speed stat moves first
-   - Speed tie: random coin flip
-4. End-of-turn effects (weather, status damage, Leftovers healing)
-
-**Damage formula (Gen 5+):**
-
-```
-Damage = floor(((2 × Level / 5 + 2) × Power × Atk / Def / 50) + 2) × modifiers
-```
-
-Modifiers applied in sequence:
-- **Type effectiveness:** 0.25x / 0.5x / 1x / 2x / 4x (based on defender's type(s))
-- **STAB:** 1.5x if move type matches attacker's type(s). 2x if attacker has Adaptability ability
-- **Critical hit:** 1.5x damage (Generation 6+). Base crit rate ~4.17% (1 in 24)
-- **Random factor:** Multiply by random integer 85-100 then divide by 100 (so damage varies ±15%)
-- **Physical vs Special:** Physical moves use Atk vs Def; Special moves use SpAtk vs SpDef
-- **Burn:** Halves physical damage output for burned Pokemon
-- **Screens (Reflect/Light Screen):** Halve damage from respective category
-
-**Fainting:** When HP reaches 0, Pokemon faints. Controlling player must switch in a replacement (if any remain). If all 6 faint, that player loses.
-
-**Win condition:** KO all 6 of opponent's Pokemon.
-
-### 3. Terastallization
-
-**Source: Bulbapedia Terastallization article (HIGH confidence)**
-
-- **Usage:** Once per battle per player. Activated as an action on the player's turn (replaces move selection for that action — the Pokemon Terastallizes AND uses a move in the same turn, but the Tera action has no priority modifier)
-- **Effect on type:** Pokemon's defensive and offensive type becomes solely its Tera type. Original types are overridden for type-effectiveness calculations
-- **Effect on STAB:**
-  - If Tera type differs from original types: only Tera type gets STAB (1.5x)
-  - If Tera type matches one original type: that type gets 2x (Adaptability-level boost)
-  - If Tera type matches both original types (dual-type): same 2x boost on matched type
-  - Original STAB types still apply for moves — if original type move used while Tera'd, it still gets 1.5x STAB if original type ≠ Tera type
-- **Duration:** Permanent for the rest of battle (survives switching out, stays until the Pokemon faints)
-- **Move base power minimum:** Moves of the Tera type with base power below 60 are boosted to 60 BP minimum
-- **In random battles:** Each Pokemon has a pre-assigned Tera type. Player chooses when (or whether) to use it
-
-### 4. AI Opponent
-
-**Source: Multiple AI research papers and Smogon community discussions (MEDIUM confidence)**
-
-Showdown's own built-in AI (for challenge mode vs CPU) uses a **heuristic approach**:
-- Evaluates each available move based on expected damage output
-- Prefers super-effective moves
-- Switches when type disadvantage is severe
-- Does NOT do deep minimax search (too expensive per turn)
-
-For a v0.1 implementation, a simple heuristic AI is appropriate:
-- Calculate expected damage for each move against current target
-- Pick the highest-damage move with some randomness to be less predictable
-- Switch if all moves are resisted and a better matchup exists
+**Domain:** Pokemon Showdown G2 smart glasses battle client — UI enhancement milestone
+**Researched:** 2026-03-01
+**Confidence:** HIGH — primary research is the existing codebase (read directly); Showdown client UX
+verified via official source code on GitHub and DeepWiki documentation.
 
 ---
 
-## Feature Landscape
+## Context: What Exists vs What Is Being Added
 
-### Table Stakes (Users Expect These)
+This is a SUBSEQUENT milestone. All core battle mechanics are complete and working. The v1.1 goal
+is to bring the UI closer to Pokemon Showdown's web client experience while respecting the G2
+hardware constraints (576x288 monochrome, text/list containers only, gesture navigation).
 
-Features without which "the battle doesn't work" on G2 glasses.
+### Already Built (v0.1)
+- Main menu with "Enter Battle"
+- Battle HUD: both Pokemon names, HP%, sprites, status/volatile display
+- Action menu: Attack / Switch / Terastallize (separate from HUD)
+- Attack select screen (4 moves, type, PP remaining/max)
+- Switch select screen (full team list with HP%)
+- Tera confirm screen (separate confirmation step)
+- Turn result screen (battle log with typewriter text)
+- Animations: typewriter, sprite flash (hit/miss/faint), HP drain, switch slide-in
+- Complete protocol text coverage (~30+ message types)
+- AI opponent (SimAI via @pkmn/sim)
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Random team generation (6v6) | Core format — no teams = no battle | MEDIUM | Pull from Showdown data files already downloaded. Level per tier, 85 EVs, preset moves/ability/item per role |
-| Battle state engine | Tracks HP, active Pokemon, turn count, faint state | HIGH | Damage calc, turn order, switching enforcement on faint |
-| Damage calculation (base formula) | Without this, battles have no outcome | MEDIUM | `((2*L/5+2)*Power*A/D/50)+2` with type effectiveness and STAB. No items/abilities for v0.1 |
-| Type effectiveness (18x18 chart) | Determines core battle strategy | LOW | Typechart already downloaded to src/data/typechart.json — just read and apply |
-| STAB multiplier (1.5x) | Core mechanic — every Pokemon uses STAB moves | LOW | Check if move type matches attacker type(s); multiply by 1.5 |
-| Turn structure (both sides pick, execute by speed) | Without turn order, game is incoherent | MEDIUM | Both player and AI pick action, resolve switches first, then moves by Speed stat |
-| HP tracking and faint detection | Without faints, battle never ends | LOW | Track current HP as integer; detect 0; force switch screen |
-| Forced switch on faint | Player must select replacement | LOW | Trigger switch screen when active Pokemon faints |
-| Win/loss detection | Without end condition, game loops forever | LOW | Detect when all 6 on either side have fainted |
-| Attack selection screen (4 moves) | Player must choose a move each turn | LOW | Vertical list of 4 move names, tap to select; display name + type + base power |
-| Switch Pokemon screen (6 Pokemon) | Player must be able to switch | LOW | Vertical list of up to 6 Pokemon with name + HP%; already fainted = greyed out or skip |
-| Battle HUD (both Pokemon, name + HP%) | Player needs to know game state | LOW | G2 display shows: own Pokemon name+HP, opponent name+HP. Already defined in PROJECT.md |
-| AI opponent (basic heuristic) | Without an opponent, nothing to play against | MEDIUM | Choose highest-damage move; switch if current matchup is very bad |
-| Terastallization option in menu | Listed as target feature in PROJECT.md | MEDIUM | Add "Terastallize" to action menu; change active type; one use per battle |
-| Critical hits (4% chance, 1.5x) | Part of damage formula; random battles rely on randomness | LOW | Roll 1/24 chance; multiply damage by 1.5 |
-| Random damage roll (85-100%) | Without this, same move always deals same damage | LOW | `Math.floor(damage * (85 + Math.random()*15) / 100)` |
-| Physical vs Special move distinction | Without this, damage calc is wrong for half of moves | LOW | Check move.category in moves.json; use Atk vs SpAtk accordingly |
+### Screen Navigation Graph (current)
+```
+MAIN_MENU
+  -> BATTLE_HUD
+       -> ACTION_MENU
+            -> ATTACK_SELECT  (move chosen -> ANIMATING -> TURN_RESULT -> back)
+            -> SWITCH_SELECT  (voluntary)
+            -> TERA_CONFIRM
+                 -> ATTACK_SELECT
+  TURN_RESULT -> BATTLE_HUD | SWITCH_SELECT (forced) | END_SCREEN
+  END_SCREEN -> MAIN_MENU
+```
 
-### Differentiators (Nice to Have, Deferrable)
+---
 
-Features that improve the experience but don't block a working battle.
+## How Pokemon Showdown Web Client Displays Battle Information
+
+This section documents what the Showdown web client actually shows, so we can identify
+what to adapt for glasses.
+
+### Showdown Battle Screen Layout
+
+**Three-column layout:**
+1. Battle field (sprites, HP bars, field conditions)
+2. Battle log (scrolling text log + move/switch choice buttons)
+3. Chat / room info
+
+**Battle field shows:**
+- Both Pokemon sprites (opponent top-right, player bottom-left, back view)
+- HP bars: color-coded (green > 50%, yellow 20-50%, red < 20%), displayed as bar + percentage
+- Pokemon name, level, gender icon, status badge (BRN/PAR/PSN/SLP/FRZ/TOX), held item icon
+- Tera type icon when Terastallized
+- Stat stage indicators (arrows or +/- numbers for each stat boost/drop)
+- Team preview: 6 pokeballs per side (filled = healthy, half = damaged, empty = fainted)
+- Field conditions: weather icon (sun/rain/sand/snow), terrain label, screens (Reflect/Light Screen)
+
+**Move selection panel (inside battle log column):**
+- 4 move buttons, color-coded by type (same type colors as the games)
+- Each button: move name + type icon + PP remaining/max (e.g. "10/16")
+- Disabled appearance when PP = 0 or move is unusable (locked by Choice, Encore, etc.)
+- Tera button: checkbox next to the move list to toggle Terastallize for this turn
+- "Forfeit" button accessible from the battle controls
+
+**HP/status tooltip on hover (opponent):**
+- Pokemon name, level, known held item or "Unknown"
+- Possible abilities (if not yet revealed)
+- Tracked moves: which moves have been used and their PP
+- Speed range estimate: "Speed: X - Y" showing min/max possible speed for that set
+- Stat stage display: current boosts/drops shown numerically
+
+**Battle log:**
+- Scrolling text showing all events: move usage, damage, status changes, stat changes
+- Color-coded: effectiveness notices highlighted
+- Player can scroll up to review old turns
+
+**Battle speed controls:**
+The Showdown client settings (gear icon) include an "Animation Speed" preference that
+controls how fast battle animations play. The underlying implementation uses an
+`acceleration` multiplier (BattleSceneStub shows `acceleration: NaN` as default,
+updated by `updateAcceleration()`). The BattleChoiceBuilder provides instant skip.
+Effectively: Slow / Normal / Fast / Instant (skip all). Users commonly use "Instant"
+during high-volume ladder play to skip through animations quickly.
+
+**Stats that change during battle (displayed on Showdown):**
+- HP (tracked exactly)
+- Stat stages: Atk/Def/SpA/SpD/Spe each from -6 to +6
+- Status: PSN/TOX/BRN/PAR/SLP/FRZ
+- Volatile conditions: CNF, TAUNT, ENCORE, DISABLE, LEECH SEED, SUBSTITUTE, etc.
+- Item usage: depleted (Berry eaten, Choice locked)
+- Tera active (type change shown)
+- Weather (turns remaining)
+- Terrain (turns remaining)
+- Side conditions: Stealth Rock, Spikes layers, Reflect/Light Screen turns
+
+**What Showdown shows on the attack screen that we currently lack:**
+- HP bars and sprites remain visible while move buttons are shown (Showdown keeps the
+  field visible at all times; the move panel is an overlay)
+- Move category icon (Physical / Special / Status)
+- Move base power number
+- Approximate damage estimate (advanced feature in some clients)
+
+**What Showdown's randbats tooltip shows for opponent:**
+- Possible move pool for that Pokemon's role
+- Possible abilities (if not yet revealed)
+- Speed range (min speed for that set at min level, max speed at max level)
+- Stat ranges for each stat
+- Possible items
+
+---
+
+## Table Stakes
+
+Features users expect for a Showdown-like glasses experience. Missing = feels incomplete
+compared to what the user explicitly asked for.
+
+| Feature | Why Expected | Complexity | Depends On |
+|---------|--------------|------------|------------|
+| Battle speed menu | Showdown has animation speed slider. User explicitly asked for it. Without it, slow typewriter is the only mode. | LOW | ANIM constants in constants.ts |
+| Action menu on HUD screen | User asked to collapse Attack/Switch/Tera into the main HUD (one fewer tap). Showdown keeps choices accessible at all times. | MEDIUM | ScreenController, battleHudRenderer |
+| HP bars + sprites visible on attack screen | Showdown keeps the battle field visible while you pick moves. Currently attack screen loses all visual context. | MEDIUM | attackSelectRenderer, glass adapter layout |
+| HP bars + sprites visible on switch screen | Same as above for switch select. Need to know opponent's HP when deciding who to switch in. | MEDIUM | switchSelectRenderer, glass adapter layout |
+| Remove back-button items from lists | Double-tap is the navigation paradigm. "< Back" as list item 0 is a clutter artifact. | LOW | All list renderers |
+| Tera without confirmation screen | Showdown's Tera is a checkbox on the move select screen — no separate confirm step. Current two-tap flow is slower than necessary. | LOW | teraConfirmRenderer, ScreenController flow |
+| Stats screen | Showdown shows stat stages, status, speed range for opponent. User explicitly asked for this. | HIGH | New renderer, BattleState data model |
+| Text in a box during animations | Showdown's battle log is a distinct styled panel. Currently text just floats in the content container. | LOW | AnimationEngine, glass adapter |
+| Pokemon attack movement animation | Showdown shows the attacker "lunge" toward the target before the move effect. User asked for this. | MEDIUM | AnimationEngine, shiftSpriteBmp (already exists) |
+| Battle log box visible from HUD | Showdown always shows recent log entries on the battle screen. User wants better log visibility. | LOW | battleHudRenderer |
+
+---
+
+## Differentiators
+
+Features that are unique advantages of the glasses platform or go beyond Showdown's web UI.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Status conditions (burn, paralysis, sleep, freeze, poison) | Adds strategic depth | HIGH | Affects damage output, turn skip, speed halving. Deferred per PROJECT.md |
-| Abilities active effects | Many abilities change battle math (Intimidate, Levitate, etc.) | HIGH | Deferred per PROJECT.md. Could silently ignore for v0.1 |
-| Held items active effects | Life Orb, Choice Band, Leftovers healing all matter | HIGH | Deferred per PROJECT.md |
-| Move effect display ("Super effective!", "Not very effective!") | Tells player how their move landed | LOW | Display effectiveness label after damage; no extra logic needed |
-| Remaining team count display | Lets player track how many Pokemon remain | LOW | Show "Player: 3/6 | AI: 4/6" on HUD |
-| Accuracy rolls (missing moves) | Some moves have <100% accuracy | MEDIUM | Apply accuracy * evasion; miss = 0 damage. Adds realism but complicates flow |
-| Priority move handling (Quick Attack, Protect) | Correct turn ordering for priority moves | MEDIUM | Requires move priority data from moves.json; already in dataset |
-| Switching mid-battle (not forced, voluntary) | Strategic play — change matchup | LOW | Switch screen accessible from main action menu, not just on faint |
-| Tera type display for opponent | Hints at what Tera type opponent may use | LOW | Could show "?" or known type from game data |
-| Battle log / move announcements | "Pikachu used Thunderbolt! It's super effective!" | MEDIUM | Adds narrative feel; needs text queue on G2 display |
-| Speed tie display | Clarify when random tie-break decided order | LOW | Minor UX improvement |
-
-### Anti-Features (Do NOT Build for v0.1)
-
-Features that seem like improvements but would bloat scope, introduce bugs, or fight the G2 display constraints.
-
-| Anti-Feature | Why Requested | Why Avoid for v0.1 | Alternative |
-|--------------|---------------|---------------------|-------------|
-| Full battle animations / move visuals | Feels more like real game | G2 is monochrome text/list only — animations impossible. Text descriptions are the medium | Use text like "Pikachu used Thunderbolt" |
-| Full status effect system | More accurate to real Pokemon | 6 status types × interaction with every ability = 50+ edge cases. Deferred in PROJECT.md | Build after core loop works |
-| Full ability interactions | Abilities dramatically change outcomes | 200+ abilities, most with unique logic. Pre-assigned by randbats but silently ignoring is valid for v0.1 | Apply only abilities that are trivially passive (Swift Swim speed boost can wait) |
-| Full item effects | Choice Band, Life Orb, etc. matter competitively | Held items are team-gen flavor but applying them correctly requires damage calc branching. Deferred in PROJECT.md | Generate teams with items but don't apply item effects in combat |
-| Multi-target / spread moves | Doubles/triples mechanics (e.g. Earthquake hits all) | v0.1 is singles only — irrelevant. Would add format complexity | Single target only |
-| Online multiplayer | More engaging | Requires websocket server, matchmaking, latency handling. Not in scope | Single player vs AI only |
-| Custom team builder | Power user feature | Contradicts "random battle" format entirely | Random only for v0.1 |
-| Detailed stat display screen | Competitive players want to see base stats, EVs | Screen real estate on G2 is extremely limited; 8 lines max | Show only HP% in HUD; full stat screen deferred |
-| Form changes (Aegislash, Rotom) | Technically accurate | Form logic requires additional state tracking and sprite swaps | Use base form for v0.1 |
-| Weather effects (Rain, Sun, Sand, Hail) | Many team sets include weather setters | Weather multipliers + end-of-turn damage = multiple edge cases. Interacts with abilities | Ignore weather for v0.1 |
-| Z-Moves / Mega Evolution | Legacy mechanics still in some randbat formats | Gen 9 format doesn't use them. Only relevant for older gen formats | Use Gen 9 format only for v0.1 |
-| Stellar Tera type | Advanced Tera type that works differently | Special case with unique damage math — adds complexity for rare edge case | Exclude Stellar type from Tera pool for v0.1 |
+| Glanceable speed control (3 presets) | Showdown's speed slider requires interaction. Glasses benefit from discrete named presets (Slow / Normal / Fast / Instant) that are one-swipe-one-tap to set. | LOW | Named presets map to ANIM constant multipliers |
+| Back to main menu from battle menu | User asked for this explicitly. Showdown has "Forfeit" but not a clean "main menu" option. Glasses user may want to reset without finishing battle. | LOW | ScreenController, renderActionMenu |
+| Stat stages shown inline on HUD | Showdown shows stat stages via tooltip hover. On glasses, show them directly in the HUD text since hover is impossible. | LOW-MEDIUM | battleHudRenderer, BattleState |
+| Opponent speed range on stats screen | The randbats tooltip extension is one of Showdown's most popular community tools precisely because speed calcs matter for competitive play. Build this in natively. | MEDIUM | DataLoader (level + stats), new calc logic |
+| Possible abilities display for opponent | When opponent's ability is unknown, show what's possible for that Pokemon's set. Matches randbats tooltip behavior. | MEDIUM | DataLoader (abilities.json), new renderer |
 
 ---
 
-## Feature Dependencies
+## Anti-Features
+
+Things to deliberately NOT build for v1.1, even though they seem like improvements.
+
+| Anti-Feature | Why It Seems Good | Why To Avoid | What To Do Instead |
+|--------------|-------------------|--------------|-------------------|
+| Scrollable battle log history | Showdown lets you scroll up through all battle events | G2 firmware scroll controls list navigation — a separate scrollable log would require a dedicated screen transition, defeating the purpose | Keep turn result screen as the log view; it already shows last 12 entries |
+| Type-color-coded move buttons | Showdown uses 18 different type colors on move buttons | G2 is monochrome. Type is already shown as text in parentheses. Color coding = zero visual difference | Keep current text format: "Thunderbolt (Electric) 15/16" |
+| Animated move effects (thunderbolts, fire, etc.) | Showdown has full move effect animations | G2 has no color and no GPU layer. Only sprite-level bitmap manipulation is possible. Move effects would require dozens of pre-rendered frames per move. | Keep sprite flash + lunge animation as the move visual feedback |
+| Move category icon (Physical/Special/Status) | Showdown shows a category icon next to each move | Only useful if it changes strategy. On G2, "Physical/Special" could be 1 char but adds clutter for limited benefit in randbats where AI chooses optimally regardless | Display on stats screen if explicitly requested, not on attack select |
+| Exact HP numbers | Showdown shows exact HP values in tooltips | Opponent's HP is intentionally hidden in randbats. Showing exact numbers would break game balance. HP% is the correct granularity. | Keep HP% display |
+| Damage calculator | Showdown has a companion damage calc (calc.pokemonshowdown.com) | Too complex for v1.1 scope. Requires knowing opponent EVs, IVs, and nature — all unknown for opponent in randbats. | Speed range is achievable (known set data); damage estimate is not |
+| Weather / terrain icons | Showdown shows visual weather effects | G2 cannot display weather icons graphically. Text already covers weather events via protocol messages. | Weather state is already shown in battle log text |
+| Team preview screen | Showdown shows all 12 Pokemon before the battle starts | Random battle format does not use team preview (both teams are hidden). Adding this would not reflect randbats rules. | No team preview — correct for the format |
+| Surrender / forfeit option mid-battle | Showdown has a forfeit button | Not worth adding in v1.1. If player wants to quit, double-tapping to main menu is sufficient. | Handled by "Back to main menu" at bottom of battle menu |
+
+---
+
+## Feature Analysis: Each v1.1 Request
+
+Detailed breakdown of each feature the user explicitly asked for.
+
+---
+
+### 1. Battle Speed Menu
+
+**What Showdown Does:**
+Showdown has an animation speed preference that scales animation timing. The `BattleSceneStub`
+class has an `acceleration` property. The scene uses it as a divisor for timing values.
+Effectively: higher acceleration = faster animations.
+
+**What We Have:**
+All timing constants live in `ANIM` in `src/config/constants.ts`:
+- `CHAR_DELAY_MS: 45` (typewriter character delay)
+- `PUNCTUATION_PAUSE_MS: 180`
+- `ENTRY_PAUSE_MS: 500` (pause between log entries)
+- `FLASH_FRAME_MS: 75` (sprite flash frame duration)
+- `HP_FRAME_MS: 40` (HP bar drain step)
+- `SWITCH_FRAME_MS: 120` (switch animation frame)
+
+**Proposed Implementation:**
+Store `battleSpeed` as an app-level setting with 4 presets:
+
+| Preset | Multiplier | Typewriter | Entry Pause | HP Drain |
+|--------|-----------|-----------|-------------|---------|
+| Slow | 0.5x | 90ms/char | 800ms | 80ms/step |
+| Normal | 1x | 45ms/char | 500ms | 40ms/step |
+| Fast | 2x | 20ms/char | 250ms | 20ms/step |
+| Instant | Skip | 0ms (dump full text at once) | 100ms | 0ms |
+
+The `AnimationEngine` must accept a speed multiplier. The main menu should offer a
+"Battle Speed" option that opens a 4-item list.
+
+**Complexity:** LOW
+**Dependencies:** `ANIM` constants, `AnimationEngine`, `ScreenController`, `mainMenuRenderer`
+
+---
+
+### 2. Consolidated Battle Menu (Action Menu on HUD)
+
+**What Showdown Does:**
+The battle field is always visible. The move/switch buttons are in an adjacent panel — you
+can see your Pokemon's HP while choosing a move simultaneously.
+
+**What We Have:**
+Current flow: HUD screen -> tap -> ACTION_MENU screen -> tap Attack -> ATTACK_SELECT.
+This is two taps to reach the move list. The user wants Attack/Switch/Tera accessible
+directly from the HUD with one tap.
+
+**Proposed Implementation:**
+Convert `BATTLE_HUD` from a text screen to a list screen. The list items ARE the action
+options. The HUD content (sprites, HP bars) displays as the screen header. On tap:
+- Item 0: "Attack" -> ATTACK_SELECT
+- Item 1: "Switch" -> SWITCH_SELECT
+- Item 2: "Terastallize" OR "Tera (used)" -> directly queue tera, go to ATTACK_SELECT
+- Item 3: "Back to Menu" -> END_SCREEN / MAIN_MENU with confirmation
+
+This eliminates the separate ACTION_MENU screen entirely.
+
+**Complexity:** MEDIUM
+**Dependencies:** `ScreenController`, `battleHudRenderer`, `ScreenState` (may need new screen type)
+
+---
+
+### 3. Attack Screen with HP Bars and Sprites Visible
+
+**What Showdown Does:**
+The field (sprites + HP bars) is always in the top portion of the screen. The move buttons
+appear in the lower portion. The player can see opponent HP while choosing.
+
+**What We Have:**
+`ATTACK_SELECT` renders a `ListScreen` with items only. The sprites and HP text are in
+separate containers (oppInfo, plyInfo, oppSprite, playerSprite) that persist from the
+battle HUD. The issue is that switching to a list screen may clear the text containers.
+
+**G2 Constraints:**
+The G2 SDK has separate containers:
+- `oppInfo` (container 6): opponent name + HP bar text
+- `plyInfo` (container 7): player name + HP bar text
+- `oppSprite` (container 4): opponent sprite image
+- `playerSprite` (container 5): player sprite image
+- `content` (container 1): main text area
+- `status` (container 2): left status bar
+- `statusRight` (container 3): right status bar
+
+In a list screen, container 1 (`content`) becomes the list. Containers 4-7 are independent
+and should persist unless explicitly cleared.
+
+**Proposed Implementation:**
+Before rendering ATTACK_SELECT, set containers 4-7 to show current battle state (same as
+HUD). The list in container 1 shows the 4 moves. This requires the `GlassAdapter` to be
+called with both `rebuildPageContainer` (list) AND `updateImage`/`updateText` (sprites and
+HP). Currently the `renderAttackSelect` function only returns a `ListScreen` — we need a way
+to also update the sprite/HP containers as part of the attack select transition.
+
+**Complexity:** MEDIUM — requires changes to how screen transitions handle multi-container updates.
+**Dependencies:** `GlassAdapter`, `attackSelectRenderer`, `ScreenController`
+
+---
+
+### 4. Switch Screen with HP Bars and Sprites Visible
+
+**What Showdown Does:**
+When switching, you can see the current active Pokemon's HP (it may be low, informing urgency)
+and the opponent's active Pokemon (to pick an appropriate counter).
+
+**Proposed Implementation:**
+Same approach as attack screen. Before rendering `SWITCH_SELECT`, update containers 4-7 with
+current battle state. The list in container 1 shows the team.
+
+**Complexity:** MEDIUM (same pattern as attack screen)
+**Dependencies:** `GlassAdapter`, `switchSelectRenderer`, `ScreenController`
+
+---
+
+### 5. Remove Back Buttons from Lists
+
+**What Showdown Does:**
+Navigation is click-based; there is no explicit "Back" item in lists.
+
+**What We Have:**
+Every list screen starts with `'< Back'` as item 0. This means list index 0 = go back,
+and every action item is offset by 1. This was designed before double-tap was the back gesture.
+
+**Proposed Implementation:**
+Remove `'< Back'` from all list renderers:
+- `attackSelectRenderer.ts`: remove `items.push('< Back')` at start
+- `switchSelectRenderer.ts`: same
+- `teraConfirmRenderer.ts`: same
+- `actionMenuRenderer.ts`: same (or eliminate this screen entirely per feature 2)
+
+Update `ScreenController`'s list index mapping — all items shift by 1 (no longer offset by 1).
+The `indexMap` in `SwitchListScreen` must be adjusted accordingly.
+
+**Complexity:** LOW — straightforward but affects every list handler in `ScreenController`
+**Dependencies:** All list renderers, `ScreenController` `onTap` handlers, `SwitchListScreen.indexMap`
+
+---
+
+### 6. Tera Without Confirmation Screen
+
+**What Showdown Does:**
+Tera is a checkbox on the move select screen. Check the box, then pick a move. No separate
+confirmation screen exists — once you pick a move with the box checked, Tera is used.
+
+**What We Have:**
+Current flow: ACTION_MENU -> "Terastallize" -> TERA_CONFIRM screen -> "Confirm Terastallize"
+-> ATTACK_SELECT. This is 3 taps to reach move select with Tera queued.
+
+**Proposed Implementation:**
+The user asked for a "notifier only" approach: when the player selects "Terastallize" from
+the consolidated battle menu, immediately set `teraQueued = true`, show a brief notification
+message (e.g. "Tera queued! Pick your move."), then transition directly to ATTACK_SELECT.
+No separate confirmation screen. The attack select screen should indicate Tera is active
+(e.g. status bar shows "Tera: [TeraType]").
+
+Eliminate the `TERA_CONFIRM` screen from the navigation graph and `ScreenName` union.
+
+**Complexity:** LOW
+**Dependencies:** `ScreenController`, `teraConfirmRenderer` (can be deleted), `attackSelectRenderer`
+
+---
+
+### 7. Stats Screen
+
+**What Showdown Does (via battle-tooltips.ts):**
+When hovering a Pokemon in Showdown, the tooltip shows:
+- Known/possible abilities
+- Tracked moves (revealed during battle)
+- Speed range (min and max possible for that randbats set)
+- Stat stages (current boosts/drops: Atk/Def/SpA/SpD/Spe each -6 to +6)
+- Status condition
+- Current HP percentage
+
+**What We Have:**
+`BattleState` contains per-mon: `status`, `volatiles`, `teraActive`, `teraType`, `ppUsed`,
+`stats` (the computed final stats), `ability`, `item`, `level`.
+
+The `BattleState` does NOT yet track stat stage numbers per mon (e.g. Atk +2, Spe -1).
+It has `volatiles: string[]` for volatile condition names but no numeric stat stages.
+
+**Proposed Implementation:**
+New `STATS_SCREEN` with two views:
+1. Player Pokemon stats (tap to view your active Pokemon)
+2. Opponent Pokemon stats (swipe to switch view)
+
+**Player view shows:**
+```
+You: [Name] (Lv.[level])
+Ability: [ability] | Item: [item]
+Status: [BRN/PAR/etc or "None"]
+Tera: [type] (active/available/used)
+Atk [stage] Def [stage] SpA [stage]
+SpD [stage] Spe [stage] [actual speed]
+HP: [bar] [pct]%
+```
+
+**Opponent view shows:**
+```
+Foe: [Name] (Lv.[level])
+Ability: [known ability OR "? (Ability1 / Ability2)"]
+Status: [status or "None"]
+Speed range: [min] - [max]
+Atk [stage] Def [stage] SpA [stage]
+SpD [stage] Spe [stage]
+HP: [bar] [pct]%
+```
+
+**Stat stage tracking requires adding to `ActivePokemon`:**
+```typescript
+statStages: { atk: number; def: number; spa: number; spd: number; spe: number; }
+```
+initialized to all 0, updated on `STAT_BOOST` / `STAT_UNBOOST` / `STAT_CLEAR` events
+in `SimBattleAdapter`.
+
+**Speed range calculation:**
+Using randbats data (`@pkmn/randoms` already installed), fetch the speed stat for the
+opponent's species at their assigned level (using min/max multipliers from the role's
+speed spread). The speed range accounts for: base speed, level, 85 EVs at neutral nature
+(standard randbats stat), no nature boost needed (randbats uses neutral by default).
+
+Formula: `speed = floor(floor((2 * baseSpe + 31 + floor(85/4)) * level / 100 + 5) * natureMultiplier)`
+For randbats: nature = 1.0, EVs = 85, IVs = 31.
+
+**Complexity:** HIGH — requires: stat stage tracking in battle state, speed range calculator, new screen renderer, navigation update
+**Dependencies:** `ActivePokemon` type, `SimBattleAdapter` (stat stage updates), new `statsRenderer.ts`, `ScreenController`
+
+---
+
+### 8. Animation Text in a Box
+
+**What Showdown Does:**
+Battle events appear in a distinct "battle log" panel with a styled border separate from
+the field. This creates visual separation between "what happened" and "what is the state."
+
+**What We Have:**
+During animations, `AnimationEngine` calls `glass.updateText(currentText, { left: hpStatus, right: '' })`.
+The text lands in the main content container with no visual distinction from the HUD.
+
+**G2 Constraints:**
+The G2 SDK does not support CSS borders or box drawing via text containers. However,
+using the status bar (bottom bar, containers 2+3) for animation text while the
+content container (container 1) remains the static HUD creates the equivalent of
+"text in a lower panel."
+
+**Proposed Implementation:**
+During animations:
+- Container 1 (`content`): shows the static HUD (sprites/HP remain)
+- Container 2 (`status`): shows the animation event text scrolling in from status bar
+- OR: use a dedicated TEXT container that only appears during animation phase
+
+This is a display architecture decision more than a data model change.
+
+**Complexity:** LOW — changes only AnimationEngine's updateText calls, no new data structures
+**Dependencies:** `AnimationEngine`, `GlassAdapter.updateText` call pattern
+
+---
+
+### 9. Pokemon Attack Movement Animation
+
+**What Showdown Does:**
+When a Pokemon attacks, it briefly "lunges" toward the opponent (moves forward/across the
+field), then returns to its position before the move effect plays.
+
+**What We Have:**
+`shiftSpriteBmp(original, offsetX, size)` already exists in `AnimationEngine` and is used
+for the switch-in slide animation. It can shift the sprite BMP horizontally by N pixels.
+
+**Proposed Implementation:**
+In `AnimationEngine.playEntry()`, for `MOVE_USE` events:
+1. Attacker's sprite shifts toward the opponent: 3-4 frames shifting +8px, +16px, +24px
+2. Hold at max offset for 1 frame
+3. Shift back: -24px, -16px, -8px, 0px
+4. Then proceed with existing hit flash / HP drain on the target
+
+For player (player lunges right = positive X offset):
+- `shiftSpriteBmp(playerSprite, +offset, size)` — shifts right
+For opponent (opponent lunges left = negative X offset):
+- `shiftSpriteBmp(oppSprite, -offset, size)` — shifts left
+
+This reuses the existing infrastructure completely.
+
+**Complexity:** MEDIUM — adds 6-8 async frames per MOVE_USE event, must be cancellable
+**Dependencies:** `AnimationEngine`, `shiftSpriteBmp` (already exists), `ANIM` constants
+
+---
+
+### 10. Back to Main Menu at Bottom of Battle Menu
+
+**What We Have:**
+No way to exit a battle in progress except winning or losing.
+
+**Proposed Implementation:**
+Add a "Main Menu" item at the bottom of the consolidated battle action list:
+```
+Attack
+Switch
+Terastallize (or "Tera: Used")
+--- (separator or just bottom position)
+Main Menu
+```
+
+Tapping "Main Menu" either: (a) shows a brief "Quit battle?" confirmation, or (b)
+immediately returns to MAIN_MENU. Given the user's stated preference for reducing
+confirmation steps, option (b) is appropriate for v1.1.
+
+**Complexity:** LOW
+**Dependencies:** `renderActionMenu` (or the new consolidated HUD menu), `ScreenController`
+
+---
+
+## Feature Dependencies for v1.1
 
 ```
-[Type chart data (typechart.json)]
-    └──required by──> [Type effectiveness calculation]
-                          └──required by──> [Damage calculation]
-                                                └──required by──> [HP tracking]
-                                                                      └──required by──> [Faint detection]
-                                                                                            └──required by──> [Win/loss detection]
+[battleSpeed setting]
+    -> stored at app level (e.g. ScreenController state or module-level variable)
+    -> consumed by AnimationEngine (multiplier for all ANIM constants)
+    -> set via main menu "Battle Speed" -> list screen
 
-[Pokemon data (pokedex.json + moves.json + learnsets.json)]
-    └──required by──> [Random team generation]
-                          └──required by──> [Battle state engine]
+[consolidated battle menu on HUD]
+    -> eliminates ACTION_MENU screen
+    -> requires battleHudRenderer to return a hybrid screen type
+    -> requires ScreenController to handle list selection from HUD
 
-[Battle state engine]
-    └──required by──> [Attack selection screen]
-    └──required by──> [Switch screen]
-    └──required by──> [Battle HUD]
-    └──required by──> [AI opponent]
-    └──required by──> [Terastallization option]
+[HP/sprites on attack + switch screens]
+    -> requires ScreenController to push sprite/HP updates before list rebuild
+    -> no data model changes needed
 
-[Terastallization]
-    └──enhances──> [Damage calculation] (changes attacker's STAB type mid-battle)
-    └──depends on──> [Battle state engine] (needs "tera used" flag per player)
+[remove back buttons]
+    -> all list renderers change
+    -> ScreenController index mapping shifts by -1
 
-[AI opponent]
-    └──depends on──> [Damage calculation] (to evaluate moves)
-    └──depends on──> [Battle state engine] (to read game state)
-    └──depends on──> [Type effectiveness calculation] (to pick super-effective moves)
+[Tera without confirm]
+    -> eliminates TERA_CONFIRM screen
+    -> teraQueued flag set immediately, skip to ATTACK_SELECT
+    -> ATTACK_SELECT status bar shows "Tera: [type]" when queued
 
-[Forced switch on faint]
-    └──depends on──> [Faint detection]
-    └──triggers──> [Switch screen]
+[stats screen]
+    -> requires stat stage tracking in ActivePokemon (new field: statStages)
+    -> SimBattleAdapter must update statStages on STAT_BOOST/UNBOOST/CLEAR events
+    -> new statsRenderer.ts
+    -> speed range calculator using DataLoader + level formula
+    -> accessible from HUD: swipe or dedicated tap gesture
+
+[attack movement animation]
+    -> extends AnimationEngine.playEntry() for MOVE_USE events
+    -> reuses shiftSpriteBmp
+    -> speed-controlled by battleSpeed multiplier
+
+[text in a box]
+    -> AnimationEngine refactor: updateText targets different container during anim
+    -> static HUD content stays in container 1 during animation
 ```
 
-### Dependency Notes
+---
 
-- **Damage calc requires type chart:** Cannot calculate damage without knowing type effectiveness. Fortunately typechart.json is already downloaded
-- **All screens require battle state:** The HUD, attack screen, and switch screen are all read-only views of the battle state object — build state first, screens second
-- **Terastallization changes type mid-battle:** Damage calc must re-check the active Pokemon's current type (which may be Tera type) each turn — use a `currentType` field that overrides base type when tera'd
-- **AI depends on full calc pipeline:** The AI needs to score each move by expected damage, which requires the same calc path the player uses
-- **Faint → forced switch is a special flow:** When Pokemon faints, the normal "pick action" flow is interrupted — player must switch before turn continues. This is a different screen state than voluntary switching
+## MVP Definition for v1.1
+
+### Ship in v1.1 (all explicitly requested)
+
+- [ ] Battle speed control (4 presets: Slow/Normal/Fast/Instant)
+- [ ] Remove back buttons from all screens (double-tap navigation only)
+- [ ] Consolidated battle menu on HUD (Attack/Switch/Tera/Main Menu all from HUD)
+- [ ] Tera without confirmation screen (notifier only, direct to attack select)
+- [ ] HP bars + sprites visible on attack screen
+- [ ] HP bars + sprites visible on switch screen
+- [ ] Pokemon attack movement animation (attacker lunges toward target)
+- [ ] Text in a box during animations (visual separation from static HUD)
+- [ ] Stats screen: ability, status, stat stages, opponent speed range, possible abilities
+- [ ] Back to main menu at bottom of battle menu
+
+### Defer to v1.2
+
+- Damage estimate on attack screen (requires knowing opponent EVs/nature — not available in randbats)
+- Full stat stage history log (nice-to-have for competitive analysis)
+- Move category (Physical/Special/Status) display on attack screen (marginal value in randbats)
+- Opponent move tracking display (what moves has foe revealed) — fits stats screen but adds complexity
+- Battle replay / log save
+- Multiple battle formats (only Gen 9 Random Battle now)
+- Sound feedback on G2 (hardware does not support)
 
 ---
 
-## MVP Definition
+## Complexity Summary
 
-### Launch With (v0.1)
-
-Minimum for a complete, playable random battle on G2 glasses.
-
-- [ ] Random team generation (6v6, Gen 9 format, levels by tier, 85 EVs, 31 IVs, 4 moves, ability, item ignored for combat) — cannot start battle without teams
-- [ ] Battle state engine (tracks active Pokemon, HP, whose turn, fainted flags) — core of everything
-- [ ] Damage calculation (base formula + type effectiveness + STAB + crit roll + random roll) — determines outcomes
-- [ ] Physical vs Special move routing — prerequisite for correct damage calc
-- [ ] Turn structure (both pick action, switches resolve first, then moves by Speed) — defines game flow
-- [ ] Faint detection and forced switch — without this, battle gets stuck
-- [ ] Win/loss detection and battle end screen — without this, game never ends
-- [ ] Battle HUD (own Pokemon name+HP%, opponent name+HP%) — player needs situational awareness
-- [ ] Attack selection screen (4 move names + type + BP, vertical list) — main player action
-- [ ] Switch Pokemon screen (6 Pokemon, name+HP%, skip fainted) — required for forced switch and voluntary switch
-- [ ] Terastallization option in action menu (one use per player per battle, changes active type) — listed as v0.1 target in PROJECT.md
-- [ ] AI opponent (score moves by expected damage, prefer super-effective, switch if all moves resisted) — single-player requires an opponent
-- [ ] Voluntary switching (from action menu, not just on faint) — without this, switching is only reactive
-
-### Add After Validation (v1.x)
-
-Add once v0.1 battle loop is confirmed working and fun.
-
-- [ ] Move effect text / battle log ("Super effective!" etc.) — adds game feel, low effort after core works
-- [ ] Status conditions (burn, paralysis, sleep, freeze, poison) — significantly expands strategy
-- [ ] Accuracy rolls (moves can miss) — adds realism; some moves only relevant with this (e.g. Blizzard 70% accuracy)
-- [ ] Active item effects (Life Orb, Leftovers, Choice Band) — teams are generated with items; time to apply them
-- [ ] Remaining team count display in HUD — small but meaningful HUD improvement
-- [ ] Priority move system (Quick Attack first, Trick Room reversal) — already have priority data in moves.json
-
-### Future Consideration (v2+)
-
-Defer until product-market fit established or explicitly requested.
-
-- [ ] Full ability interactions — adds strategic depth but significant edge cases
-- [ ] Weather / terrain effects — complex interaction surface
-- [ ] Multiple generations (Gen 1-8 random battle formats) — different mechanics per gen
-- [ ] Stellar Tera type — edge case Tera variant
-- [ ] Form changes (Aegislash stance, Rotom forms) — significant state complexity
-- [ ] Online multiplayer vs other players — requires server infrastructure
+| Feature | Complexity | Reason |
+|---------|-----------|--------|
+| Battle speed menu | LOW | Constants already isolated in ANIM; just add multiplier |
+| Remove back buttons | LOW | Mechanical change to 5 renderers + ScreenController index offsets |
+| Tera without confirmation | LOW | Remove one screen, set flag directly, update status bar |
+| Back to main menu option | LOW | One extra menu item + handler |
+| Text in animation box | LOW | Change which container AnimationEngine updates |
+| Attack movement animation | MEDIUM | New animation phase in playEntry, ~6 frames, must be cancellable |
+| Consolidated HUD menu | MEDIUM | Hybrid screen type, layout change, ScreenController routing update |
+| HP/sprites on attack screen | MEDIUM | Multi-container update on screen transition |
+| HP/sprites on switch screen | MEDIUM | Same pattern as attack screen |
+| Stats screen | HIGH | Stat stage tracking in data model, speed calc, new renderer, navigation |
 
 ---
 
-## Feature Prioritization Matrix
+## What Makes the Battle Feel Like Showdown: Summary
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Random team generation | HIGH | MEDIUM | P1 |
-| Battle state engine | HIGH | HIGH | P1 |
-| Damage calculation | HIGH | MEDIUM | P1 |
-| Turn structure | HIGH | MEDIUM | P1 |
-| Battle HUD | HIGH | LOW | P1 |
-| Attack selection screen | HIGH | LOW | P1 |
-| Switch screen | HIGH | LOW | P1 |
-| Faint detection + forced switch | HIGH | LOW | P1 |
-| Win/loss detection | HIGH | LOW | P1 |
-| AI opponent (basic heuristic) | HIGH | MEDIUM | P1 |
-| Terastallization | MEDIUM | MEDIUM | P1 (in PROJECT.md scope) |
-| Voluntary switching | MEDIUM | LOW | P1 |
-| Physical vs Special routing | HIGH | LOW | P1 (part of damage calc) |
-| Move effect text | MEDIUM | LOW | P2 |
-| Status conditions | MEDIUM | HIGH | P2 |
-| Accuracy rolls | LOW | MEDIUM | P2 |
-| Item effects | MEDIUM | HIGH | P2 |
-| Remaining team count in HUD | LOW | LOW | P2 |
-| Priority move handling | LOW | MEDIUM | P2 |
-| Full ability interactions | LOW | HIGH | P3 |
-| Weather/terrain effects | LOW | HIGH | P3 |
-| Multi-gen support | LOW | HIGH | P3 |
-| Online multiplayer | HIGH (long-term) | HIGH | P3 |
+The features that most move the needle toward Showdown's feel, ranked by impact:
 
-**Priority key:**
-- P1: Must have for v0.1 launch
-- P2: Should have, add in v1.x
-- P3: Nice to have, v2+ consideration
+1. **Consolidated action menu on HUD** — eliminates the most friction in the battle loop.
+   Showdown's move selection is always one click away; current G2 is two taps.
 
----
+2. **HP bars and sprites on attack/switch screens** — the single biggest UX gap. On Showdown
+   you never lose sight of the battle state while making decisions. On G2 v0.1 you do.
 
-## Competitor Feature Analysis
+3. **Battle speed control** — this is the #1 quality-of-life feature for Showdown ladder players.
+   "Instant" mode is used by almost all experienced players. Making it available immediately
+   validates that the G2 experience can feel as fluid as the web client.
 
-For a G2 glasses Pokemon battle simulator, the relevant "competitors" are reference implementations to calibrate against.
+4. **Attack movement animation** — the visual feedback that a move was used. Showdown's lunging
+   animation is what makes each attack feel impactful. The lunge exists; the infrastructure exists.
 
-| Feature | Full Pokemon Showdown (web) | Typical fan game | Our G2 v0.1 Approach |
-|---------|-----------------------------|--------------------|----------------------|
-| Team generation | Full randbats algorithm with roles, IVs, items, abilities | Manual team builder | Simplified randbats: levels by tier, 85 EVs, 31 IVs, 4 moves per role, items generated but not applied |
-| Damage calc | Full formula with all modifiers | Approximate | Base formula + type effectiveness + STAB + crit + random roll |
-| Status effects | Full 6-condition system | Partial | None in v0.1 |
-| Abilities | 200+ abilities fully implemented | Few key ones | None in v0.1 |
-| Items | 100+ items with effects | Few key ones | Generated for flavor, not applied |
-| Tera | Full Tera system including Stellar type | N/A | Core Tera (type change, STAB adjustment), no Stellar |
-| AI | Heuristic + ladder opponents | Basic random | Basic heuristic: prefer highest expected damage, occasional switch |
-| UI | Rich web interface, animations | Varies | G2 text/list only — names, HP%, move list |
-| Turn display | Real-time with animations | Varies | Sequential text states via G2 SDK containers |
-
----
-
-## Terastallization Implementation Notes
-
-This mechanic needs special attention because it interacts with the damage pipeline.
-
-**What changes when Tera is activated:**
-1. `pokemon.activeType = pokemon.teraType` (replaces `pokemon.types[]` for all calculations)
-2. STAB check: `if move.type === pokemon.teraType → 1.5x` (or 2x if also an original type)
-3. Move base power floor: `if move.type === pokemon.teraType && move.basePower < 60 → basePower = 60`
-4. Defensive type matching: use `pokemon.teraType` as single type for incoming damage calc
-
-**State to track:**
-- `player.teraUsed: boolean` — only one use per player per battle
-- `pokemon.isTera: boolean` — whether current active Pokemon is currently Tera'd
-- `pokemon.teraType: string` — the Tera type assigned at team generation
-
-**When to offer Tera option:**
-- Add "Terastallize" as a checkbox/toggle option before move selection
-- Once `player.teraUsed = true`, do not show the option again
-- AI can use its Tera based on same heuristic (use when it would flip a matchup from resist to neutral or STAB)
+5. **Stats screen** — the competitive depth layer. Showdown's randbats tooltip is a beloved
+   community tool. Building speed ranges and possible abilities directly into the client matches
+   what experienced players expect and use constantly.
 
 ---
 
 ## Sources
 
-- [Random Formats on Pokemon Showdown - Smogon University](https://www.smogon.com/articles/random-formats-overview) — Format overview, team composition rules (MEDIUM confidence)
-- [Random Team Generation - DeepWiki (smogon/pokemon-showdown)](https://deepwiki.com/smogon/pokemon-showdown/3.3-random-team-generation) — Source code-based team gen documentation (MEDIUM confidence)
-- [smogon/pokemon-showdown teams.ts on GitHub](https://github.com/smogon/pokemon-showdown/blob/master/data/random-battles/gen9/teams.ts) — Authoritative source for level assignment, EV/IV rules, item/move/ability logic (HIGH confidence via source code)
-- [Random Battles Level Balancing - Smogon Forums](https://www.smogon.com/forums/threads/random-battles-level-balancing.3721211/) — Win-rate based monthly level adjustment system (MEDIUM confidence)
-- [Damage - Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Damage) — Official damage formula, type effectiveness multipliers, STAB, critical hits, random factor (HIGH confidence)
-- [Terastallization - Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Terastallization) — Tera type change mechanics, STAB interactions, duration, one-use-per-battle rule (HIGH confidence)
-- [Battle Mechanics - Cave of Dragonflies](https://www.dragonflycave.com/mechanics/battle/) — Turn structure, speed/priority ordering, damage formula verification (HIGH confidence)
-- [Same-type attack bonus - Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Same-type_attack_bonus) — STAB multiplier 1.5x (2x with Adaptability) (HIGH confidence)
-- [Programming AI for Pokemon Showdown - Game Developer](https://www.gamedeveloper.com/programming/programming-ai-for-pokemon-showdown-bot-battle-royale-) — AI heuristic approaches, random vs heuristic vs minimax comparison (MEDIUM confidence)
-- [randbats - pkmn.github.io](https://pkmn.github.io/randbats/) — Auto-updated Gen 9 random battle set data (MEDIUM confidence)
+- Existing codebase read directly:
+  - `src/screens/renderers/` — all renderers (HIGH confidence, direct code read)
+  - `src/animation/AnimationEngine.ts` — animation system (HIGH confidence)
+  - `src/config/constants.ts` — ANIM timing constants (HIGH confidence)
+  - `src/types/battleState.ts` — data model (HIGH confidence)
+  - `src/screens/ScreenController.ts` — navigation graph (HIGH confidence)
+- [smogon/pokemon-showdown-client on GitHub](https://github.com/smogon/pokemon-showdown-client) — client architecture (MEDIUM confidence via DeepWiki)
+- [battle-tooltips.ts source](https://raw.githubusercontent.com/smogon/pokemon-showdown-client/master/play.pokemonshowdown.com/src/battle-tooltips.ts) — tooltip data fields (HIGH confidence via source code fetch)
+- [panel-battle.tsx source](https://raw.githubusercontent.com/smogon/pokemon-showdown-client/master/play.pokemonshowdown.com/src/panel-battle.tsx) — move buttons, HP bars, Tera toggle (HIGH confidence via source code fetch)
+- [DeepWiki: smogon/pokemon-showdown-client](https://deepwiki.com/smogon/pokemon-showdown-client) — UI component architecture (MEDIUM confidence)
+- [Pokemon Showdown Randbats Tooltip - Smogon Forums](https://www.smogon.com/forums/threads/pok%C3%A9mon-showdown-randbats-tooltip.3686306/) — randbats tooltip feature scope (MEDIUM confidence)
+- [battle-scene-stub.ts source](https://raw.githubusercontent.com/smogon/pokemon-showdown-client/master/play.pokemonshowdown.com/src/battle-scene-stub.ts) — `acceleration` property and speed control pattern (HIGH confidence via source code fetch)
 
 ---
-*Feature research for: Pokemon Showdown Random Battle Simulator on G2 Glasses*
-*Researched: 2026-02-26*
+*Feature research for: Pokemon Showdown G2 — v1.1 UI Enhancement milestone*
+*Researched: 2026-03-01*

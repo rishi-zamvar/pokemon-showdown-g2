@@ -1,332 +1,445 @@
-# Stack Research
+# Technology Stack — v1.1 UI Enhancement & Polish
 
-**Domain:** Pokemon battle game for Even Realities G2 smart glasses
-**Researched:** 2026-02-26
-**Confidence:** HIGH (npm versions verified live; API patterns verified against official GitHub)
-
----
-
-## Recommended Stack
-
-### New Dependencies (Pokemon Battle Layer)
-
-These are additions to the existing Even Hub SDK / Vite / TypeScript foundation.
-
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| `@smogon/calc` | `0.10.0` | Damage calculation for all gens (1-9) | Official Smogon tool. Powers the real Showdown damage calculator UI. Supports Tera types (Gen 9), Z-moves (Gen 7), Dynamax (Gen 8). Ships all data internally — no external data files needed for damage math. ES module compatible, clean TypeScript exports. Works with Vite with zero configuration. |
-| `@pkmn/randoms` | `0.10.6` | Random battle team generation for gen1–gen9 | Official extraction of Showdown's `RandomTeam` logic. `getTeamGenerator('gen9randombattle').getTeam()` returns a fully-built PokemonSet[] array with species, moves, EVs, item, tera type. Competes directly with rolling your own team builder, which would take weeks. |
-| `@pkmn/img` | `0.3.3` | Sprite URL resolution for all gens | Returns CDN URL + dimensions + `pixelated` flag for any Pokemon in any generation. Handles the naming complexity (e.g. gen3frlg, gen2crystal-back, etc.). ~34KB compressed. No dependencies. |
-
-### Existing Stack (Validated — Do Not Change)
-
-| Technology | Version | Purpose | Status |
-|------------|---------|---------|--------|
-| `@evenrealities/even_hub_sdk` | `^0.0.7` | G2 glasses display + gesture events | Validated working |
-| `vite` | `^6.0.0` | Build system | Validated working |
-| `typescript` | `^5.7.0` | Type safety | Validated working |
-| Local JSON data files | — | Pokedex, moves, learnsets, abilities, items, typechart | Already in `src/data/` |
+**Project:** Pokemon Showdown G2
+**Milestone:** v1.1 UI Enhancement & Polish
+**Researched:** 2026-03-01
+**Confidence:** HIGH (based on verified codebase inspection; no external library additions required)
 
 ---
 
-## How to Use the Local Showdown Data Files
+## Summary
 
-The project already has `resolveJsonModule: true` in `tsconfig.json` and `moduleResolution: bundler`. Vite natively handles JSON imports. No configuration changes needed.
+No new npm dependencies are needed for this milestone. Every feature — consolidated menus, animation speed controls, stats screen, attack movement animation, and screen layout changes — is implemented by modifying and extending existing TypeScript modules. The existing stack already has all required primitives: BMP pixel manipulation via `encodeBmp` + `shiftSpriteBmp`, timing control via `ANIM` constants, battle data via `SimBattleAdapter`/`DataLoader`, and rendering via `GlassAdapterImpl`.
 
-```typescript
-// Direct TypeScript import — works out of the box
-import pokedex from './data/pokedex.json';
-import moves from './data/moves.json';
-import learnsets from './data/learnsets.json';
-import abilities from './data/abilities.json';
-import items from './data/items.json';
-
-// Type assertions needed since the JSON shapes are not typed by default
-const dex = pokedex as Record<string, PokemonData>;
-const moveDb = moves as Record<string, MoveData>;
-```
-
-**Data file shapes (verified from inspection):**
-
-`pokedex.json` — keyed by lowercase ID (e.g. `"bulbasaur"`):
-```typescript
-interface PokemonData {
-  num: number;
-  name: string;
-  types: string[];
-  baseStats: { hp: number; atk: number; def: number; spa: number; spd: number; spe: number };
-  abilities: { '0': string; '1'?: string; 'H'?: string };
-  genderRatio?: { M: number; F: number };
-  tier?: string;
-  evos?: string[];
-  eggGroups: string[];
-}
-```
-
-`moves.json` — keyed by lowercase ID (e.g. `"flamethrower"`):
-```typescript
-interface MoveData {
-  num: number;
-  name: string;
-  type: string;
-  category: 'Physical' | 'Special' | 'Status';
-  basePower: number;
-  accuracy: number | true;
-  pp: number;
-  priority: number;
-  target: string;
-  flags: Record<string, 1>;
-  isNonstandard?: string;  // "Past" = removed from current gen
-}
-```
-
-`learnsets.json` — keyed by lowercase ID:
-```typescript
-interface LearnsetData {
-  learnset: Record<string, string[]>; // moveid → ["9L1", "8M", ...] (gen+method codes)
-}
-```
-
-**What the local files are used for in this project:**
-
-- `pokedex.json` — team display (name, types, base stats for HP calculation)
-- `moves.json` — building the 4-move attack menu per Pokemon
-- `learnsets.json` — filtering which moves a Pokemon can know by generation
-- `abilities.json` — deferred to v0.2
-- `items.json` — deferred to v0.2
-
-**What NOT to use local files for:** Damage calculation. Use `@smogon/calc` instead — it has its own internally-consistent data layer for all gens. Mixing the local files with `@smogon/calc`'s data creates version skew risk.
+The work is entirely intra-project: new renderers, modified ScreenState, new ANIM constants for speed tiers, new container layout patterns in `glassAdapter.ts`, and new screen names in the FSM.
 
 ---
 
-## Battle Engine Strategy
+## Existing Stack — Unchanged
 
-### Recommendation: @smogon/calc for damage + custom turn engine
-
-**Do NOT use `@pkmn/sim`** for this project. Rationale below.
-
-**Use `@smogon/calc` for damage calculation only**, combined with a small custom turn engine.
-
-```typescript
-import { calculate, Generations, Pokemon, Move } from '@smogon/calc';
-
-const gen = Generations.get(9); // or 1-8 for older gens
-
-const result = calculate(
-  gen,
-  new Pokemon(gen, 'Charizard', {
-    level: 100,
-    nature: 'Timid',
-    evs: { spa: 252, spe: 252, hp: 4 },
-  }),
-  new Pokemon(gen, 'Blastoise', {
-    level: 100,
-  }),
-  new Move(gen, 'Flamethrower'),
-);
-
-// Returns damage range as [min, max] array
-const [minDmg, maxDmg] = result.range();
-const avgDmg = Math.floor((minDmg + maxDmg) / 2);
-```
-
-For v0.1 scope (no abilities, no items, no status), the custom turn engine is ~200 lines:
-- Pick move
-- Calculate damage via `@smogon/calc`
-- Apply damage to HP
-- Check faint
-- Handle switch
+| Technology | Version | Role in v1.1 |
+|------------|---------|--------------|
+| `@evenrealities/even_hub_sdk` | `^0.0.7` | All rendering primitives. `TextContainerProperty`, `ListContainerProperty`, `ImageContainerProperty`, `ImageRawDataUpdate`, `TextContainerUpgrade` are the only display APIs. No additions needed. |
+| `@pkmn/sim` | (transitive) | Battle state source of truth. The stats screen reads stat boosts, ability, item, speed from the sim's Pokemon objects via `SimBattleAdapter.getBattle()`. |
+| `@pkmn/randoms` | `^0.10.6` | Unchanged. Team generation is not touched this milestone. |
+| `@smogon/calc` | `^0.10.0` | Unchanged. Damage calc not touched this milestone. |
+| `vite` | `^6.0.0` | Build system, unchanged. |
+| `typescript` | `^5.9.3` | Type checking, unchanged. |
+| Local JSON data files | — | `abilities.json` already loaded — needed for stats screen ability display. |
 
 ---
 
-## Why NOT @pkmn/sim (Full Battle Simulator)
+## What NOT to Add — And Why
 
-| Concern | Details |
-|---------|---------|
-| Bundle size | Full simulator ships all 9 gens of data + validation + stream infrastructure. Likely 5-10MB before minification — heavy for a glasses app. |
-| Node polyfill requirement | `@pkmn/sim` uses Node-specific modules. Requires `vite-plugin-node-polyfills` which adds build complexity and known breakages at certain versions. |
-| API complexity | Battle is run through streams (`BattleStreams`), a protocol layer designed for networked play. Requires parsing protocol messages to extract state — massive overkill for a single-player vs. AI game. |
-| Overkill for v0.1 scope | v0.1 defers abilities, items, status effects. The sim validates all of these. You'd be fighting the engine to limit scope. |
-| `@pkmn/randoms` still available standalone | You get the team generation benefit without the full sim. |
-
-**`@pkmn/sim` is appropriate when:** you need a fully rules-compliant server-side simulator for multiplayer battles with all mechanics. That is not this project.
+| Temptation | Why Not |
+|------------|---------|
+| A UI framework (React, Lit, etc.) | The G2 SDK is the entire rendering layer. There is no DOM on the glasses. Frameworks add bundle weight with zero benefit. |
+| A state management library (Zustand, XState) | `ScreenController` already is the state machine. `ScreenState` is the discriminated union. Adding a library adds indirection without solving any real problem at this scale. |
+| A canvas/BMP library | `encodeBmp` and `shiftSpriteBmp` already exist in `SpriteBmpEncoder.ts` and `AnimationEngine.ts`. The attack movement animation is more pixel shifts — same pattern, same tools. |
+| An animation scheduler library | `AnimationEngine` is already the scheduler. Speed tiers are just different delay values. An external scheduler adds complexity without benefit. |
+| A logging/telemetry library | Not appropriate for a glasses app with no network. |
 
 ---
 
-## Team Generation Strategy
+## Patterns Needed Per Feature
 
-### Recommendation: @pkmn/randoms
-
-```typescript
-import { TeamGenerators } from '@pkmn/randoms';
-
-// Generate a gen9 random battle team
-const generator = TeamGenerators.getTeamGenerator('gen9randombattle');
-const team = generator.getTeam(); // Returns PokemonSet[]
-
-// For older generations
-const gen1Team = TeamGenerators.getTeamGenerator('gen1randombattle').getTeam();
-```
-
-**PokemonSet shape (what getTeam() returns):**
-```typescript
-interface PokemonSet {
-  name: string;    // e.g. "Charizard"
-  species: string;
-  item: string;
-  ability: string;
-  moves: string[]; // exactly 4 moves
-  nature: string;
-  evs: StatsTable;
-  ivs: StatsTable;
-  level: number;
-  teraType?: string; // Gen 9 only
-}
-```
-
-This gives you everything needed to:
-1. Display team on switch screen (name, level)
-2. Show 4 moves on attack screen
-3. Calculate damage with `@smogon/calc` (all fields map directly)
-
-**Supported formats (verified from search and docs):**
-- `gen1randombattle` through `gen9randombattle`
-- `gen9randomdoublesbattle`, `gen9randombattlemonotype` (not needed for v0.1)
+This section maps each v1.1 feature to the specific code patterns and integration points required.
 
 ---
 
-## Sprite Handling Strategy
+### 1. Consolidated Battle Menu (Attack/Switch/Tera on Main HUD)
 
-### CDN Pattern (play.pokemonshowdown.com)
+**Current state:** BATTLE_HUD is a tap-target (any tap opens ACTION_MENU); ACTION_MENU is a separate list screen with Back/Attack/Switch/Tera.
 
-Sprites are hosted at: `https://play.pokemonshowdown.com/sprites/`
+**New behavior:** Attack/Switch/Tera options appear directly on the BATTLE_HUD screen (likely as a list with HP bars visible simultaneously, OR as a hybrid text+list layout). Eliminating ACTION_MENU removes one navigation level.
 
-**Directory naming by generation (verified from CDN directory listing):**
+**Pattern: Hybrid layout via combined container content**
 
-| Generation | Front sprite dir | Back sprite dir | Notes |
-|------------|-----------------|-----------------|-------|
-| Gen 1 | `gen1/` | `gen1-back/` | 56x56 PNG |
-| Gen 2 | `gen2/` | `gen2-back/` | includes `gen2-shiny/` |
-| Gen 3 | `gen3/` | `gen3-back/` | includes `gen3rs`, `gen3frlg` variants |
-| Gen 4 | `gen4/` | `gen4-back/` | |
-| Gen 5 | `gen5/` | `gen5-back/` | also `gen5ani/` for animated GIFs |
-| Gen 6+ | `dex/` | — | Higher res, not 8-bit |
+The G2 SDK allows a layout with both text and list containers simultaneously in one `rebuildPageContainer` call. The constraint is the 4-container maximum in the firmware.
 
-**Sprite URL formula:**
+Current BATTLE_HUD uses:
+- `oppSprite` (ImageContainerProperty, ID 4)
+- `playerSprite` (ImageContainerProperty, ID 5)
+- `content` (TextContainerProperty, ID 1) — combined opp+player info text
+- `status` (TextContainerProperty, ID 2) — status bar
+
+The most compatible approach for the consolidated menu: replace the separate ACTION_MENU screen with a `ListContainerProperty` that replaces the `content` text container in the battle HUD layout — while keeping both sprite containers. The list shows the available actions. The status bar shows abbreviated HP information.
+
+Alternatively: encode actions as text lines within the existing `content` container and detect which "line" was tapped via scroll position. This is fragile — the list approach is correct.
+
+**Integration point:** `GlassAdapterImpl` needs a new method `showBattleHudWithMenu()` that takes the same sprite args plus a list of action items, composing a 4-container page: oppSprite, playerSprite, listContainer (actions), textContainer (minimal HP status bar). This replaces the `showBattleHud` + separate `showList` two-screen pattern.
+
+**ScreenController change:** Remove `ACTION_MENU` from `ScreenName` or keep it unused. The `BATTLE_HUD` tap handler directly renders the consolidated view. Double-tap navigates back from attack/switch sub-screens. No "< Back" items in action list.
+
+**Key constraint:** The list container in this layout cannot also display text above it (the sprite containers already consume two of four container slots). HP bar data must be encoded into the list item strings or into the status bar — not into a separate text container.
+
 ```typescript
-// Lowercase species name, hyphens for forms (e.g. "mr-mime", "nidoran-m")
-const spriteUrl = (species: string, gen: number): string => {
-  const id = species.toLowerCase().replace(/[^a-z0-9]/g, '-');
-  const dir = gen <= 5 ? `gen${gen}` : 'gen5'; // cap at gen5 for 8-bit look
-  return `https://play.pokemonshowdown.com/sprites/${dir}/${id}.png`;
+// New GlassAdapterImpl method signature:
+async showBattleHudWithMenu(
+  menuItems: string[],  // e.g. ['Attack', 'Switch', 'Tera']
+  hpStatus: string,     // status bar: "You 87% | Foe 54%"
+  oppSprite?: Uint8Array,
+  playerSprite?: Uint8Array,
+): Promise<void>
+```
+
+---
+
+### 2. Remove "< Back" from All Screens
+
+**Current state:** Every sub-menu has `'< Back'` as item index 0. `ScreenController` tap handlers treat `idx === 0` as back navigation. The double-tap gesture is already mapped to TAP with `undefined` listIndex in the SDK event mapping.
+
+**Problem:** The current event mapping treats DOUBLE_CLICK_EVENT as `{ kind: "TAP", listIndex: ... }` — same as single click. There is no separate `DOUBLE_TAP` gesture kind.
+
+**Finding from codebase inspection:** `mapEventToGesture()` in `glassAdapter.ts` maps `OsEventTypeList.DOUBLE_CLICK_EVENT` to `{ kind: "TAP", listIndex: ... }`. Single click maps to the same `TAP` kind. The distinction the current code relies on is that the ACTION_MENU "< Back" item has listIndex 0. Double-tap currently just selects whatever item is highlighted.
+
+**Pattern: Add DOUBLE_TAP gesture kind**
+
+To make double-tap mean "go back" regardless of selected item, the gesture mapper must distinguish single vs double tap. This requires adding a new gesture kind:
+
+```typescript
+// In types/contracts.ts — add:
+export type GestureEvent =
+  | { kind: 'SCROLL_FWD' }
+  | { kind: 'SCROLL_BACK' }
+  | { kind: 'TAP'; listIndex?: number }
+  | { kind: 'DOUBLE_TAP' }          // NEW
+  | { kind: 'FOREGROUND_ENTER' }
+  | { kind: 'FOREGROUND_EXIT' };
+```
+
+Map `OsEventTypeList.DOUBLE_CLICK_EVENT` → `{ kind: 'DOUBLE_TAP' }` in `mapEventToGesture()`.
+
+Map single `OsEventTypeList.CLICK_EVENT` (and the `undefined` quirk) → `{ kind: 'TAP', listIndex }`.
+
+In `ScreenController.handleGesture()`, add a case for `DOUBLE_TAP` that navigates back from the current screen — a centralized back-navigation handler instead of per-screen "< Back" item checks.
+
+**All screens:** Remove `'< Back'` from items arrays. Remove `if (idx === 0) { ... back ... }` blocks from each tap handler. Add to `ScreenController.onDoubleTap()`: a back-navigation switch on `this.state.screen`.
+
+---
+
+### 3. Battle Animation Text in a Box
+
+**Current state:** During animation (`ANIMATING`), `AnimationEngine` calls `glass.updateText(text, { left: hpStatus, right: '' })` — text appears in the full-height content container, no visual boundary.
+
+**New behavior:** Animation text appears in a visually distinct box — likely the bottom quarter of the screen, while sprites remain in the top three-quarters.
+
+**Pattern: Separate animation text container**
+
+This requires a new container layout for the `ANIMATING` state. The animation text box is a `TextContainerProperty` positioned at the bottom of the content area (e.g., `yPosition: 180`, `height: 68`). The sprite containers continue to occupy the top area.
+
+In `GlassAdapterImpl`, add a method `showBattleAnimLayout()` that establishes the container structure used during animations: oppSprite (top-right), playerSprite (bottom-left of top area), animText (bottom strip). This layout is set up once when animation begins (via `showBattleHud` transitioning to this layout) and animation engine's `updateText` calls update only the animText container in-place.
+
+**Integration in AnimationEngine:** Currently `playEntry` calls `glass.updateText(currentText, { left: hpStatus, right: '' })`. Post-change, the `updateText` method targets the animation text container specifically. No change to AnimationEngine's calling convention is needed if `updateText` already writes to the correct container — but the container must be set up by the layout before animation starts.
+
+**Key question: container budget.** With oppSprite + playerSprite + animTextBox + hpStatusBar, that is 4 containers — at the firmware limit. This works only if the HP bar is either encoded within the animTextBox or eliminated during animation (HP drain shows in the animTextBox itself). Recommended: encode current HP in the animTextBox string (`"Foe HP: ██████████ 87%\nCharizard used Flamethrower!"`), no separate HP status bar during animation.
+
+---
+
+### 4. Attack Screen with HP Bars and Sprites Visible
+
+**Current state:** `ATTACK_SELECT` renders as a plain list via `glass.showList()` — sprites disappear because `showList` rebuilds the page with only a list container and status bar, no image containers.
+
+**New behavior:** During attack selection, both sprites and HP information remain visible. The 4-move list is still selectable.
+
+**Pattern: showBattleHudWithMenu reuse**
+
+The same `showBattleHudWithMenu` method designed for the consolidated battle menu works here. The move list replaces the action list. Sprites stay. HP status in the status bar.
+
+```
+Layout: oppSprite | playerSprite | moveList | hpStatusBar
+```
+
+`renderAttackSelect` returns `BattleHudScreen`-style output (with sprites) instead of a `ListScreen`. `ScreenController.render()` for `ATTACK_SELECT` calls `showBattleHudWithMenu(moveItems, hpStatus, oppSprite, playerSprite)`.
+
+**Applies equally to SWITCH_SELECT:** Same pattern — sprite containers stay, the list shows team members.
+
+---
+
+### 5. Tera Without Confirmation Screen
+
+**Current state:** Selecting Tera from the action menu navigates to `TERA_CONFIRM`, which shows a Yes/No list. Confirming navigates to `ATTACK_SELECT`.
+
+**New behavior:** Selecting Tera immediately queues the tera flag and transitions to move selection. A notifier text appears briefly (e.g., in the status bar: "Tera ready!") without a full screen transition.
+
+**Pattern: Remove TERA_CONFIRM from FSM, use status bar flash**
+
+In `ScreenController.handleActionMenu`: tap on Tera sets `this.teraQueued = true`, updates the status bar text momentarily ("Tera ready — choose move"), then immediately transitions to `ATTACK_SELECT`.
+
+Remove `TERA_CONFIRM` from `ScreenName`. Remove `handleTeraConfirm()` and `renderTeraConfirm.ts`. Remove the teraConfirmRenderer file.
+
+The brief notifier does not require a separate screen or timer — the status bar string in the `ATTACK_SELECT` layout can read "Tera: choose move" to indicate the queued state.
+
+---
+
+### 6. Animation Speed Controls
+
+**Current state:** `ANIM` constants in `src/config/constants.ts` are hardcoded. No runtime speed control exists.
+
+**Pattern: Speed tier runtime configuration**
+
+Add a `SpeedConfig` object to module scope (not a constant — mutable):
+
+```typescript
+// In config/constants.ts — ADD alongside ANIM:
+
+export type SpeedTier = 'slow' | 'normal' | 'fast' | 'instant';
+
+/** Mutable runtime speed config — set from main menu, read by AnimationEngine */
+export const SpeedConfig = {
+  tier: 'normal' as SpeedTier,
+};
+
+/** Speed multipliers by tier */
+export const SPEED_MULTIPLIERS: Record<SpeedTier, number> = {
+  slow: 2.0,
+  normal: 1.0,
+  fast: 0.35,
+  instant: 0.0,
 };
 ```
 
-### Recommendation: @pkmn/img for URL generation (use as reference, not dependency)
-
-`@pkmn/img` (v0.3.3) handles edge cases: form name normalization, shiny lookups, different subdirectories. But it is lightweight enough (~34KB) to include as a dependency if edge-case sprite names become a problem.
+In `AnimationEngine`, replace `this.delay(ANIM.CHAR_DELAY_MS)` with:
 
 ```typescript
-import { Sprites } from '@pkmn/img';
-
-const { url, w, h, pixelated } = Sprites.getPokemon('charizard', { gen: 'gen1' });
-// url: "https://play.pokemonshowdown.com/sprites/gen1/charizard.png"
-// w: 56, h: 56, pixelated: true
+private delayScaled(baseMs: number): Promise<void> {
+  const mult = SPEED_MULTIPLIERS[SpeedConfig.tier];
+  if (mult === 0) return Promise.resolve(); // instant skip
+  return this.delay(Math.round(baseMs * mult));
+}
 ```
 
-**Decision: Start with manual URL construction.** The formula above handles the vast majority of cases. Add `@pkmn/img` only if form name edge cases (Rotom formes, Mega evolutions, etc.) cause sprite 404s.
+All `this.delay(ANIM.CHAR_DELAY_MS)`, `this.delay(ANIM.FLASH_FRAME_MS)`, `this.delay(ANIM.HP_FRAME_MS)`, etc. → `this.delayScaled(ANIM.CHAR_DELAY_MS)` etc.
 
-### G2 Display Constraint
+`ENTRY_PAUSE_MS` and `POST_ANIM_DELAY_MS` are also scaled — they are the most impactful for perceived speed.
 
-The G2 display is 576x288 monochrome. Sprites render as images within the Even Hub SDK display. Gen 1 sprites (~56x56 PNG) and Gen 2-5 sprites are small enough. **Do not use animated GIFs** (`gen5ani/`) — the G2 SDK renders static images only.
+**Main menu integration:** The main menu list includes a speed item (e.g., "Speed: Normal"). Tapping it cycles through tiers: `slow → normal → fast → instant`. No sub-menu needed. `SpeedConfig.tier` is updated directly. The menu item label reflects the current tier.
 
-Key rendering hint: apply `image-rendering: pixelated` CSS when displaying sprites in any browser preview/simulator context.
+**Why mutable module-level, not localStorage:** This app already avoids localStorage for state (sprite cache uses it, but that is cleared explicitly). Speed preference is session-only — reset on reload is acceptable and simpler.
 
 ---
 
-## Terastallization Implementation
+### 7. Stats Screen
 
-Tera type is handled directly by `@smogon/calc`:
+**Current state:** No stats screen exists. `ScreenName` does not include `STATS`.
+
+**Data available in `SimBattleAdapter.getBattle()`:**
+
+The `@pkmn/sim` `Battle` object exposes each side's Pokemon with:
+- `pokemon.ability` — current ability name (string)
+- `pokemon.item` — held item name (string)
+- `pokemon.boosts` — `{ atk, def, spa, spd, spe, accuracy, evasion }` (stat stage deltas, -6 to +6)
+- `pokemon.status` — current status condition
+- `pokemon.hp`, `pokemon.maxhp` — current/max HP
+- `pokemon.baseStoredStats` — the computed base stats dict
+- `pokemon.set.ivs`, `pokemon.set.evs` — IV/EV spread
+
+The opponent's ability and item are revealed via the sim's protocol messages and stored on the Battle object — `opponent.pokemon[0].ability` reflects only what has been revealed in battle (not yet revealed = empty string).
+
+**Pattern: New STATS screen with text layout**
+
+Add `'STATS'` to `ScreenName`. Add a `renderStats(state: BattleState, battle: Battle): TextScreen` renderer.
 
 ```typescript
-const result = calculate(
-  Generations.get(9),
-  new Pokemon(gen, 'Charizard', {
-    teraType: 'Dragon', // Player has Terastallized
-  }),
-  defender,
-  move,
-);
+// src/screens/renderers/statsRenderer.ts
+
+export function renderStats(state: BattleState): TextScreen {
+  const battle = SimBattleAdapter.getBattle()!;
+  const playerMon = state.playerSide.team[state.playerSide.activeIndex]!;
+  const oppMon = state.opponentSide.team[state.opponentSide.activeIndex]!;
+
+  // Access sim Pokemon for live data
+  const simPlayer = battle.sides[0]!.active[0]!;
+  const simOpp = battle.sides[1]!.active[0]!;
+
+  const lines: string[] = [];
+
+  // Player section
+  lines.push(`=== ${playerMon.name} ===`);
+  lines.push(`Ability: ${simPlayer.ability || playerMon.ability || '?'}`);
+  lines.push(`Item: ${simPlayer.item || playerMon.item || 'None'}`);
+  lines.push(`Status: ${playerMon.status || 'None'}`);
+  lines.push(formatBoosts(simPlayer.boosts));
+  lines.push(`HP: ${playerMon.currentHp}/${playerMon.stats.hp}`);
+
+  lines.push('');
+
+  // Opponent section
+  lines.push(`=== Foe: ${oppMon.name} ===`);
+  lines.push(`Ability: ${simOpp.ability || '???'}`);   // Only shown if revealed
+  lines.push(`Status: ${oppMon.status || 'None'}`);
+  lines.push(formatBoosts(simOpp.boosts));
+  lines.push(formatSpeRange(oppMon)); // Speed range from base speed + possible boost
+
+  return {
+    text: lines.join('\n').slice(0, 900),
+    status: { left: 'Stats', right: 'dbl-tap back' },
+  };
+}
+
+function formatBoosts(boosts: Record<string, number>): string {
+  const parts: string[] = [];
+  const statNames: Record<string, string> = {
+    atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe'
+  };
+  for (const [key, label] of Object.entries(statNames)) {
+    const val = boosts[key] ?? 0;
+    if (val !== 0) parts.push(`${label}${val > 0 ? '+' : ''}${val}`);
+  }
+  return parts.length > 0 ? `Boosts: ${parts.join(', ')}` : 'No boosts';
+}
+
+function formatSpeRange(mon: ActivePokemon): string {
+  const base = mon.stats.spe;
+  // Speed range accounts for nature (0.9x - 1.1x) and choice scarf (1.5x)
+  const min = Math.floor(base * 0.9);
+  const max = Math.floor(base * 1.1);
+  return `Foe Speed: ${min}-${max} (base ${base})`;
+}
 ```
 
-For v0.1 battle state, track `hasTerastallized: boolean` per Pokemon. Once used, it cannot be used again that battle. The damage calculator handles STAB recalculation automatically when `teraType` is set.
+**Navigation:** Stats screen is accessible from the battle menu (new item: "Stats") via double-tap to return. It is a text screen — no gesture input beyond double-tap.
+
+**Access to sim Battle object:** `SimBattleAdapter.getBattle()` already exists and is public. The stats renderer calls it directly, same pattern as `ScreenController` does for AI actions.
 
 ---
 
-## Alternatives Considered
+### 8. Pokemon Attack Movement Animation
 
-| Category | Recommended | Alternative | Why Not Recommended |
-|----------|-------------|-------------|---------------------|
-| Damage calculation | `@smogon/calc` | Roll your own from typechart.json | Would take weeks to implement correctly across 9 gens. `@smogon/calc` already handles gen-specific formula differences (Gen 1 special stat split, Gen 5 crit changes, etc.) |
-| Team generation | `@pkmn/randoms` | Read from local learnsets.json | Learnsets tell you which moves a Pokemon can learn, not which moves Showdown selects for random battles. The random battle format uses curated move pools, not raw learnsets. |
-| Full simulator | `@pkmn/sim` | `@smogon/calc` + custom engine | Too heavy, Node polyfill issues, stream-based API is overkill |
-| Sprites | CDN URL construction | Download all sprites locally | CDN is simpler; local copies would add hundreds of MB to project |
-| Sprites | CDN URL construction | PokeAPI sprites | Showdown CDN has the correct 8-bit pixel-art sprites by generation; PokeAPI has modern art |
-| JSON data import | Vite native JSON import | `@pkmn/dex` | tsconfig already has `resolveJsonModule: true`; adding `@pkmn/dex` adds bundle weight for data already on disk |
+**Current state:** Damage animation = sprite flash (invert/blank cycles). Attacker sprite does not move.
 
----
+**New behavior:** When a Pokemon uses an attack, the attacker's sprite briefly slides toward the opponent and snaps back, before the defender's hit flash plays.
 
-## What NOT to Use
+**Pattern: Attacker lunge via `shiftSpriteBmp`**
 
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| `pokemon-showdown` (main npm package) | Server-side Node.js package not built for browsers; no ES module exports; heavy | `@smogon/calc` + `@pkmn/randoms` |
-| `@pkmn/sim` | Requires Node polyfills in Vite, stream-based API, 5-10MB bundle, full validation overhead | `@smogon/calc` + custom turn engine |
-| Rolling own damage calculator | Gen-specific formula differences (Gen 1 has no special split, etc.) are subtle and easy to get wrong | `@smogon/calc` |
-| `gen5ani/` animated GIFs for sprites | G2 SDK renders static images; animated GIFs do not animate | `gen1/` through `gen5/` static PNGs |
-| Importing the full `learnsets.json` for move assignment | Learnsets list every move ever learned — not curated battle sets | `@pkmn/randoms` which uses Showdown's actual random battle pools |
+`shiftSpriteBmp` already exists in `AnimationEngine.ts` — it shifts a sprite BMP by N pixels horizontally. The switch-in animation already uses this for a slide effect.
 
----
+For the attack lunge:
+- Player attacks → player sprite shifts right (toward opponent) by `ANIM.LUNGE_PX` pixels for `ANIM.LUNGE_FRAMES` frames, then snaps back.
+- Opponent attacks → opponent sprite shifts left (toward player) by `ANIM.LUNGE_PX` pixels, then snaps back.
 
-## Installation
-
-```bash
-# Battle engine additions
-npm install @smogon/calc @pkmn/randoms
-
-# Optional — add only if sprite URL edge cases cause 404s
-npm install @pkmn/img
+```typescript
+// Add to ANIM constants:
+LUNGE_PX: 8,         // Pixels per lunge frame
+LUNGE_FRAMES: 2,     // Number of frames in lunge
+LUNGE_FRAME_MS: 60,  // Duration per lunge frame
 ```
 
-No changes needed to `vite.config.ts` or `tsconfig.json`. Both are already configured for ESM, bundler module resolution, and `resolveJsonModule`.
+Lunge direction per side:
+- Player (bottom-left sprite) attacks → shift right (+8, +16 px offsets)
+- Opponent (top-right sprite) attacks → shift left (-8, -16 px offsets)
+
+`shiftSpriteBmp` takes `(original, offsetX, size)`. Positive offsetX = shift right. Player lunge uses positive offset; opponent lunge uses negative.
+
+```typescript
+private async lunge(
+  side: Side,
+  state: BattleState,
+  glass: GlassAdapter,
+): Promise<void> {
+  const sprite = getSpriteForSide(state, side);
+  if (!sprite) return;
+
+  const containerID = side === 'opponent' ? CONTAINER_IDS.oppSprite : CONTAINER_IDS.playerSprite;
+  const containerName = side === 'opponent' ? CONTAINER_NAMES.oppSprite : CONTAINER_NAMES.playerSprite;
+  const direction = side === 'player' ? 1 : -1; // player lunges right, opp lunges left
+  const size = SPRITE_CONFIG.SIZE;
+
+  // Lunge out
+  for (let f = 1; f <= ANIM.LUNGE_FRAMES; f++) {
+    if (this.cancelled) return;
+    const shifted = shiftSpriteBmp(sprite, direction * ANIM.LUNGE_PX * f, size);
+    await glass.updateImage(containerID, containerName, shifted);
+    await this.delayScaled(ANIM.LUNGE_FRAME_MS);
+  }
+
+  // Snap back
+  if (!this.cancelled) {
+    await glass.updateImage(containerID, containerName, sprite);
+  }
+}
+```
+
+The lunge plays at the beginning of a `DAMAGE` entry's `playEntry`, before the typewriter text and hit flash. It runs sequentially (not via `Promise.all`) — the lunge must complete before the hit flash begins.
+
+Order: `lunge(attacker)` → then `Promise.all([typewriterText, spriteFlash(defender), hpDrain])`.
 
 ---
 
-## Version Compatibility
+### 9. Screen Layout Optimization
 
-| Package | Version | Compatible With | Notes |
-|---------|---------|-----------------|-------|
-| `@smogon/calc` | `0.10.0` | Vite 6, TypeScript 5.7, ES2022 | Last published May 2024. No breaking changes expected soon; project uses stable versions. |
-| `@pkmn/randoms` | `0.10.6` | Vite 6, TypeScript 5.7 | Pairs with `@pkmn/sim@0.10.x` if sim is added later. Not needed to use randoms standalone. |
-| `@pkmn/img` | `0.3.3` | Any bundler, no deps | Tiny package, no compatibility issues expected. |
-| Local JSON imports | — | Vite natively supports JSON imports | `resolveJsonModule: true` already in tsconfig. |
+**Current state:** The battle HUD text block shows opp and player info in a single shared text container using a combined string with `\n\n` separator. This is fragile and unidirectional.
+
+**Optimization pattern: Use `oppInfo` and `playerInfo` containers**
+
+`CONTAINER_IDS.oppInfo` (6) and `CONTAINER_IDS.playerInfo` (7) are already defined in `constants.ts` but are not used. These can be wired up as dedicated text containers for opp and player info blocks respectively.
+
+However, this increases container count: oppSprite + playerSprite + oppInfo + playerInfo = 4 containers, leaving no room for a status bar. To add the status bar would be 5 containers — possibly beyond the firmware limit.
+
+**Recommendation:** Keep the current single `content` text container for the battle HUD to preserve the status bar slot. Do not try to split into `oppInfo` + `playerInfo` as separate containers — the 4-container limit makes this too constraining when sprites are also in the layout.
+
+The layout optimization should instead focus on:
+1. Text content formatting: tighter, more information-dense lines
+2. Removing the `\n\n` double-newline separator in favor of a single `\n` with a visual divider character
+3. Status bar: encode both HP bars as a single compact string (`"[████████░░]87% | [███░░░░░░░]30%"`)
+
+---
+
+## Integration Points Summary
+
+| Feature | Files Modified | New Files |
+|---------|---------------|-----------|
+| Consolidated battle menu | `glassAdapter.ts`, `ScreenController.ts`, `ScreenState.ts`, `actionMenuRenderer.ts` | — |
+| Remove back buttons | `glassAdapter.ts` (gesture mapping), `ScreenController.ts`, all renderer files | — |
+| Animation text box | `glassAdapter.ts` (new layout method), `AnimationEngine.ts` | — |
+| Attack/Switch with sprites | `glassAdapter.ts`, `ScreenController.ts`, `attackSelectRenderer.ts`, `switchSelectRenderer.ts` | — |
+| Tera without confirm | `ScreenController.ts`, `ScreenState.ts` | Remove `teraConfirmRenderer.ts` |
+| Speed controls | `config/constants.ts`, `AnimationEngine.ts`, `mainMenuRenderer.ts`, `ScreenController.ts` | — |
+| Stats screen | `ScreenController.ts`, `ScreenState.ts` | `src/screens/renderers/statsRenderer.ts` |
+| Attack movement | `AnimationEngine.ts`, `config/constants.ts` | — |
+| Layout optimization | `battleHudRenderer.ts` | — |
+
+---
+
+## Container Budget Reference
+
+The G2 SDK firmware appears to enforce a maximum of ~4 containers per `rebuildPageContainer` call. This is the binding constraint on every layout decision.
+
+| Screen | Containers Used | Budget |
+|--------|----------------|--------|
+| BATTLE_HUD (current) | oppSprite, playerSprite, content, status | 4 — at limit |
+| BATTLE_HUD + menu (new) | oppSprite, playerSprite, menuList, hpStatusBar | 4 — at limit |
+| ATTACK_SELECT (new) | oppSprite, playerSprite, moveList, hpStatusBar | 4 — at limit |
+| SWITCH_SELECT (new) | oppSprite, playerSprite, teamList, hpStatusBar | 4 — at limit |
+| STATS | (no sprites) content, status | 2 — safe |
+| ANIMATING (new layout) | oppSprite, playerSprite, animTextBox | 3 — safe, no status bar |
+| MAIN_MENU | list, status | 2 — safe |
+
+**Consequence:** Any layout that includes both sprite containers must compress HP info into the list item strings or the single status bar string. There is no slot for a separate HP text block when both sprites and a list are present.
+
+---
+
+## What Requires No Stack Changes
+
+- `@pkmn/sim` is already the battle engine; the stats screen reads from `getBattle()` with zero new integration
+- `DataLoader.getAbility()` already works (abilities.json is loaded); stats screen just calls it
+- `encodeBmp` and `shiftSpriteBmp` already exist; attack lunge is the same pattern as switch slide
+- `SpeedConfig` is a plain object mutation; no reactive system needed
 
 ---
 
 ## Sources
 
-- `npm show @smogon/calc version` (live) — confirmed `0.10.0`
-- `npm show @pkmn/randoms version` (live) — confirmed `0.10.6`
-- `npm show @pkmn/img version` (live) — confirmed `0.3.3`
-- https://github.com/smogon/damage-calc/blob/master/calc/src/index.ts — verified exports: `calculate`, `Generations`, `Pokemon`, `Move`, `Field`, `Result`, `calcStat`
-- https://github.com/smogon/damage-calc — verified Gen 9 `teraType` property on Pokemon
-- https://github.com/pkmn/ps/blob/main/sim/README.md — verified `@pkmn/sim` browser support, `@pkmn/randoms` as separate package
-- https://github.com/pkmn/ps/blob/main/randoms/README.md — verified `TeamGenerators.getTeamGenerator(format).getTeam()` API
-- https://play.pokemonshowdown.com/sprites/ — verified directory structure: `gen1/` through `gen5/`, `gen5ani/`, `dex/`
-- https://play.pokemonshowdown.com/sprites/gen1/ — verified lowercase `pokemonname.png` naming convention
-- Inspection of `src/data/pokedex.json` and `src/data/moves.json` — verified JSON structure and field names
-- Inspection of `tsconfig.json` — confirmed `resolveJsonModule: true` and `moduleResolution: bundler` already set
+- `src/adapters/glassAdapter.ts` — authoritative source for container structure, 4-container limit, `showBattleHud` layout (HIGH confidence, direct inspection)
+- `src/animation/AnimationEngine.ts` — `shiftSpriteBmp`, `playEntry` orchestration, `typewriterText`, `spriteFlash` (HIGH confidence, direct inspection)
+- `src/config/constants.ts` — `ANIM`, `CONTAINER_IDS`, `CONTAINER_NAMES`, `GLASS_LAYOUT`, `SPRITE_CONFIG` (HIGH confidence, direct inspection)
+- `src/screens/ScreenController.ts` — FSM, gesture routing, render dispatch, `ANIMATING` state pattern (HIGH confidence, direct inspection)
+- `src/screens/ScreenState.ts` — `ScreenName`, renderer return types (HIGH confidence, direct inspection)
+- `src/types/battleState.ts` — `ActivePokemon`, stat boost fields available (HIGH confidence, direct inspection)
+- `src/battle/SimBattleAdapter.ts` — `getBattle()` API, Battle object access (HIGH confidence, direct inspection)
+- `src/screens/renderers/*.ts` — all renderer patterns confirmed (HIGH confidence, direct inspection)
 
 ---
-*Stack research for: Pokemon Showdown random battle simulator on Even Realities G2 glasses*
-*Researched: 2026-02-26*
+
+*Stack research for: Pokemon Showdown G2 v1.1 UI Enhancement & Polish*
+*Researched: 2026-03-01*

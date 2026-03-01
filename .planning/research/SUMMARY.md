@@ -1,234 +1,219 @@
 # Project Research Summary
 
-**Project:** Pokemon Showdown Random Battle Simulator for Even Realities G2 Glasses
-**Domain:** Turn-based Pokemon battle game on constrained text-only smart glasses display
-**Researched:** 2026-02-26
-**Confidence:** HIGH (stack verified live against npm registry; architecture verified against existing codebase; pitfalls verified by direct inspection of project data files)
+**Project:** Pokemon Showdown G2 — v1.1 UI Enhancement & Polish
+**Domain:** Smart glasses battle client UI enhancement (Even Realities G2, monochrome display, gesture navigation)
+**Researched:** 2026-03-01
+**Confidence:** HIGH
 
 ## Executive Summary
 
-This project is a single-player Pokemon random battle simulator running as a WebView app on Even Realities G2 smart glasses, built on top of an existing Even Hub SDK / Vite / TypeScript adapter layer. The correct approach is a narrow, purpose-built battle engine using `@smogon/calc` for damage calculation and `@pkmn/randoms` for team generation — both are official Smogon/pkmn ecosystem packages that plug directly into the existing build setup with zero configuration. The full Pokemon Showdown server simulator (`@pkmn/sim`) must be avoided: it requires Node.js polyfills in Vite, is 5-10MB uncompressed, uses a stream-based protocol designed for networked play, and resists scope limiting. A ~200-line custom turn engine wrapping `@smogon/calc` covers everything needed for v0.1.
+Pokemon Showdown G2 is a working battle client for the Even Realities G2 smart glasses. The v0.1 core — battle engine, animations, AI opponent, sprite rendering — is complete and functional. The v1.1 milestone is a UI polish pass that closes the gap between the current glasses experience and the web Showdown client: consolidated menus, animation speed controls, a stats screen, attack movement animation, and cleaner double-tap navigation. This is not a greenfield build; it is precision surgery on a working system.
 
-The architecture divides cleanly into four isolated layers: an unchanged glass adapter (hardware bridge), a screen layer (text formatting only, no logic), a battle engine (pure computation, no display), and a data loader (JSON indexed once at startup). This separation is critical: screens must never mutate battle state, and the battle engine must never call the glass adapter. The G2 display is 576x288 monochrome, navigated by scroll and tap gestures, with a hard 1000-character limit on page builds and 2000 characters on in-place updates. All UI is text/list based — no images, no animations.
+The recommended implementation approach requires no new npm dependencies. Every feature is achievable by modifying and extending existing TypeScript modules. The binding hardware constraint is the G2 SDK's 4-container-per-page limit, which drives every layout decision in this milestone. Features that require both sprite containers and a list container simultaneously (attack and switch screens showing HP bars alongside sprites) are at risk of SDK-level infeasibility and require hardware verification before committing to that layout. The safe fallback for those screens is HP info compressed into the status bar string, which delivers information parity without the container risk.
 
-The most dangerous risks are pre-existing and must be resolved before any game logic is written. Three of the six "downloaded" data files (`abilities.json`, `items.json`, `typechart.json`) are currently HTML 404 error pages from an incorrect CDN fetch — they will crash the app on import. The type chart is required for damage calculation and is broken. Additionally, the 3.19MB `learnsets.json` file will block the app for 1-2 seconds if statically imported. These are day-one data wiring problems, not features, and must be treated as Phase 1 blockers.
+The top three risks for this milestone are: (1) silently exceeding the 4-container SDK limit — the SDK discards extra containers without errors and behavior differs between browser and on-device, making this hard to catch without a real device test; (2) breaking list index mappings when removing the `< Back` item and adding new menu options — the renderer and ScreenController handler have no enforced contract; and (3) the Stats screen requiring data fields (stat boosts, ability) not currently in `BattleState` — the renderer cannot be written until `SimBattleAdapter` is updated to expose this data. All three risks have clear, specific prevention strategies documented in PITFALLS.md.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing Vite 6 / TypeScript 5.7 / Even Hub SDK foundation requires no configuration changes. Add two battle-specific packages: `@smogon/calc@0.10.0` for damage calculation across all generations (including Gen 9 Terastallization), and `@pkmn/randoms@0.10.6` for generating legal Gen 9 random battle teams via `TeamGenerators.getTeamGenerator('gen9randombattle').getTeam()`. The local JSON data files in `src/data/` are already configured for native Vite import via `resolveJsonModule: true` and `moduleResolution: bundler`. A third optional package, `@pkmn/img@0.3.3`, handles sprite URL edge cases but should only be added if CDN 404s from Pokemon forme names (Rotom formes, Megas) become a problem in practice.
+No new npm dependencies are needed for v1.1. The existing stack — `@evenrealities/even_hub_sdk`, `@pkmn/sim`, `@pkmn/randoms`, `@smogon/calc`, `vite`, and `typescript` — already provides every primitive required. Animation speed control is a mutable module-level multiplier applied at call sites in `AnimationEngine.ts`. The Stats screen reads from `SimBattleAdapter.getBattle()` (already public) and `DataLoader` (already loaded). The attack lunge animation reuses `shiftSpriteBmp()` which already exists in `AnimationEngine.ts` for the switch-in slide. Speed persistence uses `localStorage`, which is already used by the sprite cache in v0.1.
 
 **Core technologies:**
-- `@smogon/calc@0.10.0`: Damage calculation — the official Smogon tool powering the real Showdown calculator; handles Gen 1-9 formula differences, Tera types, Z-moves, Dynamax; ES module compatible; ships all data internally
-- `@pkmn/randoms@0.10.6`: Team generation — official extraction of Showdown's `RandomTeam` logic; `getTeam()` returns fully-built `PokemonSet[]` with species, moves, EVs, item, Tera type already assigned
-- Local JSON data files (existing): `pokedex.json`, `moves.json`, `learnsets.json` for team display and move menus; **do not use for damage calculation** (use `@smogon/calc`'s internal data to avoid version skew)
-- Showdown sprite CDN (`play.pokemonshowdown.com/sprites/`): Gen 1-5 static PNG sprites via URL construction; `gen5ani/` animated GIFs must not be used (G2 renders static images only)
+- `@evenrealities/even_hub_sdk ^0.0.7`: All rendering primitives (`TextContainerProperty`, `ListContainerProperty`, `ImageContainerProperty`) — no additions needed; the 4-container limit per `rebuildPageContainer` call is the primary architectural constraint for every v1.1 layout decision
+- `@pkmn/sim` (transitive): Battle state source of truth; the stats screen reads stat boosts, ability, item, and speed from the sim's Pokemon objects via `SimBattleAdapter.getBattle()`; abilities.json is already loaded and needed for stats display
+- `TypeScript ^5.9.3`: The type system serves as the primary regression harness; exhaustive `switch` on `ScreenName` union catches dead transitions when screens are removed (critical for TERA_CONFIRM removal)
+- Local JSON data files: Already loaded via `DataLoader`; stats screen calls existing `DataLoader.getAbility()` and `DataLoader.getPokemon()` with no new integration
 
 ### Expected Features
 
-Research confirms the complete feature set needed for a working v0.1 battle. The dependency order is strict: type chart data enables damage calculation, which enables HP tracking, faint detection, and win/loss detection. Battle state must exist before any screen can render. The AI depends on the full damage pipeline.
+**Must have (table stakes) — all explicitly requested:**
+- Battle speed control (4 presets: Slow/Normal/Fast/Instant) — the biggest QoL feature for Showdown ladder players; Showdown has an acceleration multiplier; implement via `SpeedConfig` singleton
+- Consolidated battle menu on HUD (Attack/Switch/Tera/Stats/Main Menu from one screen, eliminating the separate ACTION_MENU) — reduces the tap count to reach move selection from 2 to 1
+- HP bars and sprites visible on attack and switch screens — the single biggest UX gap vs. Showdown web client, which keeps the battlefield visible at all times during move selection
+- Remove `< Back` from all list screens (double-tap navigation only) — removes list clutter; requires adding a `DOUBLE_TAP` gesture kind and a `backAllowed()` guard per screen state
+- Tera without confirmation screen (notifier-only, direct to attack select) — Showdown's Tera is a checkbox on the move screen; keep the two-step selection (Tera then move) but eliminate the dedicated confirm screen
+- Stats screen: ability, status, stat stages, opponent speed range, possible abilities — replicates the beloved randbats tooltip used by experienced Showdown players
+- Pokemon attack movement animation (attacker sprite lunges toward target before damage flash) — reuses existing `shiftSpriteBmp()`
+- Animation text in a visually distinct region during battle resolution (separator characters or status bar repurposing, not a 5th container)
+- Back to main menu at bottom of battle action list
 
-**Must have (table stakes — v0.1):**
-- Random team generation (6v6, Gen 9 format, level by tier, 85 EVs, 31 IVs, 4 moves) — no teams means no battle
-- Battle state engine (FSM with explicit `BattlePhase` enum: `PLAYER_CHOOSING`, `RESOLVING_TURN`, `PLAYER_SWITCH`, `GAME_OVER`) — core of everything
-- Damage calculation (base formula + type effectiveness + STAB 1.5x + crit 4% / 1.5x + random 85-100%) — determines all outcomes
-- Physical vs Special move routing — prerequisite for correct damage calc
-- Type effectiveness from type chart (dual-type multiplied, immunity = 0 regardless of other type)
-- Turn structure (both sides pick action, switches resolve first, then moves by Speed stat, Speed ties broken randomly)
-- Faint detection and forced switch-in requirement
-- Win/loss detection (all 6 Pokemon fainted on either side)
-- Battle HUD (own Pokemon name + HP%, opponent name + HP%, ASCII HP bar)
-- Attack selection screen (4 move names + type + base power, vertical list)
-- Switch Pokemon screen (6 Pokemon with name + HP%, fainted entries skipped or greyed)
-- Terastallization (one use per player per battle; changes active type; STAB recalculated; move BP floored to 60 for Tera-type moves; `@smogon/calc` handles this natively via `teraType` property)
-- AI opponent (score moves by expected damage, prefer super-effective, switch if all moves resisted)
-- Voluntary switching from action menu (not just on faint)
+**Should have (differentiators beyond Showdown web):**
+- Glanceable speed control cycling through presets with one tap — more ergonomic than Showdown's settings slider
+- Opponent speed range displayed natively — replicates the randbats tooltip community extension
+- Possible abilities for opponent when unknown — matches randbats tooltip behavior
+- Stat stages shown inline on HUD between turns — replaces Showdown's hover-only tooltip (impossible on glasses)
 
-**Should have (v1.x after v0.1 validated):**
-- Move effect text ("Super effective!", "Not very effective!") — adds game feel, low implementation cost post-core
-- Status conditions (burn, paralysis, sleep, freeze, poison) — significant strategic depth
-- Accuracy rolls (moves can miss) — adds realism; relevant for moves like Blizzard (70% accuracy)
-- Active item effects (Life Orb, Leftovers, Choice Band) — teams already have items assigned; time to apply
-- Remaining team count in HUD — small but meaningful situational awareness
-- Priority move system (Quick Attack +1, Trick Room -7) — data already in `moves.json`
-
-**Defer (v2+):**
-- Full ability interactions (200+ abilities, each with unique logic)
-- Weather and terrain effects (complex interaction surface, interacts with abilities)
-- Multi-generation support (Gen 1-8 formats have different mechanics per gen)
-- Stellar Tera type (edge case variant with unique damage math)
-- Form changes mid-battle (Aegislash, Rotom, Darmanitan-Zen)
-- Online multiplayer (requires server infrastructure)
-
-**Anti-features (do not build for v0.1):**
-- Battle animations (G2 is text-only, impossible)
-- Custom team builder (contradicts random battle format)
-- Detailed stat display screens (no screen real estate; show HP% only)
-- Z-Moves or Mega Evolution (not in Gen 9 randbats format)
+**Defer to v1.2:**
+- Damage calculator (requires opponent EVs/nature — unavailable in randbats format)
+- Scrollable battle log history (requires dedicated screen; defeats purpose on glasses)
+- Move category icon (Physical/Special/Status) on attack screen — marginal value in randbats
+- Opponent move tracking display (which moves has the foe revealed) — fits the stats screen but adds significant complexity
+- Multiple battle formats beyond Gen 9 Random Battle
 
 ### Architecture Approach
 
-The system splits into four strictly isolated layers communicating through defined interfaces. The unchanged `GlassAdapterImpl` wraps all Even Hub SDK calls. A screen layer (`BaseScreen` interface: `render(state, glass)` and `handleGesture(gesture, state)`) formats battle state as strings and calls the glass adapter. The battle engine (`BattleEngine`, `DamageCalc`, `AI`, `TeamGenerator`, all in `src/battle/`) is a pure computation layer with no display knowledge — it takes `BattleState` and an action, returns a new `BattleState`. A `DataLoader` singleton loads all JSON files once at startup into `Map<>` structures for O(1) lookup during battle turns. The controller in `main.ts` holds a screen stack (pushdown automaton), routes gestures to the active screen, and never contains game logic.
+The existing architecture is a clean FSM: `ScreenController` owns state and routes gestures, pure renderer functions return display objects, `AnimationEngine` handles async animation sequences, and `GlassAdapterImpl` bridges to the SDK. All v1.1 changes follow this same pattern. New renderers (`statsRenderer.ts`), new `ScreenName` values (`STATS_SCREEN`, `SPEED_SELECT`, `BATTLE_HUD_MENU`), a mutable `SpeedConfig` singleton, and a new `attackLunge()` method on `AnimationEngine` are the main additions. No new components break existing boundaries. The biggest structural risk is `ScreenController.ts` at 870 lines — adding 3-4 new screen states will compound complexity unless `PhoneCompanionRenderer` is extracted first.
 
-**Major components:**
-1. `DataLoader` (`src/data/`) — singleton, loads all JSON once, exposes typed O(1) accessors; source of truth for all game data
-2. `BattleEngine` + `DamageCalc` + `AI` (`src/battle/`) — pure functions, no glass calls; `BattleState` is an immutable value object; only this layer writes state
-3. `TeamGenerator` (`src/battle/`) — builds legal 6-Pokemon teams using `@pkmn/randoms`; runs once per battle start
-4. Screen layer (`src/screens/`) — `MainMenuScreen`, `BattleHUDScreen`, `MoveSelectScreen`, `SwitchScreen`, `TeraScreen`, `BattleEndScreen`; all read-only views of `BattleState`
-5. Controller (`src/main.ts`) — screen stack, gesture routing, boot sequence wiring
+**Major components and their v1.1 changes:**
+1. `ScreenController` — Add `STATS_SCREEN`, `SPEED_SELECT`, `BATTLE_HUD_MENU` to the FSM; add centralized `backAllowed()` double-tap guard; extract `PhoneCompanionRenderer` to keep the file manageable before adding new handlers
+2. `AnimationEngine` — Add `attackLunge()` method for `MOVE_USE` entries; add `delayScaled()` wrapper applying `SpeedConfig.multiplier()` to every delay call; apply `formatTextBox()` or separator chars to typewriter path
+3. `GlassAdapterImpl` — Add `showBattleHudWithList()` if hardware verification confirms 2-image + 1-list + 1-text within the 4-container limit; keep `showBattleHud()` unchanged otherwise; add `DOUBLE_TAP` to `GestureEvent` union and map `DOUBLE_CLICK_EVENT` accordingly
+4. `SpeedConfig` (new module) — Mutable module-level singleton with `get()`/`set()`/`multiplier()` API; optional `localStorage` persistence but always default to `normal` on launch
+5. Renderers (new/modified) — `statsRenderer.ts` (new), `speedSelectRenderer.ts` (new), `renderBattleHudMenu()` on `battleHudRenderer.ts` (modified); all remain pure synchronous functions with no side effects
+
+**Unchanged components:** `SimBattleAdapter`, `SimAIOpponent`, `LogParser`, `SpriteService`, `SpriteBmpEncoder`, `AnimationFrames`, `SpriteEffects`, `DataLoader`, and all `battleState` types (except adding `statStages` and `ability` fields to `ActivePokemon`).
 
 ### Critical Pitfalls
 
-1. **Three data files are broken HTML 404 pages** (`typechart.json`, `abilities.json`, `items.json`) — Re-fetch from correct Showdown CDN `.js` endpoints (`play.pokemonshowdown.com/data/typechart.js`) and strip the CommonJS wrapper. Validate all JSON at startup with a `typeof data === 'object'` guard. This blocks all damage calculation and must be resolved in Phase 1.
+1. **Silently exceeding the 4-container SDK limit (C1)** — `rebuildPageContainer` returns `false` with no error when the limit is exceeded; the display simply omits containers. Sprites visible in browser may silently disappear on device. Prevention: map container slots in a table before writing any layout code; verify every new layout on hardware before committing.
 
-2. **`learnsets.json` is 3.19MB and will freeze the app for 1-2 seconds if statically imported** — Use dynamic `import()` on first use, or preferably replace with `@pkmn/randbats` pre-extracted sets (~80KB) which eliminates the need for learnsets.json at runtime entirely. Decide on this approach before committing to an import strategy.
+2. **List index shifting breaks action handlers when items are added or reordered (C2)** — The renderer item array and the `ScreenController` `switch(idx)` block have no enforced contract. Adding "Stats" at index 1 shifts Attack to index 2 — wrong action fires silently for every tap. Prevention: define menu items as a typed `as const` array; derive both renderer items and handler switch cases from the same constant.
 
-3. **`pokedex.json` contains 602 non-battle entries that will generate invalid teams** — Pre-filter at startup: exclude `isNonstandard` (CAP, Past/Mega, Future, Custom, LGPE) and `battleOnly` formes and entries with `num <= 0`. Never pick from the raw dictionary for team generation. Without this filter, teams will include CAP fan-made Pokemon and Mega evolutions with no sprites.
+3. **Stats screen missing data fields not currently in BattleState (M5)** — Stat boosts and current ability are in `@pkmn/sim`'s internal `Battle` object but not tracked in `ActivePokemon`. The renderer will show zeros or undefined without `SimBattleAdapter` parser changes. Prevention: complete a data-availability audit and extend `BattleState` before writing any renderer code.
 
-4. **Variable-power moves (`basePower: 0` in moves.json) silently deal 0 damage** — Moves like Gyro Ball, Endeavor, Counter, Dragon Rage store `basePower: 0` as a sentinel for "compute at runtime." A naive calculator will deal 0 damage silently. Either map these to fixed fallback values (e.g., 60 BP approximation) or filter them from random battle movesets for v0.1.
+4. **Animation loop calling `showBattleHud()` causes progressive Bluetooth queue lag (M4)** — Three sequential SDK calls per animation frame at 22 fps = 66 calls/second; community reports show >20 calls/second causes visible lag after 2-3 seconds. Prevention: during animation, use only `updateText()` and `updateImage()` (in-place); never call `showBattleHud()` inside an animation loop.
 
-5. **G2 content limit silently truncates display at 1000 characters** — No error is thrown; content just disappears. Enforce a 900-character budget per screen type in development with a console warning assertion. Never render full stat descriptions, flavor text, or move effect descriptions on glasses.
+5. **Double-tap back allowed on forced-switch screen causes illegal battle state (N3)** — If the player double-taps back during a forced switch, the sim expects a switch choice but ScreenController navigates away, breaking the battle. Prevention: implement a `backAllowed()` check per screen state; block double-tap-back on `ANIMATING`, `END_SCREEN`, and forced-switch `SWITCH_SELECT`.
+
+---
 
 ## Implications for Roadmap
 
-Based on the dependency graph established by combined research, the build order is non-negotiable. Nothing in the battle engine can run until data is valid. No screen can render meaningful content until the battle engine exists. The AI cannot function without a complete damage pipeline. Each phase has a hard prerequisite in the phase before it.
+Based on the dependency graph, four phases emerge in a clear build order. Phases 1 and 2 are foundation work with no hardware risk. Phase 3 is the largest structural change with the most regression risk. Phase 4 is the highest-risk feature gated on hardware verification.
 
-### Phase 1: Data Foundation and Wiring
+### Phase 1: Foundation — Data Model and Speed Config
 
-**Rationale:** Three data files are currently broken (HTML 404 pages), blocking all game logic. The type chart is required for damage calculation. `learnsets.json` performance must be decided before the import strategy is committed. This phase has zero game logic — it is purely infrastructure and bug-fixing, but nothing else can proceed without it.
+**Rationale:** The Stats screen renderer cannot be written until `BattleState` exposes stat boosts and ability. Speed controls cannot be integrated into `AnimationEngine` until `SpeedConfig` exists. These are zero-dependency foundation tasks — no SDK interaction, no hardware needed — that unblock every other phase.
 
-**Delivers:** All six data files valid and importable; `DataLoader` singleton with O(1) typed accessors; learnsets lazy-loaded or replaced with `@pkmn/randbats`; startup JSON validation assertions in place.
+**Delivers:**
+- `SpeedConfig` singleton (`src/config/speedConfig.ts`) with `get()`/`set()`/`multiplier()` and optional `localStorage` persistence; defaults to `normal` on every launch
+- `ActivePokemon` type extended with `statStages: { atk, def, spa, spd, spe }` and `ability: string` fields in `battleState.ts`
+- `SimBattleAdapter` updated to populate `statStages` from sim `boosts` data and `ability` from reveal events
 
-**Addresses (from FEATURES.md):** Type chart data (prerequisite for type effectiveness); team generation data (prerequisite for random teams).
+**Addresses:** Stats screen data availability (pitfall M5 prevention), Speed controls foundation (pitfall M2 prevention)
+**Avoids:** Writing the stats renderer against a data model that will force a later rewrite
 
-**Avoids (from PITFALLS.md):** Pitfall 1 (broken 404 data files), Pitfall 7 (learnsets.json 3MB blocking load), and the integration gotcha of fetching `.json` instead of `.js` from the Showdown CDN.
+### Phase 2: AnimationEngine Enhancements
 
-**Research flag:** Standard patterns. Data fetching and singleton loaders are well-understood; no research phase needed. The correct CDN paths are documented in PITFALLS.md.
+**Rationale:** All animation changes are isolated to `AnimationEngine.ts` and have no dependencies on Phase 3 ScreenController wiring. They can be built and smoke-tested (even in browser with sprite overlay) before any navigation changes. Speed control multiplier requires Phase 1's `SpeedConfig`; attack lunge has no external dependencies beyond existing `shiftSpriteBmp`.
 
-### Phase 2: Team Generation
+**Delivers:**
+- `delayScaled()` wrapper in `AnimationEngine` replacing all `this.delay(ANIM.X)` calls — speed controlled by `SpeedConfig.multiplier()` read at execution time
+- `attackLunge()` method for `MOVE_USE` entries — attacker sprite shifts 2-3 frames toward opponent, snaps back, then damage flash plays; uses `shiftSpriteBmp()` with signed direction per side
+- Animation text formatting via separator characters (`═══ BATTLE ═══`) or `formatTextBox()` utility applied in the `updateDisplay` closure — no extra SDK container consumed
+- New `ANIM` constants: `LUNGE_PX: 8`, `LUNGE_FRAMES: 2`, `LUNGE_FRAME_MS: 60`
 
-**Rationale:** A battle cannot start without two legal teams. Team generation depends only on `DataLoader` (Phase 1). It is self-contained and its output — a `BattlePokemon[]` array — is the input to everything else. Building and validating this before the battle engine ensures the engine always receives well-formed data.
+**Uses:** `shiftSpriteBmp` (existing), `SpeedConfig` (Phase 1)
+**Avoids:** SDK call rate lag — in-place `updateText()`/`updateImage()` only during animation, never `showBattleHud()` (pitfall M4)
 
-**Delivers:** `TeamGenerator.buildRandom()` using `@pkmn/randoms`; generates two valid 6-Pokemon teams with species, stats, moves, Tera type; `isNonstandard` / `battleOnly` filter applied; verified across 100+ generated teams.
+### Phase 3: ScreenController Wiring and Navigation Redesign
 
-**Addresses (from FEATURES.md):** Random team generation (6v6, Gen 9, levels by tier, 85 EVs, 31 IVs, 4 moves, ability and item assigned but item effect deferred).
+**Rationale:** Requires Phase 1 data model and Phase 2 engines to exist. This is the largest structural change and the highest risk for introducing regressions in the existing working FSM. Building it after foundation work means each new wiring task is adding to proven components rather than to untested abstractions. Extract `PhoneCompanionRenderer` before adding new screen states to keep the file manageable.
 
-**Avoids (from PITFALLS.md):** Pitfall 3 (CAP/Mega/battle-only Pokemon in generated teams), variable-power move exposure (filter at team gen if needed for v0.1).
+**Delivers:**
+- `DOUBLE_TAP` gesture kind added to `GestureEvent` union; `mapEventToGesture()` maps `DOUBLE_CLICK_EVENT` to `{ kind: 'DOUBLE_TAP' }`; centralized `backAllowed()` guard blocks back on forced-switch, ANIMATING, and END_SCREEN
+- `< Back` removed from all list renderers; all index maps updated; `SwitchListScreen.indexMap` adjusted
+- `TERA_CONFIRM` screen removed from `ScreenName` union; TypeScript exhaustive checking finds all usages; `teraQueued` flag set immediately in consolidated menu handler; status bar in `ATTACK_SELECT` shows "Tera: [type]" when queued
+- `STATS_SCREEN` added to `ScreenName`; `statsRenderer.ts` wired; accessible from battle action list
+- `SPEED_SELECT` added to `ScreenName`; `speedSelectRenderer.ts` wired; speed cycles inline or via sub-screen from main menu
+- `BATTLE_HUD_MENU` added to `ScreenName`; consolidated HUD list (Attack/Switch/Tera/Stats/Main Menu) replaces separate ACTION_MENU; HP info encoded as list item text since list container occupies the content slot
+- `PhoneCompanionRenderer` extracted from `ScreenController` before adding new handlers
 
-**Research flag:** Standard patterns. `@pkmn/randoms` API is documented in STACK.md. No research phase needed.
+**Addresses:** All navigation features; Tera without confirmation; back button removal; stats screen; speed selection
+**Avoids:** Index shifting bugs (typed `as const` action array — pitfall C2); forced-switch back crash (backAllowed — pitfall N3); dead TERA_CONFIRM transitions (TypeScript union removal — pitfall I2); God object growth (extract PhoneCompanion first — pitfall I1)
 
-### Phase 3: Battle Engine Core (State Machine + Damage Calculation)
+**Research flag:** Navigation redesign is the most complex phase. The double-tap timing window (250-300ms discrimination) must be validated on hardware — if it adds perceptible latency to all single taps, fall back to keeping `< Back` on battle-critical screens (ATTACK_SELECT, SWITCH_SELECT) and only using double-tap for less critical back navigation.
 
-**Rationale:** This is the most technically complex phase, with the most pitfall exposure. It must be built before any screens, because screens are read-only views of `BattleState`. The engine must be pure (no glass calls) so it can be unit tested without hardware. Damage calculation with correct type effectiveness, STAB, crit, and random roll must pass known-matchup tests before integration.
+### Phase 4: Overlay HUD — Sprites with List During Move/Switch Selection
 
-**Delivers:** `BattleState` types with explicit `BattlePhase` FSM; `BattleEngine.submitAction()` producing new state; `DamageCalc` using `@smogon/calc`; type effectiveness lookup with dual-type and immunity handling; turn resolution (switch priority, Speed ordering, faint detection, win/loss detection); Terastallization state tracking (`teraUsed`, `isTera`, `teraType`).
+**Rationale:** This is the highest-risk feature: showing both sprite image containers AND a selectable list container simultaneously requires a 2-image + 1-list + 1-text SDK layout that may not work within the 4-container limit. It is deferred to last so the rest of the milestone ships even if this hardware test fails.
 
-**Addresses (from FEATURES.md):** Damage calculation, type effectiveness, STAB, crit/random roll, Physical vs Special routing, turn structure, faint detection, forced switch, win/loss detection, Terastallization mechanic.
+**Delivers (if hardware test passes):**
+- `showBattleHudWithList()` added to `GlassAdapterImpl` and `GlassAdapter` interface — 2 image containers (oppSprite, playerSprite) + 1 list container (moves/team) + 1 text container (status bar with compressed HP)
+- `ATTACK_SELECT` and `SWITCH_SELECT` updated to use the overlay layout — sprites visible while choosing a move or switch target
+- HP status compressed into the status bar: `"[████████░░]87% | [███░░░░░░░]30%"` — no separate HP text block when both sprite containers and a list are present
 
-**Avoids (from PITFALLS.md):** Pitfall 2 (variable-power move 0-damage), Pitfall 4 (type effectiveness dual-type and immunity errors), Pitfall 5 (damage formula modifier order and integer rounding), Pitfall (invalid state boolean soup — use explicit `BattlePhase` discriminated union from day one).
+**Fallback (if SDK rejects 4-container overlay layout):**
+- `ATTACK_SELECT` and `SWITCH_SELECT` use the status bar for compressed HP display without sprites
+- Sprites remain visible on `BATTLE_HUD` between turns — already an improvement over v0.1 baseline
+- No code changes needed to Phase 3's completed screens; fallback requires only omitting `showBattleHudWithList()`
 
-**Research flag:** Needs research phase. Damage formula modifier order is subtle; type effectiveness edge cases (Freeze-Dry vs Water, Ghost immunity) need verification. Recommend writing unit test suite against `calc.pokemonshowdown.com` reference values before integration.
+**Avoids:** Silent 4-container overflow (hardware verification is the gating step before any code — pitfall C1)
 
-### Phase 4: AI Opponent
-
-**Rationale:** The AI depends on the full damage pipeline from Phase 3 — it must score moves by expected damage output, which requires the same calculation path the player uses. The AI is isolated (`AI.ts`) and does not interact with the glass adapter. Building it separately from screens keeps the battle engine testable.
-
-**Delivers:** `AI.pickAction(state, aiSide)` returning a move or switch action; heuristic: score each move by expected damage using `@smogon/calc`; prefer highest expected damage; switch if all moves resisted; uses Tera when it flips a resistance to neutral or STAB; random tie-breaking to reduce predictability.
-
-**Addresses (from FEATURES.md):** AI opponent (basic heuristic, prefer super-effective, switch if all moves resisted), AI Tera usage.
-
-**Research flag:** Standard patterns. Heuristic AI is well-documented in game AI literature. Sources cited in FEATURES.md. No research phase needed.
-
-### Phase 5: Screen Layer and G2 Display Integration
-
-**Rationale:** Screens are the final layer. They depend on a complete `BattleState` (Phase 3), a working battle engine, and team generation. Each screen is a dumb formatter: it reads state and calls glass adapter methods. This phase is where G2 display constraints are enforced — character budgets, `showText` vs `updateText` distinction, list-only navigation for choices.
-
-**Delivers:** All six screens implementing `GameScreen` interface; `BattleHUDScreen` with ASCII HP bars; `MoveSelectScreen` with 4-move list (name + type + BP, under 25 chars each); `SwitchScreen` with 6-Pokemon list; `TeraScreen` Yes/No confirm; `BattleEndScreen`; `MainMenuScreen`; character budget assertions on every screen.
-
-**Addresses (from FEATURES.md):** Battle HUD, attack selection screen, switch screen, Tera menu, win/loss end screen, voluntary switching, main menu.
-
-**Avoids (from PITFALLS.md):** Pitfall 6 (G2 content limit silent truncation — 900-char budget enforced); anti-pattern of calling `showText` (full rebuild) for HP updates instead of `updateText`; anti-pattern of re-rendering on SCROLL events instead of only on TAP.
-
-**Research flag:** Standard patterns. Existing `GlassAdapterImpl` is authoritative; its API is fully documented in ARCHITECTURE.md. No research phase needed.
-
-### Phase 6: Full Loop Integration and End-to-End Testing
-
-**Rationale:** Wire all phases together in `main.ts` with the screen stack (pushdown automaton). Verify complete battle from menu → team generation → first turn → switching → Tera use → faint → forced switch → win/loss end screen. This is validation, not new features.
-
-**Delivers:** Complete working app; full 6v6 battle from start to end without crash; gesture routing through all screen transitions; wake lock acquired on battle start; complete battle log written.
-
-**Addresses:** All v0.1 features from FEATURES.md verified end-to-end.
-
-**Avoids:** "Looks done but isn't" checklist from PITFALLS.md — run all items before declaring v0.1 complete: data file validation, type effectiveness unit tests, team generation inspection for invalid entries, variable-power move handling verification, character budget measurement, faint detection edge cases, PP depletion handling.
-
-**Research flag:** Standard patterns. Integration testing of the existing adapter is documented in the codebase.
+**Research flag:** Hardware device test required before writing any Phase 4 code. Gate: does `rebuildPageContainer` with 2 image + 1 list + 1 text containers render correctly on the actual G2 device? Do not write `showBattleHudWithList()` until this is confirmed.
 
 ### Phase Ordering Rationale
 
-- Phases 1-2 are prerequisites with zero game logic. Data must be valid before any computation. Teams must exist before a battle state can be initialized.
-- Phase 3 (battle engine) is built before Phase 5 (screens) because screens are read-only views of state. The engine must be unit-tested without hardware — coupling it to screens before testing creates untestable code.
-- Phase 4 (AI) slots after Phase 3 because the AI uses the same damage pipeline. It is isolated from screens.
-- Phase 5 (screens) comes last in the build sequence specifically because it depends on everything else. It is the simplest layer technically but requires the most hardware iteration.
-- Phase 6 (integration) is deliberately separate from Phase 5 to enforce the "build pure, then wire" discipline.
+- **Data model first:** The stats renderer is blocked on `BattleState` having the right fields. Writing renderer code against the wrong model forces a rewrite of both the parser and the renderer. `SimBattleAdapter` changes are the most likely source of unexpected behavior since they touch live battle parsing.
+- **Animation before wiring:** `AnimationEngine` changes are self-contained and can be smoke-tested without ScreenController changes. Speed multiplier and lunge animation do not require navigation work to verify.
+- **ScreenController last among stable features:** Every new screen state multiplies the gesture-state combinations that need regression testing. Building new screens after their renderers and data sources exist means each addition is a focused, testable wiring task.
+- **Overlay HUD deferred and hardware-gated:** A SDK container limit could invalidate the most ambitious layout. The milestone should ship everything else even if Phase 4 falls back to the status-bar-only approach.
 
 ### Research Flags
 
-Phases requiring `/gsd:research-phase` during planning:
-- **Phase 3 (Battle Engine):** Damage formula modifier order and integer rounding are subtle and gen-specific. Type effectiveness edge cases (Ghost immunity, Freeze-Dry, dual-type immunity short-circuit) need verified unit test cases before implementation. Recommend deriving test vectors from `calc.pokemonshowdown.com`.
+Phases needing deeper research or hardware verification during planning:
+- **Phase 3 (Navigation):** Double-tap timing window behavior on real G2 hardware — whether 250ms discrimination adds perceptible latency to all single taps, and how `DOUBLE_CLICK_EVENT` timing varies in practice
+- **Phase 4 (Overlay HUD):** Hardware device test required — 2-image + 1-list + 1-text container layout must be verified on real G2 before writing any `showBattleHudWithList()` implementation
 
 Phases with standard patterns (skip research-phase):
-- **Phase 1 (Data Foundation):** Correct CDN paths and validation patterns documented in PITFALLS.md. No unknowns.
-- **Phase 2 (Team Generation):** `@pkmn/randoms` API is fully documented in STACK.md. Filter logic is defined in PITFALLS.md.
-- **Phase 4 (AI):** Heuristic AI for turn-based games is established; sources cited in FEATURES.md.
-- **Phase 5 (Screen Layer):** Existing glass adapter API is authoritative. G2 constraints fully documented in ARCHITECTURE.md.
-- **Phase 6 (Integration):** Standard wiring; no new research needed.
+- **Phase 1 (Foundation):** Direct TypeScript data model extension following existing `BattleState` and `SimBattleAdapter` patterns; `SpeedConfig` is a plain module-level singleton — well-understood, no SDK interaction
+- **Phase 2 (AnimationEngine):** Reuses `shiftSpriteBmp()` which already works in production; `SpeedConfig` integration is a multiplier applied to existing delay calls — established pattern
+- **Phase 3 stable features (screen removal, stats, speed):** TERA_CONFIRM removal follows the TypeScript exhaustive union pattern; stats and speed screens follow the existing renderer-then-wire pattern
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | npm versions verified live; Vite compatibility confirmed; existing tsconfig verified from file inspection; `@pkmn/sim` avoidance confirmed from API inspection |
-| Features | MEDIUM | Core battle mechanics from Bulbapedia (HIGH confidence); random battle team gen specifics from Showdown source code (HIGH); AI heuristics from secondary sources (MEDIUM); exact Tera type assignment in randbats from secondary sources (MEDIUM) |
-| Architecture | HIGH | Existing adapter is authoritative; G2 constraints verified from live codebase; patterns from canonical game dev literature; build order from dependency analysis |
-| Pitfalls | HIGH | Broken data files verified by direct file inspection (primary source); 3803-byte 404 HTML confirmed in all three affected files; character limits from even-g2-notes G2.md (HIGH) |
+| Stack | HIGH | Research based entirely on direct codebase inspection; no external library additions means no version compatibility uncertainty; all primitives verified present |
+| Features | HIGH | Features are user-specified with exact parity references to Showdown web client source code (panel-battle.tsx, battle-tooltips.ts fetched directly); scope is well-defined |
+| Architecture | HIGH | All patterns derived from direct code inspection of all existing source files; medium confidence on overlay HUD specifically (hardware-dependent, unverified on device) |
+| Pitfalls | HIGH | Critical pitfalls validated against G2 SDK community notes (Nick Ustinov G2.md), observed v0.1 behavior, and SDK source behavior; all pitfalls trace to specific code locations |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Tera type assignment in Gen 9 randbats:** The exact mechanism by which `@pkmn/randoms` assigns Tera types to generated Pokemon was not verified against source code (secondary sources used). During Phase 2 implementation, log the `teraType` field from several `getTeam()` calls to confirm it is always populated and never undefined.
+- **Hardware overlay layout verification (Phase 4):** Whether 2-image + 1-list + 1-text fits within 4 containers is not confirmed by documentation — only by device test. This gap must be resolved with a hardware test at the start of Phase 4. Do not write code before this answer is known.
+- **Unicode box-drawing character rendering on G2 display:** Whether `┌┐└┘│─` render correctly on the G2 font is unconfirmed. Fallback is `+`, `-`, `|` ASCII borders if Unicode fails — plan for both when implementing animation text box.
+- **Double-tap timing discrimination window on hardware:** The exact millisecond window that distinguishes a deliberate double-tap from two rapid single taps has not been measured on G2. This affects whether removing `< Back` causes accidental navigation or perceptible tap latency for all single taps.
+- **Stat boost data accessibility via `SimBattleAdapter`:** The plan to read `battle.sides[n].active[0].boosts` from the `@pkmn/sim` Battle object is architecturally sound but not smoke-tested. Confirm the exact field path when beginning Phase 1.
+- **`localStorage` persistence in Even App WebView for SpeedConfig:** Confirmed working for sprite cache in v0.1, but SpeedConfig using it for speed persistence carries some risk. Session-only (in-memory) persistence is the safe fallback if `localStorage` behaves differently in a new storage key context.
 
-- **Sprite 404s for edge-case Pokemon formes:** The sprite URL construction formula handles the common case but form-named Pokemon (Rotom-Heat, Landorus-Therian, etc.) use hyphenated names that may not match CDN expectations. During Phase 5, test sprite loading for a sample of form-variant Pokemon and add `@pkmn/img` or fallback logic if needed.
-
-- **Even App WebView performance on actual device:** The 1-2 second freeze estimate for `learnsets.json` parsing is based on reasoning about mobile WebView behavior, not measurement on the actual G2 device. During Phase 1, measure actual time-to-interactive on device with and without lazy loading to confirm the mitigation is necessary and sufficient.
-
-- **`@pkmn/randoms` team format compatibility:** `getTeam()` returns a `PokemonSet[]` which maps to `@smogon/calc`'s `Pokemon` constructor fields. This mapping was verified by documentation but not by running both packages together. During Phase 2, add a smoke test that passes a generated team's first Pokemon through `@smogon/calc`'s `Pokemon` constructor to confirm field names align.
+---
 
 ## Sources
 
-### Primary (HIGH confidence)
-- Direct inspection of `src/data/*.json` in this project — confirmed broken files, file sizes, JSON structure
-- Existing `src/adapters/glassAdapter.ts` — authoritative G2 API capabilities, character limits, method names
-- Existing `tsconfig.json` — confirmed `resolveJsonModule: true`, `moduleResolution: bundler`
-- `npm show @smogon/calc version`, `npm show @pkmn/randoms version`, `npm show @pkmn/img version` — confirmed live versions
-- https://github.com/smogon/damage-calc/blob/master/calc/src/index.ts — verified exports and `teraType` property
-- https://bulbapedia.bulbagarden.net/wiki/Damage — damage formula, modifier order, STAB, critical hits, random factor
-- https://bulbapedia.bulbagarden.net/wiki/Terastallization — Tera mechanics, STAB interactions, duration, one-use rule
-- https://www.dragonflycave.com/mechanics/battle/ — turn structure, speed/priority ordering
-- https://github.com/smogon/pokemon-showdown/blob/master/data/random-battles/gen9/teams.ts — level assignment, EV/IV rules, item/move/ability logic
-- https://github.com/nickustinov/even-g2-notes/blob/main/G2.md — G2 display constraints, content limits, input event quirks
-- https://gameprogrammingpatterns.com/state.html — FSM / pushdown automaton patterns for game state
+### Primary (HIGH confidence — direct codebase inspection)
+- `src/adapters/glassAdapter.ts` — 4-container limit, `showBattleHud()` layout, gesture event mapping (`mapEventToGesture`)
+- `src/animation/AnimationEngine.ts` — `shiftSpriteBmp`, `playEntry` orchestration, `typewriterText`, `spriteFlash`, HP drain, switch slide-in
+- `src/config/constants.ts` — `ANIM`, `CONTAINER_IDS`, `CONTAINER_NAMES`, `GLASS_LAYOUT`, `SPRITE_CONFIG`, `DISPLAY_BUDGET`
+- `src/screens/ScreenController.ts` — full FSM (870 lines), gesture routing, render dispatch, `ANIMATING` state, forced-switch handling, `teraQueued` flag
+- `src/screens/ScreenState.ts` — `ScreenName` union, all renderer return types (`TextScreen`, `ListScreen`, `SwitchListScreen`, `BattleHudScreen`)
+- `src/types/battleState.ts` — `ActivePokemon`, `BattleState`, `TurnLogEntry` (35+ kinds), current field inventory
+- `src/battle/SimBattleAdapter.ts` — `getBattle()` API, Battle object access pattern, action submission
+- `src/screens/renderers/*.ts` — all existing renderer patterns, index map conventions, item array structure
+- Nick Ustinov's G2 Community Notes (github.com/nickustinov/even-g2-notes/blob/main/G2.md) — 4-container limit, character budget, `rebuildPageContainer` cursor reset behavior
 
 ### Secondary (MEDIUM confidence)
-- https://www.smogon.com/articles/random-formats-overview — format overview, team composition rules
-- https://deepwiki.com/smogon/pokemon-showdown/3.3-random-team-generation — source code-based team gen documentation
-- https://www.smogon.com/forums/threads/random-battles-level-balancing.3721211/ — win-rate level adjustment system
-- https://www.gamedeveloper.com/programming/programming-ai-for-pokemon-showdown-bot-battle-royale- — AI heuristic approaches
-- https://pkmn.github.io/randbats/ — Gen 9 random battle set data (alternative to learnsets.json)
-- https://github.com/pkmn/randbats — pre-extracted random battle sets as learnsets.json replacement
-- https://github.com/smogon/pokemon-showdown/issues/10187 — format-specific team validation failures
+- [smogon/pokemon-showdown-client on GitHub](https://github.com/smogon/pokemon-showdown-client) — client architecture via DeepWiki
+- [battle-tooltips.ts](https://raw.githubusercontent.com/smogon/pokemon-showdown-client/master/play.pokemonshowdown.com/src/battle-tooltips.ts) — tooltip data fields for stats screen design reference
+- [panel-battle.tsx](https://raw.githubusercontent.com/smogon/pokemon-showdown-client/master/play.pokemonshowdown.com/src/panel-battle.tsx) — move button layout, HP bar display, Tera checkbox UX
+- [battle-scene-stub.ts](https://raw.githubusercontent.com/smogon/pokemon-showdown-client/master/play.pokemonshowdown.com/src/battle-scene-stub.ts) — `acceleration` property and speed control pattern
+- [DeepWiki: smogon/pokemon-showdown-client](https://deepwiki.com/smogon/pokemon-showdown-client) — UI component architecture overview
+- [Even Realities G2 SDK Architecture Notes](https://www.evenrealities.com/blog/how-we-rebuilt-g2-from-the-inside-out) — display pipeline behavior
+- Gestural interface pitfall references — double-tap accidental activation, system gesture conflicts, cognitive load on constrained displays
+
+### Tertiary (LOW confidence — needs validation during implementation)
+- `localStorage` persistence in Even App WebView for SpeedConfig — inferred from sprite cache behavior; not explicitly documented for arbitrary keys
+- Unicode box-drawing character rendering on G2 — inferred from monospace font behavior; unconfirmed on device
+- Double-tap timing window specifics — community inference; no published G2 SDK timing documentation
 
 ---
-*Research completed: 2026-02-26*
+
+*Research completed: 2026-03-01*
 *Ready for roadmap: yes*
