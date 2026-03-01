@@ -21,7 +21,7 @@ v1.1 (UI Enhancement & Polish) adds five more phases (7-11) that transform the b
 - [x] **Phase 5.2: @pkmn/sim Integration** (INSERTED) - Replace custom battle engine with @pkmn/sim for accurate Gen 9 mechanics
 - [x] **Phase 5.3: Switch Animation & Text Polish** (INSERTED) - Switch animation, complete protocol text, HUD volatiles
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
-- [ ] **Phase 7: Speed Config & Model Foundation** - SpeedConfig singleton, battle speed menu, BattleState data model extensions, dead code removal
+- [x] **Phase 7: Speed Config & Model Foundation** - SpeedConfig singleton, battle speed menu, BattleState data model extensions, dead code removal
 - [ ] **Phase 8: Animation Polish** - Text box frame, lunge animation, speed-scaled timing, instant skip
 - [ ] **Phase 9: Navigation & HUD Consolidation** - Double-tap back gesture, merged battle HUD, Tera simplification
 - [ ] **Phase 10: Overlay HUD Layouts** - Attack and switch screens with persistent sprites and HP bars
@@ -207,9 +207,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — SpeedConfig singleton + main menu speed cycling integration
-- [ ] 07-02-PLAN.md — BattleState model extensions (stat stages, ability, held item on ActivePokemon)
-- [ ] 07-03-PLAN.md — Delete dead v0.1 engine files (BattleEngine, DamageCalc, StatusEngine, TurnResolver, AIOpponent)
+- [x] 07-01-PLAN.md — SpeedConfig singleton + main menu speed cycling integration
+- [x] 07-02-PLAN.md — BattleState model extensions (stat stages, ability, held item on ActivePokemon)
+- [x] 07-03-PLAN.md — Delete dead v0.1 engine files (BattleEngine, DamageCalc, StatusEngine, TurnResolver, AIOpponent)
 
 ### Phase 8: Animation Polish
 **Goal**: Battle animations display inside a visible text box frame, the attacking sprite lunges toward the target before hit, all timing scales with the speed setting, and Instant mode skips animations entirely
