@@ -421,7 +421,7 @@ export class ScreenController {
 
     // Step 5: Play opening intro scene
     //   Order: player switch-in → opponent switch-in → abilities/weather/terrain
-    if (initialLog.length > 0) {
+    if (initialLog.length > 0 && !SpeedConfig.isInstant()) {
       console.log('[BATTLE] Step 5: playing opening intro:', initialLog.length, 'entries');
 
       // Partition and reorder: player switches, opponent switches, then everything else
@@ -474,13 +474,21 @@ export class ScreenController {
       hudResult.playerSprite,
     );
 
-    // Step 2: Play animated sequence
+    // Step 2: Play animated sequence (completes instantly when SpeedConfig.isInstant())
     await this.animationEngine.playTurn(
       result.log,
       prevState,
       result.nextState,
       this.glass,
     );
+
+    // Instant mode: show turn result text, wait for tap to advance
+    if (SpeedConfig.isInstant()) {
+      const turnResult = renderTurnResult(result.log, result.nextState);
+      await this.glass.showText(turnResult.text, turnResult.status);
+      this.state = { ...this.state, screen: 'TURN_RESULT', cursorIndex: 0 };
+      return;
+    }
 
     // Step 3: Write final state to display (cleanup after animation or skip)
     const finalHud = renderBattleHud(result.nextState);
@@ -543,8 +551,16 @@ export class ScreenController {
       prevHud.oppSprite, prevHud.playerSprite,
     );
 
-    // Step 2: Play switch animation
+    // Step 2: Play switch animation (completes instantly when SpeedConfig.isInstant())
     await this.animationEngine.playTurn(log, prevState, bs, this.glass);
+
+    // Instant mode: show switch log text, wait for tap to advance
+    if (SpeedConfig.isInstant()) {
+      const turnResult = renderTurnResult(log, bs);
+      await this.glass.showText(turnResult.text, turnResult.status);
+      this.state = { ...this.state, screen: 'TURN_RESULT', cursorIndex: 0 };
+      return;
+    }
 
     // Step 3: Show HUD with final state
     const finalHud = renderBattleHud(bs);
