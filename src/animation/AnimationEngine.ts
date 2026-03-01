@@ -114,6 +114,7 @@ function shiftSpriteBmp(original: Uint8Array, offsetX: number, size: number): Ui
 export class AnimationEngine {
   private cancelled = false;
   private running = false;
+  private lastMoveSlug = '';
 
   /** Signal the current animation to end immediately. Idempotent. */
   skip(): void {
@@ -141,6 +142,7 @@ export class AnimationEngine {
   ): Promise<void> {
     this.cancelled = false;
     this.running = true;
+    this.lastMoveSlug = '';
 
     try {
       for (let i = 0; i < log.length; i++) {
@@ -171,6 +173,11 @@ export class AnimationEngine {
     glass: GlassAdapter,
   ): Promise<void> {
     const fullText = formatEntry(entry, prevState);
+
+    // Track the last move used so DAMAGE entries know if it was a contact move
+    if (entry.kind === 'MOVE_USE') {
+      this.lastMoveSlug = String(entry.detail.move ?? '');
+    }
 
     // Shared mutable state for concurrent text + HP updates
     let currentText = '';
@@ -209,6 +216,11 @@ export class AnimationEngine {
     if (entry.kind === 'DAMAGE') {
       // Damage: target is the opposite side of the actor
       const targetSide: Side = entry.actor === 'player' ? 'opponent' : 'player';
+
+      // Contact moves: lunge SEQUENTIALLY before concurrent effects
+      if (this.isContactMove(this.lastMoveSlug)) {
+        await this.lungeAnimation(entry.actor, prevState, glass);
+      }
 
       tasks.push(this.spriteFlash(targetSide, 'hit', prevState, glass));
       tasks.push(this.hpDrain(
@@ -569,6 +581,60 @@ export class AnimationEngine {
       setHpStatus(formatHpBar(tempMon));
       await triggerUpdate();
       await this.scaledDelay(ANIM.HP_FRAME_MS);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Contact move detection + lunge animation
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Check if a move is a contact move (Physical/Special with contact flag).
+   * Status moves never lunge. Ranged special moves (no contact flag) do not lunge.
+   */
+  private isContactMove(moveSlug: string): boolean {
+    if (!moveSlug) return false;
+    const move = DataLoader.getMove(moveSlug.toLowerCase());
+    if (!move) return false;
+    if (move.category === 'Status') return false;
+    return Boolean(move.flags?.contact);
+  }
+
+  /**
+   * Lunge the attacker sprite toward the target, then snap back instantly.
+   * Player lunges right (toward opponent), opponent lunges left (toward player).
+   */
+  private async lungeAnimation(
+    side: Side,
+    state: BattleState,
+    glass: GlassAdapter,
+  ): Promise<void> {
+    const sprite = getSpriteForSide(state, side);
+    if (!sprite) return;
+
+    const containerID = side === 'opponent'
+      ? CONTAINER_IDS.oppSprite
+      : CONTAINER_IDS.playerSprite;
+    const containerName = side === 'opponent'
+      ? CONTAINER_NAMES.oppSprite
+      : CONTAINER_NAMES.playerSprite;
+
+    const size = SPRITE_CONFIG.SIZE;
+    // Player lunges right (+offset), opponent lunges left (-offset)
+    const direction = side === 'player' ? 1 : -1;
+
+    const frameCount = this.scaledFrameCount(ANIM.LUNGE_FRAMES);
+    for (let f = 1; f <= frameCount; f++) {
+      if (this.cancelled) break;
+      const offset = ANIM.LUNGE_OFFSET_PX * f * direction;
+      const shifted = shiftSpriteBmp(sprite, offset, size);
+      await glass.updateImage(containerID, containerName, shifted);
+      await this.scaledDelay(ANIM.LUNGE_FRAME_MS);
+    }
+
+    // Snap back to original position instantly
+    if (!this.cancelled) {
+      await glass.updateImage(containerID, containerName, sprite);
     }
   }
 

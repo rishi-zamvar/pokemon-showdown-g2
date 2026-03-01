@@ -73,6 +73,12 @@ export const ANIM = {
   SWITCH_SLIDE_PX: 3,
   /** Number of slide frames for switch-in sprite entrance. */
   SWITCH_SLIDE_FRAMES: 2,
+  /** Pixel offset for attack lunge (pixels per frame). */
+  LUNGE_OFFSET_PX: 10,
+  /** Number of frames for the lunge forward motion. */
+  LUNGE_FRAMES: 2,
+  /** Duration of each lunge frame (ms) -- uses base timing, speed-scaled. */
+  LUNGE_FRAME_MS: 60,
 } as const;
 
 export const DISPLAY_BUDGET = {
@@ -83,5 +89,5 @@ export const DISPLAY_BUDGET = {
   /** Max lines on G2 display */
   MAX_LINES: 8,
   /** Max turn result log entries to show (prevents budget overflow) */
-  MAX_LOG_ENTRIES: 6,
+  MAX_LOG_ENTRIES: 12,
 } as const;
