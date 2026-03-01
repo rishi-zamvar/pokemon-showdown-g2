@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 7 — Speed Config & Model Foundation
-Plan: 1 of ? (07-01 complete)
+Plan: 3 of ? (07-01, 07-03 complete)
 Status: In progress
-Last activity: 2026-03-01 — Completed 07-01-PLAN.md (SpeedConfig singleton + main menu wiring)
+Last activity: 2026-03-01 — Completed 07-03-PLAN.md (deleted 6 dead v0.1 engine files, clean build confirmed)
 
 ```
 Milestone v1.1 Progress:
@@ -175,6 +175,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-01T21:05:35Z
-Stopped at: Completed 07-01-PLAN.md (SpeedConfig singleton + main menu wiring)
+Last session: 2026-03-01T21:10:19Z
+Stopped at: Completed 07-03-PLAN.md (dead v0.1 engine files deleted, clean build)
 Resume file: None
