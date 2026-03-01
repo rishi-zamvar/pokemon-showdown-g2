@@ -32,6 +32,7 @@ import {
   getSubstituteFrame,
 } from './AnimationFrames.js';
 import { encodeBmp } from '../sprites/SpriteBmpEncoder.js';
+import { renderTextBox } from './TextBoxRenderer.js';
 
 type Side = 'player' | 'opponent';
 type FlashEffect = 'hit' | 'miss' | 'faint';
@@ -176,7 +177,7 @@ export class AnimationEngine {
     let hpStatus = '';
 
     const updateDisplay = async (): Promise<void> => {
-      await glass.updateText(currentText, { left: hpStatus, right: '' });
+      await glass.updateText(renderTextBox(currentText), { left: hpStatus, right: '' });
     };
 
     // SWITCH: animation runs BEFORE text (sequential, not concurrent)
