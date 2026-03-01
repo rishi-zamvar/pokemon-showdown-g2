@@ -5,14 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Milestone v1.1 — UI Enhancement & Polish
+**Current focus:** Milestone v1.1 — UI Enhancement & Polish (Phase 7)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 7 — Speed Config & Model Foundation
 Plan: —
-Status: Defining requirements for v1.1
-Last activity: 2026-03-01 — Milestone v1.1 started
+Status: Roadmap created, ready for phase planning
+Last activity: 2026-03-01 — v1.1 roadmap created (Phases 7-11)
+
+```
+Milestone v1.1 Progress:
+[          ] Phase 7  Speed Config & Model Foundation
+[          ] Phase 8  Animation Polish
+[          ] Phase 9  Navigation & HUD Consolidation
+[          ] Phase 10 Overlay HUD Layouts
+[          ] Phase 11 Stats Screen
+0% complete
+```
 
 ## Performance Metrics
 
@@ -129,6 +139,16 @@ Recent decisions affecting current work:
 - [05.3-05]: HEAL uses prevState/nextState HP diff, not entry.detail percentages — actual HP values are authoritative
 - [05.3-05b]: resolveSwitch mirrors resolveTurn animation pattern exactly — prevState HUD, playTurn, nextState HUD, transition
 
+### v1.1 Research Context
+
+Key findings from research (2026-03-01):
+- [v1.1]: Zero new npm dependencies needed for all v1.1 features
+- [v1.1]: 4-container SDK limit is the binding constraint for overlay HUD layouts (Phase 10)
+- [v1.1]: Double-tap needs new gesture kind — DOUBLE_CLICK_EVENT currently maps to TAP in gesture handler
+- [v1.1]: Stats screen needs BattleState type changes (statStages map, ability fields on ActivePokemon)
+- [v1.1]: Attack lunge reuses existing shiftSpriteBmp() — no new BMP primitives needed
+- [v1.1]: SpeedConfig is a mutable module-level singleton — imported by AnimationEngine and ScreenController
+
 ### Pending Todos
 
 None.
@@ -138,6 +158,7 @@ None.
 - Phase 5.1 inserted after Phase 5: Game Boy-style battle animations — typewriter text, sprite flash on damage, HP drain animation, sequential log playback (INSERTED)
 - Phase 5.2 inserted after Phase 5.1: Replace custom BattleEngine with @pkmn/sim for accurate Gen 9 mechanics (INSERTED)
 - Phase 5.3 inserted after Phase 5.2: Switch animation (pokeball→green square→checkbox), sprite slide, text polish, activeIndex fix (INSERTED)
+- Phases 7-11 added 2026-03-01: Milestone v1.1 UI Enhancement & Polish
 
 ### Blockers/Concerns
 
@@ -148,9 +169,10 @@ None.
 - [Data note]: PS typechart damageTaken uses 1=2x (not 3) — plan had incorrect assertion; actual encoding documented above
 - [Phase 4 note]: Pass BattlePokemon.calcSpecies (not species) to @smogon/calc — cosmetic forme crash avoided
 - [Bundle note]: @pkmn/sim + @pkmn/randoms produce ~1.25 MB bundle (247 KB gzip) — chunk warning is cosmetic, not blocking
+- [Phase 10 flag]: 4-container SDK limit may require fallback if overlay layout exceeds hardware constraint — research noted this as hardware-gated with a fallback option
 
 ## Session Continuity
 
-Last session: 2026-02-27T17:04:00Z
-Stopped at: Completed 05.3-05b-PLAN.md (resolveSwitch animation playback)
+Last session: 2026-03-01T00:00:00Z
+Stopped at: v1.1 roadmap created (Phases 7-11)
 Resume file: None

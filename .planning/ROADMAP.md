@@ -4,6 +4,8 @@
 
 Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart glasses in six phases, each delivering one complete capability layer. The dependency order is non-negotiable: data must be valid before game logic, the battle engine must be pure-tested before screens touch it, and the AI depends on the full damage pipeline. Phase 6 wires all layers together and validates a complete battle from main menu to win/loss screen.
 
+v1.1 (UI Enhancement & Polish) adds five more phases (7-11) that transform the battle experience: configurable speed, consolidated HUD, animated attacks, persistent overlay layouts, and a stats screen.
+
 ## Phases
 
 **Phase Numbering:**
@@ -19,6 +21,11 @@ Build a fully playable Gen 9 random battle simulator on Even Realities G2 smart 
 - [x] **Phase 5.2: @pkmn/sim Integration** (INSERTED) - Replace custom battle engine with @pkmn/sim for accurate Gen 9 mechanics
 - [x] **Phase 5.3: Switch Animation & Text Polish** (INSERTED) - Switch animation, complete protocol text, HUD volatiles
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
+- [ ] **Phase 7: Speed Config & Model Foundation** - SpeedConfig singleton, battle speed menu, BattleState data model extensions, dead code removal
+- [ ] **Phase 8: Animation Polish** - Text box frame, lunge animation, speed-scaled timing, instant skip
+- [ ] **Phase 9: Navigation & HUD Consolidation** - Double-tap back gesture, merged battle HUD, Tera simplification
+- [ ] **Phase 10: Overlay HUD Layouts** - Attack and switch screens with persistent sprites and HP bars
+- [ ] **Phase 11: Stats Screen** - New stats screen showing stat stages, ability, opponent speed range, possible abilities
 
 ## Phase Details
 
@@ -180,10 +187,77 @@ Plans:
 - [ ] 06-01: Wire all layers in main.ts (screen stack, gesture routing, boot sequence, wake lock); run end-to-end battle checklist
 - [ ] 06-02: On-device validation — complete 3 full battles, verify all navigation paths, confirm character budgets, measure load time
 
+---
+
+## Milestone v1.1: UI Enhancement & Polish
+
+**Started:** 2026-03-01
+**Phases:** 7-11
+**Requirements:** 31 v1.1 requirements
+
+### Phase 7: Speed Config & Model Foundation
+**Goal**: Players can select battle speed from the main menu and the selection persists; BattleState carries stat stage and ability data; dead v0.1 code is removed
+**Depends on**: Phase 6
+**Requirements**: MENU-01, MENU-02, MENU-03, OPT-01, OPT-02
+**Success Criteria** (what must be TRUE):
+  1. Main menu shows "Battle Speed" as a selectable option alongside "Enter Battle"
+  2. Selecting "Battle Speed" opens a list of four presets: Slow (0.5x), Normal (1x), Fast (2x), Instant (skip)
+  3. Selected speed carries into the next battle without resetting — starting a new battle uses the last chosen speed
+  4. Build succeeds with no TypeScript errors after old BattleEngine, DamageCalc, StatusEngine files are deleted and TERA_CONFIRM / ACTION_MENU screen types are removed
+**Plans**: TBD
+
+### Phase 8: Animation Polish
+**Goal**: Battle animations display inside a visible text box frame, the attacking sprite lunges toward the target before hit, all timing scales with the speed setting, and Instant mode skips animations entirely
+**Depends on**: Phase 7 (needs SpeedConfig)
+**Requirements**: ANIM-01, ANIM-02, ANIM-03, ANIM-04
+**Success Criteria** (what must be TRUE):
+  1. During battle animation, text appears inside a visible bordered frame rather than directly on the background
+  2. When a Pokemon attacks, its sprite visibly shifts toward the opponent before the hit flash plays
+  3. Setting speed to Slow makes animations noticeably longer; Fast makes them shorter; the ratio matches 0.5x / 2x multipliers
+  4. Setting speed to Instant causes the battle to skip all animations and display the result text immediately with no per-character delay
+**Plans**: TBD
+
+### Phase 9: Navigation & HUD Consolidation
+**Goal**: Double-tap navigates back throughout the app; the battle HUD is a unified action list with Attack/Switch/Tera/Stats/Back; ACTION_MENU and TERA_CONFIRM screens are gone; Tera queues directly into attack select
+**Depends on**: Phase 7 (needs OPT-02 clean-up from Phase 7 so removed screen types don't conflict)
+**Requirements**: NAV2-01, NAV2-02, NAV2-03, NAV2-04, HUD-01, HUD-02, HUD-03, HUD-04, TERA-01, TERA-02, TERA-03
+**Success Criteria** (what must be TRUE):
+  1. No "< Back" text item appears on any list screen — the top of every sub-list is the first real option
+  2. Double-tapping returns to the parent screen from attack select, switch select, and stats screens; single-tap on a list item selects it without triggering back navigation
+  3. Forced-switch screens (after a faint) do not respond to double-tap — the player cannot escape to the battle HUD mid-forced-switch
+  4. Tapping Attack or Switch on the battle HUD goes directly to that selection screen in one tap (no intermediate action menu step)
+  5. After Tera is used, the battle HUD shows "Tera (used)" as a non-selectable item
+  6. Selecting Tera on the battle HUD immediately opens the attack select screen with a "Tera queued" indicator visible
+**Plans**: TBD
+
+### Phase 10: Overlay HUD Layouts
+**Goal**: The attack select and switch select screens show both Pokemon sprites and HP bars in the upper portion of the display while the move or team list occupies the lower portion
+**Depends on**: Phase 9 (attack/switch screens must already be consolidated before layout changes)
+**Requirements**: ATK-01, ATK-02, ATK-03, SWT-01, SWT-02, SWT-03
+**Success Criteria** (what must be TRUE):
+  1. While choosing an attack, both Pokemon HP bars are visible above the move list without requiring the player to leave the screen
+  2. While choosing an attack, both Pokemon sprites are visible above the move list
+  3. While choosing a switch target, both Pokemon HP bars are visible above the team list
+  4. While choosing a switch target, both Pokemon sprites are visible above the team list
+  5. The move list and team list render in the lower portion of the screen; battle context (sprites, HP) occupies the upper portion
+**Plans**: TBD
+
+### Phase 11: Stats Screen
+**Goal**: Players can open a stats screen from the battle HUD that shows their active Pokemon's stat stages, ability, status, and the opponent's speed range and possible abilities
+**Depends on**: Phase 9 (stats screen entry point is on the consolidated battle HUD from Phase 9)
+**Requirements**: STAT-01, STAT-02, STAT-03, STAT-04, STAT-05
+**Success Criteria** (what must be TRUE):
+  1. "Stats" appears as a selectable option on the battle HUD; tapping it opens the stats screen
+  2. Stats screen shows the player's active Pokemon's current stat modifiers with clear labels (e.g., "+1 Atk", "-2 Def")
+  3. Stats screen shows the player's active Pokemon's ability name and any active status condition
+  4. Stats screen shows the opponent's active Pokemon's speed stat as a min-max range appropriate for the randbats set
+  5. Stats screen shows the opponent's possible abilities — if the ability has not been revealed, all possible abilities for that species are listed
+**Plans**: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -196,7 +270,14 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 | 5.2 @pkmn/sim Integration | 3/3 | Complete | 2026-02-27 |
 | 5.3 Switch Animation & Text Polish | 8/8 | Complete | 2026-02-27 |
 | 6. Integration | 0/2 | Not started | - |
+| 7. Speed Config & Model Foundation | 0/TBD | Not started | - |
+| 8. Animation Polish | 0/TBD | Not started | - |
+| 9. Navigation & HUD Consolidation | 0/TBD | Not started | - |
+| 10. Overlay HUD Layouts | 0/TBD | Not started | - |
+| 11. Stats Screen | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-26*
-*Milestone: v0.1 Random Battle Simulator*
+*Milestone v0.1: Random Battle Simulator*
+*Milestone v1.1 phases added: 2026-03-01*
+*Milestone v1.1: UI Enhancement & Polish*

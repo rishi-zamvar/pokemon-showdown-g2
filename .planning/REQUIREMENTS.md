@@ -203,13 +203,44 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 | AI-03 | Phase 4 | Complete |
 | AI-04 | Phase 4 | Complete |
 | AI-05 | Phase 4 | Complete |
+| MENU-01 | Phase 7 | Pending |
+| MENU-02 | Phase 7 | Pending |
+| MENU-03 | Phase 7 | Pending |
+| OPT-01 | Phase 7 | Pending |
+| OPT-02 | Phase 7 | Pending |
+| ANIM-01 | Phase 8 | Pending |
+| ANIM-02 | Phase 8 | Pending |
+| ANIM-03 | Phase 8 | Pending |
+| ANIM-04 | Phase 8 | Pending |
+| NAV2-01 | Phase 9 | Pending |
+| NAV2-02 | Phase 9 | Pending |
+| NAV2-03 | Phase 9 | Pending |
+| NAV2-04 | Phase 9 | Pending |
+| HUD-01 | Phase 9 | Pending |
+| HUD-02 | Phase 9 | Pending |
+| HUD-03 | Phase 9 | Pending |
+| HUD-04 | Phase 9 | Pending |
+| TERA-01 | Phase 9 | Pending |
+| TERA-02 | Phase 9 | Pending |
+| TERA-03 | Phase 9 | Pending |
+| ATK-01 | Phase 10 | Pending |
+| ATK-02 | Phase 10 | Pending |
+| ATK-03 | Phase 10 | Pending |
+| SWT-01 | Phase 10 | Pending |
+| SWT-02 | Phase 10 | Pending |
+| SWT-03 | Phase 10 | Pending |
+| STAT-01 | Phase 11 | Pending |
+| STAT-02 | Phase 11 | Pending |
+| STAT-03 | Phase 11 | Pending |
+| STAT-04 | Phase 11 | Pending |
+| STAT-05 | Phase 11 | Pending |
 
 **Coverage:**
 - v0.1 requirements: 42 total — all Complete
-- v1.1 requirements: 25 total — Pending (awaiting roadmap)
-- Mapped to phases: 42 (v0.1) + 0 (v1.1)
-- Unmapped: 25
+- v1.1 requirements: 31 total — 0 Complete, 31 Pending
+- Mapped to phases: 42 (v0.1) + 31 (v1.1) = 73 total
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-03-01 — v1.1 requirements added for UI Enhancement milestone*
+*Last updated: 2026-03-01 — v1.1 phase mappings added (Phases 7-11)*
