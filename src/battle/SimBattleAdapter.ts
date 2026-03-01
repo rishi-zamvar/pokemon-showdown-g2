@@ -34,6 +34,7 @@ import type {
   BattleSide,
   BattleState,
   PlayerAction,
+  StatStages,
   StatusCondition,
   TurnLogEntry,
   TurnResult,
@@ -312,6 +313,25 @@ function deriveSide(
       }
     }
 
+    // Stat stages — read from simMon.boosts (-6 to +6 for each stat)
+    const statStages: StatStages = {
+      atk: simMon.boosts?.atk ?? 0,
+      def: simMon.boosts?.def ?? 0,
+      spa: simMon.boosts?.spa ?? 0,
+      spd: simMon.boosts?.spd ?? 0,
+      spe: simMon.boosts?.spe ?? 0,
+      accuracy: simMon.boosts?.accuracy ?? 0,
+      evasion: simMon.boosts?.evasion ?? 0,
+    };
+
+    // Revealed ability — sim always tracks the real ability; Phase 11 adds visibility logic
+    const revealedAbility: string = simMon.ability ?? '';
+
+    // Held item — simMon.item is current item (empty if consumed)
+    // heldItemConsumed: sim shows no item but BattlePokemon originally had one
+    const heldItem: string = simMon.item ?? '';
+    const heldItemConsumed: boolean = prev.heldItemConsumed || (simMon.item === '' && prev.item !== '');
+
     // Update max HP from sim if it changed (e.g. Terapagos Tera Shift form change)
     const stats = simMon.maxhp !== prev.stats.hp
       ? { ...prev.stats, hp: simMon.maxhp }
@@ -330,6 +350,10 @@ function deriveSide(
       teraActive: !!((simMon as unknown as { terastallized?: string }).terastallized),
       ppUsed,
       volatiles,
+      statStages,
+      revealedAbility,
+      heldItem,
+      heldItemConsumed,
     } satisfies ActivePokemon;
   });
 
@@ -520,7 +544,7 @@ export const SimBattleAdapter = {
    * instance, sets both players, and returns initial BattleState with
    * phase WAITING_FOR_ACTION, 6 Pokemon per side at full HP.
    */
-  startBattle(): BattleState {
+  startBattle(): { state: BattleState; initialLog: TurnLogEntry[] } {
     // Step 1: Generate teams via @pkmn/randoms
     const p1Generator = TeamGenerators.getTeamGenerator("[Gen 9] Random Battle");
     const p2Generator = TeamGenerators.getTeamGenerator("[Gen 9] Random Battle");
@@ -585,7 +609,11 @@ export const SimBattleAdapter = {
       winner: null,
     };
 
-    return initialState;
+    // Step 8: Parse initial log (battle-start abilities, weather, terrain, etc.)
+    const filteredInitLog = filterSplitLines([...logBuffer]);
+    const initialLog = parseLogLines(filteredInitLog);
+
+    return { state: initialState, initialLog };
   },
 
   /**
