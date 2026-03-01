@@ -9,27 +9,27 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 8 — Animation Polish — In Progress
-Plan: 1/2 complete
-Status: In progress
-Last activity: 2026-03-01 — Completed 08-01-PLAN.md (Speed Scaling & Instant Mode)
+Phase: 8 — Animation Polish — Complete
+Plan: 2/2 complete
+Status: Phase complete
+Last activity: 2026-03-01 — Completed 08-02-PLAN.md (Text Box Frame & Lunge Animation)
 
 ```
 Milestone v1.1 Progress:
 [██        ] Phase 7  Speed Config & Model Foundation ✓
-[█         ] Phase 8  Animation Polish (1/2)
+[██        ] Phase 8  Animation Polish ✓
 [          ] Phase 9  Navigation & HUD Consolidation
 [          ] Phase 10 Overlay HUD Layouts
 [          ] Phase 11 Stats Screen
-30% complete
+40% complete
 ```
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 22
+- Total plans completed: 23
 - Average duration: ~2.3 min
-- Total execution time: ~46.9 min
+- Total execution time: ~54 min
 
 **By Phase:**
 
@@ -142,6 +142,11 @@ Recent decisions affecting current work:
 - [08-01]: scaledFrameCount returns 0 for Instant, min 1 otherwise — prevents degenerate 0-frame animations at non-Instant speeds
 - [08-01]: Early return after TURN_RESULT in Instant branches — prevents fall-through to transitionAfterTurn which would overwrite text
 - [08-01]: Opening intro skipped entirely in Instant mode — cosmetic switch-in animations add no value at Instant speed
+- [08-02]: renderTextBox lineWidth default 62 — leaves 1-char margin each side of 64-char G2 line
+- [08-02]: Text box truncates to last 4 lines — most recent text visible during typewriter effect
+- [08-02]: isContactMove checks flags.contact, not just category — ranged specials (Thunderbolt) skip lunge, contact specials (Grass Knot) lunge
+- [08-02]: Lunge snaps back instantly — no smooth return animation, per context decisions
+- [08-02]: lastMoveSlug tracked from MOVE_USE entries, reset at playTurn start — prevents stale cross-turn state
 
 ### v1.1 Research Context
 
@@ -184,6 +189,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-01T21:48:22Z
-Stopped at: Completed 08-01-PLAN.md (Speed Scaling & Instant Mode)
+Last session: 2026-03-01T21:58:50Z
+Stopped at: Completed 08-02-PLAN.md (Text Box Frame & Lunge Animation) — Phase 8 complete
 Resume file: None
