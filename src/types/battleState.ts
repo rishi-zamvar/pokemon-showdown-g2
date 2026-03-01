@@ -33,6 +33,21 @@ export type BattlePhase =
 export type StatusCondition = "brn" | "par" | "psn" | "tox" | "slp" | "frz" | "";
 
 // ---------------------------------------------------------------------------
+// StatStages — per-stat modifier tracking
+// ---------------------------------------------------------------------------
+
+/** Stat stage modifiers: -6 to +6 for each stat. Matches @pkmn/sim boosts. */
+export interface StatStages {
+  atk: number;
+  def: number;
+  spa: number;
+  spd: number;
+  spe: number;
+  accuracy: number;
+  evasion: number;
+}
+
+// ---------------------------------------------------------------------------
 // ActivePokemon — BattlePokemon + runtime battle fields
 // ---------------------------------------------------------------------------
 
@@ -45,6 +60,14 @@ export interface ActivePokemon extends BattlePokemon {
   ppUsed: Record<string, number>;
   fainted: boolean;
   volatiles: string[];  // Active volatile abbreviations e.g. ['CNF', 'TAUNT']
+  /** Current stat stage modifiers (-6 to +6). Default all 0. */
+  statStages: StatStages;
+  /** Revealed ability name (empty string if not yet revealed). */
+  revealedAbility: string;
+  /** Current held item (empty string if none or consumed). */
+  heldItem: string;
+  /** True if the held item has been consumed this battle. */
+  heldItemConsumed: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +95,7 @@ export type PlayerAction =
 
 export interface TurnLogEntry {
   kind:
+    | "MOVE_USE"
     | "DAMAGE"
     | "MISS"
     | "FAINT"
@@ -172,5 +196,9 @@ export function initActivePokemon(pokemon: BattlePokemon): ActivePokemon {
     ppUsed: {},
     fainted: false,
     volatiles: [],
+    statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, accuracy: 0, evasion: 0 },
+    revealedAbility: '',
+    heldItem: '',
+    heldItemConsumed: false,
   };
 }
