@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 7 — Speed Config & Model Foundation
-Plan: 3 of ? (07-01, 07-03 complete)
+Plan: 3 of ? (07-01, 07-02, 07-03 complete)
 Status: In progress
-Last activity: 2026-03-01 — Completed 07-03-PLAN.md (deleted 6 dead v0.1 engine files, clean build confirmed)
+Last activity: 2026-03-01 — Completed 07-02-PLAN.md (StatStages + ActivePokemon model extension + SimBattleAdapter wiring)
 
 ```
 Milestone v1.1 Progress:
@@ -150,6 +150,10 @@ Key findings from research (2026-03-01):
 - [07-01]: SpeedConfig cycle order: ['Normal', 'Fast', 'Instant', 'Slow'] — index wrapping, resets to Normal on app restart
 - [07-01]: About/Credits uses showText() directly then state stays MAIN_MENU — no new screen type needed
 - [07-01]: Battle Speed cursorIndex=1 preserved after cycle so highlighted item stays visible after tap
+- [07-02]: StatStages keys mirror @pkmn/sim boosts object verbatim — no key-mapping indirection at read site
+- [07-02]: revealedAbility reads simMon.ability unconditionally for all pokemon — Phase 11 adds opponent visibility filtering if needed
+- [07-02]: heldItemConsumed: prev.heldItemConsumed || (simMon.item === '' && prev.item !== '') — BattlePokemon.item from team gen is authoritative original item reference
+- [07-02]: New BattleState fields follow: type in battleState.ts → default in initActivePokemon() → deriveSide() wiring → downstream consumers
 
 ### Pending Todos
 
@@ -175,6 +179,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-01T21:10:19Z
-Stopped at: Completed 07-03-PLAN.md (dead v0.1 engine files deleted, clean build)
+Last session: 2026-03-01T21:09:03Z
+Stopped at: Completed 07-02-PLAN.md (StatStages + ActivePokemon model extension + SimBattleAdapter wiring)
 Resume file: None
