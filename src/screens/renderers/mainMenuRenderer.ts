@@ -3,10 +3,11 @@
  */
 
 import type { ListScreen } from '../ScreenState.js';
+import { SpeedConfig } from '../../config/SpeedConfig.js';
 
 export function renderMainMenu(): ListScreen {
   return {
-    items: ['Enter Battle'],
+    items: ['Enter Battle', `Battle Speed: ${SpeedConfig.current()}`, 'About/Credits'],
     status: 'Pokemon Showdown G2',
   };
 }

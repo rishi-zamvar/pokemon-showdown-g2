@@ -31,7 +31,9 @@ import { renderTurnResult } from './renderers/turnResultRenderer.js';
 import { renderEndScreen } from './renderers/endScreenRenderer.js';
 import { renderSpriteRefresh } from './renderers/spriteRefreshRenderer.js';
 import { SpriteService } from '../sprites/SpriteService.js';
+import { blankSprite } from '../animation/SpriteEffects.js';
 import { ANIM } from '../config/constants.js';
+import { SpeedConfig } from '../config/SpeedConfig.js';
 
 export class ScreenController {
   private readonly glass: GlassAdapter;
@@ -144,12 +146,18 @@ export class ScreenController {
       case 0: // "Enter Battle"
         await this.startNewBattle();
         break;
-      case 1: // "Clear Sprites"
-        SpriteService.clearAllBitmapCache();
-        await this.glass.showMessage('All sprites cleared!');
-        await this.delay(1000);
-        this.state = { ...this.state, screen: 'MAIN_MENU', cursorIndex: 0 };
+      case 1: // "Battle Speed" — cycle preset inline, re-render with cursor at 1
+        SpeedConfig.cycle();
+        this.state = { ...this.state, screen: 'MAIN_MENU', cursorIndex: 1 };
         await this.render();
+        break;
+      case 2: // "About/Credits" — show credits text, tap anywhere returns to menu
+        await this.glass.showText(
+          'Pokemon Showdown G2\nGen 9 Random Battles\non Even Realities G2\n\nBuilt with @pkmn/sim\n\nTap to return',
+          { left: 'About', right: '' },
+        );
+        // State stays MAIN_MENU — next tap re-renders the menu
+        this.state = { ...this.state, screen: 'MAIN_MENU', cursorIndex: 0 };
         break;
     }
   }
@@ -245,7 +253,7 @@ export class ScreenController {
 
     // Map display index to team index
     const toIndex = this.switchIndexMap[idx - 1];
-    if (toIndex === undefined) return;
+    if (toIndex === undefined || toIndex < 0) return;
 
     if (this.forcedSwitch) {
       await this.resolveSwitch(toIndex);
@@ -328,9 +336,12 @@ export class ScreenController {
     await this.glass.showMessage('Generating teams...');
 
     console.log('[BATTLE] Step 1: calling SimBattleAdapter.startBattle()...');
-    let battleState;
+    let battleState: BattleState;
+    let initialLog: TurnLogEntry[] = [];
     try {
-      battleState = SimBattleAdapter.startBattle();
+      const result = SimBattleAdapter.startBattle();
+      battleState = result.state;
+      initialLog = result.initialLog;
     } catch (e: unknown) {
       const err = e instanceof Error ? e : new Error(String(e));
       console.error('[BATTLE] startBattle() threw:', err);
@@ -408,9 +419,35 @@ export class ScreenController {
       console.log(`[SPRITES] player dex=${num} back cached=${cached ? cached.length + ' bytes BMP' : 'NULL'}`);
     }
 
-    console.log('[BATTLE] Step 5: rendering battle HUD...');
+    // Step 5: Play opening intro scene
+    //   Order: player switch-in → opponent switch-in → abilities/weather/terrain
+    if (initialLog.length > 0) {
+      console.log('[BATTLE] Step 5: playing opening intro:', initialLog.length, 'entries');
+
+      // Partition and reorder: player switches, opponent switches, then everything else
+      const playerSwitches = initialLog.filter(e => e.kind === 'SWITCH' && e.actor === 'player');
+      const oppSwitches = initialLog.filter(e => e.kind === 'SWITCH' && e.actor === 'opponent');
+      const rest = initialLog.filter(e => e.kind !== 'SWITCH');
+      const orderedLog = [...playerSwitches, ...oppSwitches, ...rest];
+
+      // Set up battle HUD layout with blank text and blank sprites — image
+      // containers must exist for switch animations to target via updateImage().
+      const blank = blankSprite();
+      await this.glass.showBattleHud('', '', { left: '', right: '' }, blank, blank);
+
+      await this.animationEngine.playTurn(
+        orderedLog,
+        battleState,
+        battleState,
+        this.glass,
+      );
+      await this.delay(ANIM.POST_ANIM_DELAY_MS);
+    }
+
+    // Step 6: Now show the interactive battle HUD with sprites
+    console.log('[BATTLE] Step 6: rendering battle HUD...');
     await this.render();
-    console.log('[BATTLE] Step 6: render complete!');
+    console.log('[BATTLE] Step 7: render complete!');
   }
 
   private async resolveTurn(playerAction: PlayerAction): Promise<void> {
@@ -527,11 +564,47 @@ export class ScreenController {
         this.state = { ...this.state, screen: 'BATTLE_HUD', cursorIndex: 0 };
         await this.render();
         break;
-      case 'WAITING_FOR_SWITCH':
-        this.forcedSwitch = true;
-        this.state = { ...this.state, screen: 'SWITCH_SELECT', cursorIndex: 0 };
-        await this.render();
+      case 'WAITING_FOR_SWITCH': {
+        // Check which side(s) actually need to switch
+        const battle = SimBattleAdapter.getBattle()!;
+        const p1NeedsSwitch = battle.sides[0]?.activeRequest?.forceSwitch?.some(Boolean);
+        const p2NeedsSwitch = battle.sides[1]?.activeRequest?.forceSwitch?.some(Boolean);
+
+        if (p1NeedsSwitch) {
+          // Player needs to switch — show switch menu
+          this.forcedSwitch = true;
+          this.state = { ...this.state, screen: 'SWITCH_SELECT', cursorIndex: 0 };
+          await this.render();
+        } else if (p2NeedsSwitch) {
+          // Only opponent needs to switch — auto-handle with AI
+          const aiSwitchIndex = SimAIOpponent.pickSwitch(battle);
+          const result = SimBattleAdapter.submitSwitch(nextState, 'opponent', aiSwitchIndex);
+          this.lastTurnLog = result.log;
+          this.state = {
+            ...this.state,
+            battleState: result.nextState,
+            cursorIndex: 0,
+          };
+
+          // Play switch animation for opponent
+          const prevHud = renderBattleHud(nextState);
+          await this.glass.showBattleHud(
+            prevHud.oppText, prevHud.playerText, prevHud.status,
+            prevHud.oppSprite, prevHud.playerSprite,
+          );
+          await this.animationEngine.playTurn(result.log, nextState, result.nextState, this.glass);
+          const finalHud = renderBattleHud(result.nextState);
+          await this.glass.showBattleHud(
+            finalHud.oppText, finalHud.playerText, finalHud.status,
+            finalHud.oppSprite, finalHud.playerSprite,
+          );
+          await this.delay(ANIM.POST_ANIM_DELAY_MS);
+
+          // Recurse — the new state might need further transitions
+          await this.transitionAfterTurn(result.nextState);
+        }
         break;
+      }
       case 'BATTLE_OVER':
         this.state = { ...this.state, screen: 'END_SCREEN', cursorIndex: 0 };
         await this.render();
@@ -755,6 +828,7 @@ export class ScreenController {
       case 'ASLEEP':
       case 'PP_OUT':
         return 'info';
+      case 'MOVE_USE':
       case 'SWITCH':
       case 'TERA':
       case 'WIN':
@@ -769,8 +843,10 @@ export class ScreenController {
     const d = entry.detail;
     const actor = entry.actor === 'player' ? 'You' : 'Foe';
     switch (entry.kind) {
+      case 'MOVE_USE':
+        return `${actor}'s ${String(d['pokemon'] ?? '?')} used ${String(d['move'] ?? '?')}`;
       case 'DAMAGE':
-        return `${actor}'s ${String(d['target'] ?? '?')} took ${String(d['damage'] ?? '?')} damage`;
+        return `${String(d['damage'] ?? '?')} damage`;
       case 'MISS':
         return `${actor}'s attack missed!`;
       case 'FAINT':
