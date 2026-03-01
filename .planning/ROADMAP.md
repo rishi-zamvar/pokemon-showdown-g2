@@ -220,8 +220,11 @@ Plans:
   2. When a Pokemon attacks, its sprite visibly shifts toward the opponent before the hit flash plays
   3. Setting speed to Slow makes animations noticeably longer; Fast makes them shorter; the ratio matches 0.5x / 2x multipliers
   4. Setting speed to Instant causes the battle to skip all animations and display the result text immediately with no per-character delay
-**Plans**: TBD
+**Plans**: 2 plans
 
+Plans:
+- [ ] 08-01-PLAN.md — Speed scaling + Instant mode (wire SpeedConfig into AnimationEngine timing)
+- [ ] 08-02-PLAN.md — Text box frame + lunge animation (bordered text display, contact move sprite shift)
 ### Phase 9: Navigation & HUD Consolidation
 **Goal**: Double-tap navigates back throughout the app; the battle HUD is a unified action list with Attack/Switch/Tera/Stats/Back; ACTION_MENU and TERA_CONFIRM screens are gone; Tera queues directly into attack select
 **Depends on**: Phase 7 (needs OPT-02 clean-up from Phase 7 so removed screen types don't conflict)
@@ -276,7 +279,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 | 5.3 Switch Animation & Text Polish | 8/8 | Complete | 2026-02-27 |
 | 6. Integration | 0/2 | Not started | - |
 | 7. Speed Config & Model Foundation | 0/3 | Not started | - |
-| 8. Animation Polish | 0/TBD | Not started | - |
+| 8. Animation Polish | 0/2 | Not started | - |
 | 9. Navigation & HUD Consolidation | 0/TBD | Not started | - |
 | 10. Overlay HUD Layouts | 0/TBD | Not started | - |
 | 11. Stats Screen | 0/TBD | Not started | - |
