@@ -24,10 +24,12 @@ import {
 } from '../config/constants.js';
 import { SpriteService } from '../sprites/SpriteService.js';
 import { DataLoader } from '../data/DataLoader.js';
+import { SpeedConfig } from '../config/SpeedConfig.js';
 import {
   getPokeballFrame,
   getFilledSquareFrame,
   getCheckboxFrame,
+  getSubstituteFrame,
 } from './AnimationFrames.js';
 import { encodeBmp } from '../sprites/SpriteBmpEncoder.js';
 
@@ -149,7 +151,7 @@ export class AnimationEngine {
 
         // Pause between entries (skip pause after last entry)
         if (i < log.length - 1) {
-          await this.delay(ANIM.ENTRY_PAUSE_MS);
+          await this.scaledDelay(ANIM.ENTRY_PAUSE_MS);
         }
       }
     } finally {
@@ -238,6 +240,20 @@ export class AnimationEngine {
       if (tickDamage !== undefined && tickDamage >= 0) {
         tasks.push(this.spriteFlash(tickSide, 'hit', prevState, glass));
       }
+    } else if (entry.kind === 'VOLATILE_START') {
+      const volatile = String(entry.detail.volatile ?? '').toLowerCase();
+      if (volatile === 'substitute') {
+        tasks.push(this.swapSprite(entry.actor, getSubstituteFrame(), glass));
+      }
+    } else if (entry.kind === 'VOLATILE_END') {
+      const volatile = String(entry.detail.volatile ?? '').toLowerCase();
+      if (volatile === 'substitute') {
+        // Restore the real sprite
+        const realSprite = getSpriteForSide(nextState, entry.actor);
+        if (realSprite) {
+          tasks.push(this.swapSprite(entry.actor, realSprite, glass));
+        }
+      }
     }
 
     await Promise.all(tasks);
@@ -265,7 +281,7 @@ export class AnimationEngine {
         ? ANIM.PUNCTUATION_PAUSE_MS
         : ANIM.CHAR_DELAY_MS;
 
-      await this.delay(pauseMs);
+      await this.scaledDelay(pauseMs);
     }
   }
 
@@ -298,45 +314,45 @@ export class AnimationEngine {
 
     if (effect === 'hit') {
       // 2 cycles: invert -> restore -> blank -> restore
-      for (let c = 0; c < ANIM.HIT_FLASH_CYCLES; c++) {
+      for (let c = 0; c < this.scaledFrameCount(ANIM.HIT_FLASH_CYCLES); c++) {
         if (this.cancelled) break;
         await updateImg(inverted);
-        await this.delay(ANIM.FLASH_FRAME_MS);
+        await this.scaledDelay(ANIM.FLASH_FRAME_MS);
         if (this.cancelled) break;
         await updateImg(normal);
-        await this.delay(ANIM.FLASH_FRAME_MS);
+        await this.scaledDelay(ANIM.FLASH_FRAME_MS);
         if (this.cancelled) break;
         await updateImg(blank);
-        await this.delay(ANIM.FLASH_FRAME_MS);
+        await this.scaledDelay(ANIM.FLASH_FRAME_MS);
         if (this.cancelled) break;
         await updateImg(normal);
-        await this.delay(ANIM.FLASH_FRAME_MS);
+        await this.scaledDelay(ANIM.FLASH_FRAME_MS);
       }
     } else if (effect === 'miss') {
       // 1 cycle: blank -> restore
       if (!this.cancelled) {
         await updateImg(blank);
-        await this.delay(ANIM.FLASH_FRAME_MS);
+        await this.scaledDelay(ANIM.FLASH_FRAME_MS);
       }
       if (!this.cancelled) {
         await updateImg(normal);
-        await this.delay(ANIM.FLASH_FRAME_MS);
+        await this.scaledDelay(ANIM.FLASH_FRAME_MS);
       }
     } else if (effect === 'faint') {
       // 3 cycles same as hit, then permanent blank
-      for (let c = 0; c < ANIM.FAINT_FLASH_CYCLES; c++) {
+      for (let c = 0; c < this.scaledFrameCount(ANIM.FAINT_FLASH_CYCLES); c++) {
         if (this.cancelled) break;
         await updateImg(inverted);
-        await this.delay(ANIM.FLASH_FRAME_MS);
+        await this.scaledDelay(ANIM.FLASH_FRAME_MS);
         if (this.cancelled) break;
         await updateImg(normal);
-        await this.delay(ANIM.FLASH_FRAME_MS);
+        await this.scaledDelay(ANIM.FLASH_FRAME_MS);
         if (this.cancelled) break;
         await updateImg(blank);
-        await this.delay(ANIM.FLASH_FRAME_MS);
+        await this.scaledDelay(ANIM.FLASH_FRAME_MS);
         if (this.cancelled) break;
         await updateImg(normal);
-        await this.delay(ANIM.FLASH_FRAME_MS);
+        await this.scaledDelay(ANIM.FLASH_FRAME_MS);
       }
       // Final blank -- sprite removed permanently
       await updateImg(blank);
@@ -362,7 +378,7 @@ export class AnimationEngine {
     const startHp = mon.currentHp;
     const endHp = Math.max(0, startHp - damage);
     const actualDamage = startHp - endHp;
-    const steps = Math.min(actualDamage, ANIM.MAX_HP_STEPS);
+    const steps = Math.min(actualDamage, this.scaledFrameCount(ANIM.MAX_HP_STEPS));
 
     if (steps <= 0) return;
 
@@ -380,7 +396,7 @@ export class AnimationEngine {
 
       setHpStatus(formatHpBar(tempMon));
       await triggerUpdate();
-      await this.delay(ANIM.HP_FRAME_MS);
+      await this.scaledDelay(ANIM.HP_FRAME_MS);
     }
   }
 
@@ -416,7 +432,7 @@ export class AnimationEngine {
     for (const frame of frames) {
       if (this.cancelled) return;
       await updateImg(frame);
-      await this.delay(ANIM.SWITCH_FRAME_MS);
+      await this.scaledDelay(ANIM.SWITCH_FRAME_MS);
     }
 
     // Phase 2: Sprite slide — shifted BMP frames sliding left-to-right
@@ -424,16 +440,16 @@ export class AnimationEngine {
     if (!finalSprite) return;
 
     const size = SPRITE_CONFIG.SIZE;
-    const totalOffset = ANIM.SWITCH_SLIDE_PX * ANIM.SWITCH_SLIDE_FRAMES;
+    const totalOffset = ANIM.SWITCH_SLIDE_PX * this.scaledFrameCount(ANIM.SWITCH_SLIDE_FRAMES);
 
     // Generate slide frames from offset to 0 (right-to-left shift decreasing)
-    for (let f = ANIM.SWITCH_SLIDE_FRAMES; f >= 1; f--) {
+    for (let f = this.scaledFrameCount(ANIM.SWITCH_SLIDE_FRAMES); f >= 1; f--) {
       if (this.cancelled) return;
       const offset = ANIM.SWITCH_SLIDE_PX * f;
       // Negative offset = sprite appears shifted left, sliding right
       const shifted = shiftSpriteBmp(finalSprite, -offset, size);
       await updateImg(shifted);
-      await this.delay(ANIM.SWITCH_FRAME_MS);
+      await this.scaledDelay(ANIM.SWITCH_FRAME_MS);
     }
 
     // Final frame: sprite at home position
@@ -487,7 +503,7 @@ export class AnimationEngine {
     for (const frame of frames) {
       if (this.cancelled) return;
       await updateImg(frame);
-      await this.delay(ANIM.SWITCH_FRAME_MS);
+      await this.scaledDelay(ANIM.SWITCH_FRAME_MS);
     }
 
     // Ensure sprite caching finished before slide-in
@@ -498,12 +514,12 @@ export class AnimationEngine {
     if (!finalSprite) return;
 
     const size = SPRITE_CONFIG.SIZE;
-    for (let f = ANIM.SWITCH_SLIDE_FRAMES; f >= 1; f--) {
+    for (let f = this.scaledFrameCount(ANIM.SWITCH_SLIDE_FRAMES); f >= 1; f--) {
       if (this.cancelled) return;
       const offset = ANIM.SWITCH_SLIDE_PX * f;
       const shifted = shiftSpriteBmp(finalSprite, -offset, size);
       await updateImg(shifted);
-      await this.delay(ANIM.SWITCH_FRAME_MS);
+      await this.scaledDelay(ANIM.SWITCH_FRAME_MS);
     }
 
     if (!this.cancelled) {
@@ -536,7 +552,7 @@ export class AnimationEngine {
 
     if (healAmount <= 0) return; // No healing occurred
 
-    const steps = Math.min(healAmount, ANIM.MAX_HP_STEPS);
+    const steps = Math.min(healAmount, this.scaledFrameCount(ANIM.MAX_HP_STEPS));
 
     for (let i = 0; i <= steps; i++) {
       if (this.cancelled) break;
@@ -551,13 +567,28 @@ export class AnimationEngine {
 
       setHpStatus(formatHpBar(tempMon));
       await triggerUpdate();
-      await this.delay(ANIM.HP_FRAME_MS);
+      await this.scaledDelay(ANIM.HP_FRAME_MS);
     }
   }
 
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  /** Instantly swap a side's sprite to a new image (no animation). */
+  private async swapSprite(
+    side: Side,
+    sprite: Uint8Array,
+    glass: GlassAdapter,
+  ): Promise<void> {
+    const containerID = side === 'opponent'
+      ? CONTAINER_IDS.oppSprite
+      : CONTAINER_IDS.playerSprite;
+    const containerName = side === 'opponent'
+      ? CONTAINER_NAMES.oppSprite
+      : CONTAINER_NAMES.playerSprite;
+    await glass.updateImage(containerID, containerName, sprite);
+  }
 
   /** Find which side a fainted Pokemon belongs to by name match. */
   private findFaintedSide(pokemonName: string, state: BattleState): Side | null {
@@ -568,6 +599,19 @@ export class AnimationEngine {
     if (oppMon.name === pokemonName) return 'opponent';
 
     return null;
+  }
+
+  /** Speed-scaled delay. Multiplies base ms by SpeedConfig.multiplier().
+   *  When multiplier is 0 (Instant), resolves immediately. */
+  private scaledDelay(baseMs: number): Promise<void> {
+    return this.delay(baseMs * SpeedConfig.multiplier());
+  }
+
+  /** Speed-scaled frame count. Returns 0 for Instant, rounded for other speeds. */
+  private scaledFrameCount(baseCount: number): number {
+    const m = SpeedConfig.multiplier();
+    if (m === 0) return 0;
+    return Math.max(1, Math.round(baseCount * m));
   }
 
   /** Cancellation-aware delay. Resolves immediately if cancelled. */
