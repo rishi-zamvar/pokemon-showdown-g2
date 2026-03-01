@@ -10,18 +10,17 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 ## Current Position
 
 Phase: 7 — Speed Config & Model Foundation
-Plan: —
-Status: Roadmap created, ready for phase planning
-Last activity: 2026-03-01 — v1.1 roadmap created (Phases 7-11)
+Plan: 1 of ? (07-01 complete)
+Status: In progress
+Last activity: 2026-03-01 — Completed 07-01-PLAN.md (SpeedConfig singleton + main menu wiring)
 
 ```
 Milestone v1.1 Progress:
-[          ] Phase 7  Speed Config & Model Foundation
+[█         ] Phase 7  Speed Config & Model Foundation (07-01 done)
 [          ] Phase 8  Animation Polish
 [          ] Phase 9  Navigation & HUD Consolidation
 [          ] Phase 10 Overlay HUD Layouts
 [          ] Phase 11 Stats Screen
-0% complete
 ```
 
 ## Performance Metrics
@@ -148,6 +147,9 @@ Key findings from research (2026-03-01):
 - [v1.1]: Stats screen needs BattleState type changes (statStages map, ability fields on ActivePokemon)
 - [v1.1]: Attack lunge reuses existing shiftSpriteBmp() — no new BMP primitives needed
 - [v1.1]: SpeedConfig is a mutable module-level singleton — imported by AnimationEngine and ScreenController
+- [07-01]: SpeedConfig cycle order: ['Normal', 'Fast', 'Instant', 'Slow'] — index wrapping, resets to Normal on app restart
+- [07-01]: About/Credits uses showText() directly then state stays MAIN_MENU — no new screen type needed
+- [07-01]: Battle Speed cursorIndex=1 preserved after cycle so highlighted item stays visible after tap
 
 ### Pending Todos
 
@@ -173,6 +175,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-01T00:00:00Z
-Stopped at: v1.1 roadmap created (Phases 7-11)
+Last session: 2026-03-01T21:05:35Z
+Stopped at: Completed 07-01-PLAN.md (SpeedConfig singleton + main menu wiring)
 Resume file: None
