@@ -67,16 +67,69 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **AI-04**: AI uses Terastallization when it would flip a bad matchup
 - [ ] **AI-05**: AI makes decisions within one turn cycle (no noticeable delay)
 
-## Future Requirements (v0.2+)
+## v1.1 Requirements
 
-### Enhanced Mechanics
+Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 
-- **MECH-01**: Abilities with passive effects (Levitate, Intimidate, etc.)
-- **MECH-02**: Held items with battle effects
-- **MECH-03**: Weather conditions (sun, rain, sandstorm, hail)
-- **MECH-04**: Entry hazards (Stealth Rock, Spikes, Toxic Spikes)
-- **MECH-05**: Priority moves (Quick Attack, Extreme Speed)
-- **MECH-06**: Multi-hit moves, recoil moves, draining moves
+### Navigation Redesign
+
+- [ ] **NAV2-01**: Remove "< Back" from all list screens — double-tap is the only back gesture
+- [ ] **NAV2-02**: Double-tap gesture distinguished from single-tap with proper timing
+- [ ] **NAV2-03**: Double-tap navigates back from any sub-screen to its parent
+- [ ] **NAV2-04**: Forced-switch screens block back navigation (cannot escape when Pokemon fainted)
+
+### Main Menu Enhancement
+
+- [ ] **MENU-01**: Main menu includes "Battle Speed" option that opens speed preset selector
+- [ ] **MENU-02**: Battle speed presets: Slow (0.5x), Normal (1x), Fast (2x), Instant (skip)
+- [ ] **MENU-03**: Selected speed persists across battles within the session
+
+### Battle HUD Consolidation
+
+- [ ] **HUD-01**: Battle HUD shows Attack/Switch/Tera as selectable list items (one tap to reach moves)
+- [ ] **HUD-02**: "Back to Menu" option at bottom of battle HUD list
+- [ ] **HUD-03**: Eliminate separate ACTION_MENU screen entirely
+- [ ] **HUD-04**: Tera option disabled/grayed after use (shows "Tera (used)")
+
+### Attack Screen Redesign
+
+- [ ] **ATK-01**: Attack select screen keeps HP bars visible for both Pokemon
+- [ ] **ATK-02**: Attack select screen keeps sprites visible for both Pokemon
+- [ ] **ATK-03**: Move list positioned in lower portion of screen with battle info above
+
+### Switch Screen Redesign
+
+- [ ] **SWT-01**: Switch select screen keeps HP bars visible for both Pokemon
+- [ ] **SWT-02**: Switch select screen keeps sprites visible for both Pokemon
+- [ ] **SWT-03**: Team list shows Pokemon with HP% alongside battle context
+
+### Tera Simplification
+
+- [ ] **TERA-01**: Selecting Tera from battle HUD queues it and goes directly to attack select
+- [ ] **TERA-02**: Visual notifier shows "Tera queued" on attack select when tera is active
+- [ ] **TERA-03**: Eliminate TERA_CONFIRM screen entirely
+
+### Animation Polish
+
+- [ ] **ANIM-01**: Battle animation text displayed inside a text box (bordered frame)
+- [ ] **ANIM-02**: Attacking Pokemon sprite moves toward target (lunge animation) before hit effect
+- [ ] **ANIM-03**: All animation timing scales with battle speed setting
+- [ ] **ANIM-04**: Instant speed mode skips animations and dumps text immediately
+
+### Stats Screen
+
+- [ ] **STAT-01**: Stats screen accessible from battle HUD (new screen type)
+- [ ] **STAT-02**: Shows player Pokemon's current stats with modifier adjustments (+1 Atk, -2 Def, etc.)
+- [ ] **STAT-03**: Shows player Pokemon's ability and status conditions
+- [ ] **STAT-04**: Shows opponent Pokemon's speed range (min-max for randbats set)
+- [ ] **STAT-05**: Shows opponent Pokemon's possible abilities (if not yet revealed, show all options)
+
+### Code Optimization
+
+- [ ] **OPT-01**: Remove dead code from v0.1 (old BattleEngine, DamageCalc, StatusEngine files)
+- [ ] **OPT-02**: Remove TERA_CONFIRM and ACTION_MENU screen types and renderers
+
+## Future Requirements (v2.0+)
 
 ### Enhanced AI
 
@@ -88,21 +141,21 @@ Requirements for initial release. Each maps to roadmap phases.
 - **UI-11**: Battle animations on phone companion
 - **UI-12**: Move effectiveness indicator before selecting
 - **UI-13**: Battle history/log scrollable on phone
+- **UI-14**: Damage estimate on move hover
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Online multiplayer | v0.1 is single-player vs AI only |
+| Online multiplayer | Single-player vs AI only |
 | Custom team building | Random battles only — no teambuilder |
 | Sound effects | G2 glasses have no speaker |
-| Full Showdown simulator (@pkmn/sim) | Too heavy (5-10MB), needs Node polyfills |
-| Abilities | Complex interactions, defer to v0.2 |
-| Held items | Requires ability system for many items |
-| Weather/terrain | Requires multi-turn state tracking |
-| Entry hazards | Requires layer-counting state |
-| Stellar Tera type | Edge case, defer to v0.2 |
-| Sprites on glasses display | SDK only supports text/list containers |
+| Scrollable battle log history | G2 firmware scroll controls list nav; turn result screen already shows log |
+| Type-color-coded move buttons | G2 is monochrome — type shown as text |
+| Animated move effects (thunderbolts, fire) | No GPU layer; sprite-level BMP only |
+| Exact HP numbers for opponent | Intentionally hidden in randbats format |
+| Damage calculator | Requires unknown opponent EVs/IVs/nature |
+| Team preview screen | Randbats format doesn't use team preview |
 
 ## Traceability
 
@@ -152,10 +205,11 @@ Requirements for initial release. Each maps to roadmap phases.
 | AI-05 | Phase 4 | Complete |
 
 **Coverage:**
-- v0.1 requirements: 42 total (note: prior count of 38 was pre-BATTLE-09 through 12 addition)
-- Mapped to phases: 42
-- Unmapped: 0
+- v0.1 requirements: 42 total — all Complete
+- v1.1 requirements: 25 total — Pending (awaiting roadmap)
+- Mapped to phases: 42 (v0.1) + 0 (v1.1)
+- Unmapped: 25
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 — traceability updated after roadmap creation*
+*Last updated: 2026-03-01 — v1.1 requirements added for UI Enhancement milestone*
