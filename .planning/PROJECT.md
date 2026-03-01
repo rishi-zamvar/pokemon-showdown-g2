@@ -8,19 +8,23 @@ A Pokemon Showdown random battle simulator for Even Realities G2 smart glasses. 
 
 Players can play a complete random battle on their G2 glasses with attack, switch, and Terastallize options — using real Pokemon Showdown data and mechanics.
 
-## Current Milestone: v0.1 Random Battle Simulator
+## Current Milestone: v1.1 UI Enhancement & Polish
 
-**Goal:** Build a fully playable 6v6 random battle against AI on G2 glasses, pulling all game data from Pokemon Showdown's public repos.
+**Goal:** Make the battle experience cleaner, faster, and closer to Pokemon Showdown — redesigned screens, consolidated menus, animation polish, stats viewer, and speed controls.
 
 **Target features:**
-- Main menu screen with "Enter Battle" option
-- Random team generation (all generations) for player and AI
-- Battle display: both Pokemon names, HP percentages, 8-bit sprites
-- Attack selection from 4 moves (vertical list)
-- Pokemon switch screen showing full team
-- Terastallization option
-- Gesture navigation: swipe up/down to scroll, tap to select, double-tap to go back
-- AI opponent that makes random/semi-intelligent move choices
+- Main menu with battle speed control and additional options
+- Remove back buttons from all screens (double-tap only navigation)
+- Battle animation text displayed in a box
+- Attack/Switch/Tera menu on main battle screen (one less navigation level)
+- Attack screen preserves HP bars, sprites, Pokemon visibility
+- Switch screen preserves HP bars, sprites, Pokemon visibility
+- Tera selection without confirmation screen (notifier only)
+- Pokemon attack movement animation
+- Stats screen showing abilities, status conditions, stat modifiers, opponent speed range, possible abilities
+- Battle speed menu controlling animation speed and text streaming speed
+- Back to main menu option at bottom of menu screen
+- Code optimization pass
 
 ## Requirements
 
@@ -32,30 +36,41 @@ Players can play a complete random battle on their G2 glasses with attack, switc
 - ✓ Build toolchain (Vite, TypeScript, Even Hub SDK) — existing
 - ✓ Pokemon Showdown data files downloaded (pokedex, moves, learnsets, typechart, abilities, items) — existing
 - ✓ Gen 1 sprite directory structure created — existing
+- ✓ Main menu with "Enter Battle" entry point — v0.1
+- ✓ Random team generation using @pkmn/randoms (all gens) — v0.1
+- ✓ Battle state engine via @pkmn/sim (turns, damage, fainting, switching) — v0.1
+- ✓ Battle HUD showing both Pokemon, names, HP%, sprites — v0.1
+- ✓ 8-bit sprites rendered on glasses display — v0.1
+- ✓ Attack selection screen (4 moves, vertical list) — v0.1
+- ✓ Switch Pokemon screen (full team, vertical list) — v0.1
+- ✓ Terastallization mechanic — v0.1
+- ✓ AI opponent logic (random with tera heuristic) — v0.1
+- ✓ Gesture navigation: swipe scroll, tap select, double-tap back — v0.1
+- ✓ Win/loss detection and battle end screen — v0.1
+- ✓ Battle animations: typewriter text, sprite flash, HP drain — v0.1
+- ✓ Switch animation (pokeball → green square → checkbox) — v0.1
+- ✓ Complete protocol text coverage (~30+ message types) — v0.1
 
 ### Active
 
-- [ ] Main menu with "Enter Battle" entry point
-- [ ] Random team generation using Showdown data (all gens)
-- [ ] Battle state engine (turns, damage calc, fainting, switching)
-- [ ] Battle HUD showing both Pokemon, names, HP%
-- [ ] 8-bit sprites rendered on glasses display
-- [ ] Attack selection screen (4 moves, vertical list)
-- [ ] Switch Pokemon screen (full team, vertical list)
-- [ ] Terastallization mechanic
-- [ ] AI opponent logic
-- [ ] Gesture navigation: swipe scroll, tap select, double-tap back
-- [ ] Win/loss detection and battle end screen
+- [ ] Redesigned main menu with speed controls and options
+- [ ] Remove back buttons, double-tap only navigation
+- [ ] Battle animation text in a box
+- [ ] Consolidated battle menu (Attack/Switch/Tera on main HUD)
+- [ ] Attack screen with HP bars, sprites, and Pokemon visible
+- [ ] Switch screen with HP bars, sprites, and Pokemon visible
+- [ ] Tera without confirmation (notifier only)
+- [ ] Pokemon attack movement animation
+- [ ] Stats screen (abilities, statuses, modifiers, opponent info)
+- [ ] Battle speed control (animation + text streaming)
+- [ ] Back to main menu at bottom of battle menu
+- [ ] Code optimization
 
 ### Out of Scope
 
-- Online multiplayer — v0.1 is single-player vs AI only
+- Online multiplayer — single-player vs AI only
 - Custom team building — random battles only
-- Animations/transitions — G2 display is text/list only
 - Sound effects — G2 glasses have no speaker
-- Move effects beyond damage (status conditions, stat changes) — defer to v0.2
-- Abilities — defer to v0.2
-- Items/held items — defer to v0.2
 
 ## Context
 

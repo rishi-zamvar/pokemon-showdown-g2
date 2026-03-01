@@ -5,16 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Phase 6 — Integration (full loop from main menu to win/loss on device).
+**Current focus:** Milestone v1.1 — UI Enhancement & Polish
 
 ## Current Position
 
-Phase: 6 of 6 (Integration)
-Plan: Not started
-Status: Phase 5.3 complete, ready for Phase 6
-Last activity: 2026-02-27 — Completed Phase 5.3 (Switch Animation & Text Polish)
-
-Progress: [█████████████████████████] ~92% (27/~29 plans complete — 3 Phase 1 + 2 Phase 2 + 4 Phase 3 + 1 Phase 4 + 3 Phase 5 + 3 Phase 5.1 + 3 Phase 5.2 + 8 Phase 5.3)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.1
+Last activity: 2026-03-01 — Milestone v1.1 started
 
 ## Performance Metrics
 
