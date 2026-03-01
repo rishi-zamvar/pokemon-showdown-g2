@@ -22,7 +22,7 @@ v1.1 (UI Enhancement & Polish) adds five more phases (7-11) that transform the b
 - [x] **Phase 5.3: Switch Animation & Text Polish** (INSERTED) - Switch animation, complete protocol text, HUD volatiles
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
 - [x] **Phase 7: Speed Config & Model Foundation** - SpeedConfig singleton, battle speed menu, BattleState data model extensions, dead code removal
-- [ ] **Phase 8: Animation Polish** - Text box frame, lunge animation, speed-scaled timing, instant skip
+- [x] **Phase 8: Animation Polish** - Text box frame, lunge animation, speed-scaled timing, instant skip
 - [ ] **Phase 9: Navigation & HUD Consolidation** - Double-tap back gesture, merged battle HUD, Tera simplification
 - [ ] **Phase 10: Overlay HUD Layouts** - Attack and switch screens with persistent sprites and HP bars
 - [ ] **Phase 11: Stats Screen** - New stats screen showing stat stages, ability, opponent speed range, possible abilities
@@ -223,8 +223,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Speed scaling + Instant mode (wire SpeedConfig into AnimationEngine timing)
-- [ ] 08-02-PLAN.md — Text box frame + lunge animation (bordered text display, contact move sprite shift)
+- [x] 08-01-PLAN.md — Speed scaling + Instant mode (wire SpeedConfig into AnimationEngine timing)
+- [x] 08-02-PLAN.md — Text box frame + lunge animation (bordered text display, contact move sprite shift)
 ### Phase 9: Navigation & HUD Consolidation
 **Goal**: Double-tap navigates back throughout the app; the battle HUD is a unified action list with Attack/Switch/Tera/Stats/Back; ACTION_MENU and TERA_CONFIRM screens are gone; Tera queues directly into attack select
 **Depends on**: Phase 7 (needs OPT-02 clean-up from Phase 7 so removed screen types don't conflict)
@@ -278,8 +278,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 | 5.2 @pkmn/sim Integration | 3/3 | Complete | 2026-02-27 |
 | 5.3 Switch Animation & Text Polish | 8/8 | Complete | 2026-02-27 |
 | 6. Integration | 0/2 | Not started | - |
-| 7. Speed Config & Model Foundation | 0/3 | Not started | - |
-| 8. Animation Polish | 0/2 | Not started | - |
+| 7. Speed Config & Model Foundation | 3/3 | Complete | 2026-03-01 |
+| 8. Animation Polish | 2/2 | Complete | 2026-03-02 |
 | 9. Navigation & HUD Consolidation | 0/TBD | Not started | - |
 | 10. Overlay HUD Layouts | 0/TBD | Not started | - |
 | 11. Stats Screen | 0/TBD | Not started | - |

@@ -208,10 +208,10 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 | MENU-03 | Phase 7 | Complete |
 | OPT-01 | Phase 7 | Complete |
 | OPT-02 | Phase 7 | Complete |
-| ANIM-01 | Phase 8 | Pending |
-| ANIM-02 | Phase 8 | Pending |
-| ANIM-03 | Phase 8 | Pending |
-| ANIM-04 | Phase 8 | Pending |
+| ANIM-01 | Phase 8 | Complete |
+| ANIM-02 | Phase 8 | Complete |
+| ANIM-03 | Phase 8 | Complete |
+| ANIM-04 | Phase 8 | Complete |
 | NAV2-01 | Phase 9 | Pending |
 | NAV2-02 | Phase 9 | Pending |
 | NAV2-03 | Phase 9 | Pending |
@@ -237,10 +237,10 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 
 **Coverage:**
 - v0.1 requirements: 42 total — all Complete
-- v1.1 requirements: 31 total — 5 Complete, 26 Pending
+- v1.1 requirements: 31 total — 9 Complete, 22 Pending
 - Mapped to phases: 42 (v0.1) + 31 (v1.1) = 73 total
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-03-01 — Phase 7 requirements marked Complete*
+*Last updated: 2026-03-02 — Phase 8 requirements marked Complete*

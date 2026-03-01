@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Milestone v1.1 — UI Enhancement & Polish (Phase 8)
+**Current focus:** Milestone v1.1 — UI Enhancement & Polish (Phase 9)
 
 ## Current Position
 
 Phase: 8 — Animation Polish — Complete
 Plan: 2/2 complete
 Status: Phase complete
-Last activity: 2026-03-01 — Completed 08-02-PLAN.md (Text Box Frame & Lunge Animation)
+Last activity: 2026-03-02 — Phase 8 complete (2 plans, 2 waves, verified 9/9)
 
 ```
 Milestone v1.1 Progress:
