@@ -17,6 +17,7 @@ import {
   CONTAINER_IDS,
   CONTAINER_NAMES,
   GLASS_LAYOUT,
+  OVERLAY_LAYOUT,
   SPRITE_CONFIG,
   TIMING,
 } from "../config/constants";
@@ -303,6 +304,82 @@ export class GlassAdapterImpl implements GlassAdapter {
   }
 
   /**
+   * Show the 4-container overlay HUD used by all decision screens.
+   *
+   * Layout (576x288 total):
+   *   C1: Team preview bar  — ImageContainer 576x24  at (0, 0)
+   *   C2: Opponent composite — ImageContainer 144x132 at (432, 24)
+   *   C3: Player composite   — ImageContainer 144x132 at (0, 156)
+   *   C4: Action list        — ListContainer  288x132 at (288, 156)
+   *
+   * BMP image data is sent sequentially after container creation.
+   * Total container count is exactly 4, within the SDK hardware limit.
+   */
+  async showOverlayHud(
+    teamBarBmp: Uint8Array,
+    oppCompositeBmp: Uint8Array,
+    playerCompositeBmp: Uint8Array,
+    listItems: string[],
+    listStatus: string,
+  ): Promise<void> {
+    // C1: Team preview bar (full-width, top strip)
+    const teamBarContainer = new ImageContainerProperty({
+      xPosition: 0,
+      yPosition: 0,
+      width: OVERLAY_LAYOUT.TEAM_BAR_W,
+      height: OVERLAY_LAYOUT.TEAM_BAR_H,
+      containerID: CONTAINER_IDS.teamBar,
+      containerName: CONTAINER_NAMES.teamBar,
+    });
+
+    // C2: Opponent composite (top-right quadrant)
+    const oppContainer = new ImageContainerProperty({
+      xPosition: OVERLAY_LAYOUT.OPP_X,
+      yPosition: OVERLAY_LAYOUT.OPP_Y,
+      width: OVERLAY_LAYOUT.COMPOSITE_W,
+      height: OVERLAY_LAYOUT.COMPOSITE_H,
+      containerID: CONTAINER_IDS.oppSprite,
+      containerName: CONTAINER_NAMES.oppSprite,
+    });
+
+    // C3: Player composite (bottom-left quadrant)
+    const playerContainer = new ImageContainerProperty({
+      xPosition: OVERLAY_LAYOUT.PLAYER_X,
+      yPosition: OVERLAY_LAYOUT.PLAYER_Y,
+      width: OVERLAY_LAYOUT.COMPOSITE_W,
+      height: OVERLAY_LAYOUT.COMPOSITE_H,
+      containerID: CONTAINER_IDS.playerSprite,
+      containerName: CONTAINER_NAMES.playerSprite,
+    });
+
+    // C4: Selectable action list (bottom-right quadrant)
+    const listContainer = new ListContainerProperty({
+      xPosition: OVERLAY_LAYOUT.LIST_X,
+      yPosition: OVERLAY_LAYOUT.LIST_Y,
+      width: OVERLAY_LAYOUT.LIST_W,
+      height: OVERLAY_LAYOUT.LIST_H,
+      containerID: CONTAINER_IDS.content,
+      containerName: CONTAINER_NAMES.content,
+      isEventCapture: 1,
+      itemContainer: new ListItemContainerProperty({
+        itemCount: listItems.length,
+        itemName: listItems,
+        isItemSelectBorderEn: 1,
+      }),
+    });
+
+    await this.renderContainers({
+      imageObject: [teamBarContainer, oppContainer, playerContainer],
+      listObject: [listContainer],
+    });
+
+    // Send BMP image data sequentially after container creation
+    await this.sendBmpData(CONTAINER_IDS.teamBar, CONTAINER_NAMES.teamBar, teamBarBmp);
+    await this.sendBmpData(CONTAINER_IDS.oppSprite, CONTAINER_NAMES.oppSprite, oppCompositeBmp);
+    await this.sendBmpData(CONTAINER_IDS.playerSprite, CONTAINER_NAMES.playerSprite, playerCompositeBmp);
+  }
+
+  /**
    * Update a sprite image in-place without rebuilding the page.
    *
    * Calls the SDK's updateImageRawData directly on the existing container.
@@ -493,6 +570,23 @@ export class GlassAdapterImpl implements GlassAdapter {
 
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /** Send BMP image data to an existing image container via updateImageRawData. */
+  private async sendBmpData(
+    containerID: number,
+    containerName: string,
+    bmpData: Uint8Array,
+  ): Promise<void> {
+    if (!this.bridge) return;
+    console.log(`[GlassAdapter] sendBmpData container=${containerName} size=${bmpData.length}B`);
+    await this.bridge.updateImageRawData(
+      new ImageRawDataUpdate({
+        containerID,
+        containerName,
+        imageData: bmpData,
+      }),
+    );
   }
 
   private async waitForBridge(): Promise<EvenAppBridge> {
