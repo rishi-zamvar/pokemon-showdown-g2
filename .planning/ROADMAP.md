@@ -24,7 +24,7 @@ v1.1 (UI Enhancement & Polish) adds five more phases (7-11) that transform the b
 - [x] **Phase 7: Speed Config & Model Foundation** - SpeedConfig singleton, battle speed menu, BattleState data model extensions, dead code removal
 - [x] **Phase 8: Animation Polish** - Text box frame, lunge animation, speed-scaled timing, instant skip
 - [x] **Phase 9: Navigation & HUD Consolidation** - Double-tap back gesture, merged battle HUD, Tera simplification
-- [ ] **Phase 10: Overlay HUD Layouts** - Attack and switch screens with persistent sprites and HP bars
+- [x] **Phase 10: Overlay HUD Layouts** - Attack and switch screens with persistent sprites and HP bars
 - [ ] **Phase 11: Stats Screen** - New stats screen showing stat stages, ability, opponent speed range, possible abilities
 
 ## Phase Details
@@ -256,8 +256,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 10-01-PLAN.md — CompositeBuilder module, OVERLAY_LAYOUT constants, showOverlayHud adapter method
-- [ ] 10-02-PLAN.md — ScreenController overlay wiring, composite caching, pre-computation, opponent reveal tracking
+- [x] 10-01-PLAN.md — CompositeBuilder module, OVERLAY_LAYOUT constants, showOverlayHud adapter method
+- [x] 10-02-PLAN.md — ScreenController overlay wiring, composite caching, pre-computation, opponent reveal tracking
 
 ### Phase 11: Stats Screen
 **Goal**: Players can open a stats screen from the battle HUD that shows their active Pokemon's stat stages, ability, status, and the opponent's speed range and possible abilities
@@ -290,7 +290,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 | 7. Speed Config & Model Foundation | 3/3 | Complete | 2026-03-01 |
 | 8. Animation Polish | 2/2 | Complete | 2026-03-02 |
 | 9. Navigation & HUD Consolidation | 2/2 | Complete | 2026-03-02 |
-| 10. Overlay HUD Layouts | 0/2 | Not started | - |
+| 10. Overlay HUD Layouts | 2/2 | Complete | 2026-03-02 |
 | 11. Stats Screen | 0/TBD | Not started | - |
 
 ---

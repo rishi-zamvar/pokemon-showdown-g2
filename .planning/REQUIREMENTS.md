@@ -93,15 +93,15 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 
 ### Attack Screen Redesign
 
-- [ ] **ATK-01**: Attack select screen keeps HP bars visible for both Pokemon
-- [ ] **ATK-02**: Attack select screen keeps sprites visible for both Pokemon
-- [ ] **ATK-03**: Move list positioned in lower portion of screen with battle info above
+- [x] **ATK-01**: Attack select screen keeps HP bars visible for both Pokemon
+- [x] **ATK-02**: Attack select screen keeps sprites visible for both Pokemon
+- [x] **ATK-03**: Move list positioned in lower portion of screen with battle info above
 
 ### Switch Screen Redesign
 
-- [ ] **SWT-01**: Switch select screen keeps HP bars visible for both Pokemon
-- [ ] **SWT-02**: Switch select screen keeps sprites visible for both Pokemon
-- [ ] **SWT-03**: Team list shows Pokemon with HP% alongside battle context
+- [x] **SWT-01**: Switch select screen keeps HP bars visible for both Pokemon
+- [x] **SWT-02**: Switch select screen keeps sprites visible for both Pokemon
+- [x] **SWT-03**: Team list shows Pokemon with HP% alongside battle context
 
 ### Tera Simplification
 
@@ -223,12 +223,12 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 | TERA-01 | Phase 9 | Complete |
 | TERA-02 | Phase 9 | Complete |
 | TERA-03 | Phase 9 | Complete |
-| ATK-01 | Phase 10 | Pending |
-| ATK-02 | Phase 10 | Pending |
-| ATK-03 | Phase 10 | Pending |
-| SWT-01 | Phase 10 | Pending |
-| SWT-02 | Phase 10 | Pending |
-| SWT-03 | Phase 10 | Pending |
+| ATK-01 | Phase 10 | Complete |
+| ATK-02 | Phase 10 | Complete |
+| ATK-03 | Phase 10 | Complete |
+| SWT-01 | Phase 10 | Complete |
+| SWT-02 | Phase 10 | Complete |
+| SWT-03 | Phase 10 | Complete |
 | STAT-01 | Phase 11 | Pending |
 | STAT-02 | Phase 11 | Pending |
 | STAT-03 | Phase 11 | Pending |
