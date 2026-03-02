@@ -14,14 +14,20 @@ export function renderSwitchSelect(
   forced: boolean,
 ): SwitchListScreen {
   const side = state.playerSide;
-  const items: string[] = ['< Back'];
+  const items: string[] = [];
   const indexMap: number[] = [];
 
   for (let i = 0; i < side.team.length; i++) {
     // Skip current active and fainted Pokemon
     if (i === side.activeIndex) continue;
     const mon = side.team[i]!;
-    if (mon.fainted) continue;
+
+    if (mon.fainted) {
+      const name = mon.name.slice(0, 12);
+      items.push(`${name} 0% (fainted)`);
+      indexMap.push(-1); // sentinel: non-selectable
+      continue;
+    }
 
     const name = mon.name.slice(0, 12);
     const hpPct = Math.max(1, Math.round((mon.currentHp / mon.stats.hp) * 100));

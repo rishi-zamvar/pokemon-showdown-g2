@@ -38,13 +38,13 @@ export interface ScreenState {
 // Renderer return types
 // ---------------------------------------------------------------------------
 
-/** Battle HUD screen -- opponent and player info with optional sprite data. */
+/** Battle HUD screen -- opponent and player info with optional BMP sprite data. */
 export interface BattleHudScreen {
   oppText: string;
   playerText: string;
   status: { left: string; right: string };
-  oppSprite?: string;
-  playerSprite?: string;
+  oppSprite?: Uint8Array;
+  playerSprite?: Uint8Array;
 }
 
 /** Text screen -- static content with a two-part status bar. */
@@ -61,7 +61,7 @@ export interface ListScreen {
 
 /**
  * Extended list screen that maps display index to team index.
- * indexMap[displayIndex - 1] = team index (offset -1 because index 0 is "< Back")
+ * indexMap[displayIndex] = team index (direct mapping, no offset)
  */
 export interface SwitchListScreen extends ListScreen {
   indexMap: number[];

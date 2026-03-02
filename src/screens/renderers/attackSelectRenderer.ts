@@ -12,7 +12,7 @@ import { DISPLAY_BUDGET } from '../../config/constants.js';
 
 export function renderAttackSelect(state: BattleState): ListScreen {
   const mon = state.playerSide.team[state.playerSide.activeIndex]!;
-  const items: string[] = ['< Back'];
+  const items: string[] = [];
 
   for (const slug of mon.moves) {
     const moveData = DataLoader.getMove(slug);
