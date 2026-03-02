@@ -15,10 +15,8 @@ import type { BattleState } from '../types/battleState.js';
 export type ScreenName =
   | 'MAIN_MENU'
   | 'BATTLE_HUD'
-  | 'ACTION_MENU'
   | 'ATTACK_SELECT'
   | 'SWITCH_SELECT'
-  | 'TERA_CONFIRM'
   | 'TURN_RESULT'
   | 'END_SCREEN'
   | 'SPRITE_REFRESH'

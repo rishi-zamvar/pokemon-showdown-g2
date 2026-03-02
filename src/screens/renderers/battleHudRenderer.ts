@@ -9,7 +9,7 @@
  */
 
 import type { BattleState, ActivePokemon } from '../../types/battleState.js';
-import type { BattleHudScreen } from '../ScreenState.js';
+import type { BattleHudScreen, ListScreen } from '../ScreenState.js';
 import { SpriteService } from '../../sprites/SpriteService.js';
 import { DataLoader } from '../../data/DataLoader.js';
 
@@ -20,7 +20,7 @@ export function formatHpBar(mon: ActivePokemon): string {
   const hpPct = mon.fainted
     ? 0
     : Math.max(1, Math.round((mon.currentHp / mon.stats.hp) * 100));
-  const filled = Math.round((hpPct / 100) * HP_BAR_WIDTH);
+  const filled = hpPct > 0 ? Math.max(1, Math.round((hpPct / 100) * HP_BAR_WIDTH)) : 0;
   const empty = HP_BAR_WIDTH - filled;
   return `[${'█'.repeat(filled)}${'░'.repeat(empty)}] ${hpPct}%`;
 }
@@ -92,6 +92,41 @@ function getDexNum(species: string): number {
   }
 
   return 0;
+}
+
+/**
+ * Render the battle HUD as a selectable action list.
+ * Shown during player decision phase via ScreenController.render() BATTLE_HUD case.
+ *
+ * Items (in order):
+ *   0: "Attack" -- always selectable
+ *   1: "Switch" or "Switch (trapped)" -- trapped shown but blocked in controller
+ *   2: Tera option -- "Terastallize", "Tera (used)", or "Tera (active)"
+ *   3: "Stats" -- no-op until Phase 11
+ *
+ * NOTE: The sprite HUD (renderBattleHud) is a SEPARATE render path called directly
+ * by resolveTurn/resolveSwitch during animation sequences, NOT via render().
+ */
+export function renderBattleHudActions(state: BattleState, isTrapped: boolean): ListScreen {
+  const activeMon = state.playerSide.team[state.playerSide.activeIndex]!;
+
+  // Switch item
+  const switchItem = isTrapped ? 'Switch (trapped)' : 'Switch';
+
+  // Tera item
+  let teraItem: string;
+  if (state.playerSide.teraUsed) {
+    teraItem = 'Tera (used)';
+  } else if (activeMon.teraActive) {
+    teraItem = 'Tera (active)';
+  } else {
+    teraItem = 'Terastallize';
+  }
+
+  return {
+    items: ['Attack', switchItem, teraItem, 'Stats'],
+    status: 'Choose action',
+  };
 }
 
 export function renderBattleHud(state: BattleState): BattleHudScreen {
