@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 8 — Animation Polish — Complete
-Plan: 2/2 complete
-Status: Phase complete
-Last activity: 2026-03-02 — Phase 8 complete (2 plans, 2 waves, verified 9/9)
+Phase: 9 — Navigation & HUD Consolidation — In progress
+Plan: 1/2 complete
+Status: In progress
+Last activity: 2026-03-02 — Completed 09-01-PLAN.md (Gesture Foundation & Renderer Cleanup)
 
 ```
 Milestone v1.1 Progress:
 [██        ] Phase 7  Speed Config & Model Foundation ✓
 [██        ] Phase 8  Animation Polish ✓
-[          ] Phase 9  Navigation & HUD Consolidation
+[█         ] Phase 9  Navigation & HUD Consolidation (1/2)
 [          ] Phase 10 Overlay HUD Layouts
 [          ] Phase 11 Stats Screen
-40% complete
+44% complete
 ```
 
 ## Performance Metrics
@@ -147,6 +147,9 @@ Recent decisions affecting current work:
 - [08-02]: isContactMove checks flags.contact, not just category — ranged specials (Thunderbolt) skip lunge, contact specials (Grass Knot) lunge
 - [08-02]: Lunge snaps back instantly — no smooth return animation, per context decisions
 - [08-02]: lastMoveSlug tracked from MOVE_USE entries, reset at playTurn start — prevents stale cross-turn state
+- [09-01]: DOUBLE_TAP has no listIndex — double-tap is a back-navigation gesture, not a list selection; listIndex only meaningful on TAP
+- [09-01]: List renderers omit '< Back' — renderers produce only real content at 0-based indices; ScreenController handles back via DOUBLE_TAP gesture kind
+- [09-01]: indexMap[displayIndex] = teamIndex directly — -1 offset removed along with '< Back' slot 0
 
 ### v1.1 Research Context
 
@@ -189,6 +192,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-01T21:58:50Z
-Stopped at: Completed 08-02-PLAN.md (Text Box Frame & Lunge Animation) — Phase 8 complete
+Last session: 2026-03-02T11:34:34Z
+Stopped at: Completed 09-01-PLAN.md (Gesture Foundation & Renderer Cleanup)
 Resume file: None
