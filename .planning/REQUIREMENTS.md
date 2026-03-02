@@ -87,7 +87,7 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 ### Battle HUD Consolidation
 
 - [ ] **HUD-01**: Battle HUD shows Attack/Switch/Tera as selectable list items (one tap to reach moves)
-- [ ] **HUD-02**: "Back to Menu" option at bottom of battle HUD list
+- [ ] **HUD-02**: "Back to Menu" via double-tap forfeit confirmation (supersedes original "list item" spec per CONTEXT.md)
 - [ ] **HUD-03**: Eliminate separate ACTION_MENU screen entirely
 - [ ] **HUD-04**: Tera option disabled/grayed after use (shows "Tera (used)")
 
@@ -212,17 +212,17 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 | ANIM-02 | Phase 8 | Complete |
 | ANIM-03 | Phase 8 | Complete |
 | ANIM-04 | Phase 8 | Complete |
-| NAV2-01 | Phase 9 | Pending |
-| NAV2-02 | Phase 9 | Pending |
-| NAV2-03 | Phase 9 | Pending |
-| NAV2-04 | Phase 9 | Pending |
-| HUD-01 | Phase 9 | Pending |
-| HUD-02 | Phase 9 | Pending |
-| HUD-03 | Phase 9 | Pending |
-| HUD-04 | Phase 9 | Pending |
-| TERA-01 | Phase 9 | Pending |
-| TERA-02 | Phase 9 | Pending |
-| TERA-03 | Phase 9 | Pending |
+| NAV2-01 | Phase 9 | Complete |
+| NAV2-02 | Phase 9 | Complete |
+| NAV2-03 | Phase 9 | Complete |
+| NAV2-04 | Phase 9 | Complete |
+| HUD-01 | Phase 9 | Complete |
+| HUD-02 | Phase 9 | Complete |
+| HUD-03 | Phase 9 | Complete |
+| HUD-04 | Phase 9 | Complete |
+| TERA-01 | Phase 9 | Complete |
+| TERA-02 | Phase 9 | Complete |
+| TERA-03 | Phase 9 | Complete |
 | ATK-01 | Phase 10 | Pending |
 | ATK-02 | Phase 10 | Pending |
 | ATK-03 | Phase 10 | Pending |
@@ -237,10 +237,10 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 
 **Coverage:**
 - v0.1 requirements: 42 total — all Complete
-- v1.1 requirements: 31 total — 9 Complete, 22 Pending
+- v1.1 requirements: 31 total — 20 Complete, 11 Pending
 - Mapped to phases: 42 (v0.1) + 31 (v1.1) = 73 total
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-03-02 — Phase 8 requirements marked Complete*
+*Last updated: 2026-03-02 — Phase 9 requirements marked Complete*

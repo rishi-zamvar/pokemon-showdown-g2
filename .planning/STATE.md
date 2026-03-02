@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Milestone v1.1 — UI Enhancement & Polish (Phase 9)
+**Current focus:** Milestone v1.1 — UI Enhancement & Polish (Phase 10 next)
 
 ## Current Position
 

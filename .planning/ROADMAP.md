@@ -23,7 +23,7 @@ v1.1 (UI Enhancement & Polish) adds five more phases (7-11) that transform the b
 - [ ] **Phase 6: Integration** - Full loop from main menu through battle to win/loss, validated on device
 - [x] **Phase 7: Speed Config & Model Foundation** - SpeedConfig singleton, battle speed menu, BattleState data model extensions, dead code removal
 - [x] **Phase 8: Animation Polish** - Text box frame, lunge animation, speed-scaled timing, instant skip
-- [ ] **Phase 9: Navigation & HUD Consolidation** - Double-tap back gesture, merged battle HUD, Tera simplification
+- [x] **Phase 9: Navigation & HUD Consolidation** - Double-tap back gesture, merged battle HUD, Tera simplification
 - [ ] **Phase 10: Overlay HUD Layouts** - Attack and switch screens with persistent sprites and HP bars
 - [ ] **Phase 11: Stats Screen** - New stats screen showing stat stages, ability, opponent speed range, possible abilities
 
@@ -240,8 +240,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — DOUBLE_TAP gesture kind + remove "< Back" from attack/switch renderers
-- [ ] 09-02-PLAN.md — Battle HUD as action list, ScreenController refactor, screen elimination, tera toggle, trapping
+- [x] 09-01-PLAN.md — DOUBLE_TAP gesture kind + remove "< Back" from attack/switch renderers
+- [x] 09-02-PLAN.md — Battle HUD as action list, ScreenController refactor, screen elimination, tera toggle, trapping
 
 ### Phase 10: Overlay HUD Layouts
 **Goal**: The attack select and switch select screens show both Pokemon sprites and HP bars in the upper portion of the display while the move or team list occupies the lower portion
@@ -285,7 +285,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 | 6. Integration | 0/2 | Not started | - |
 | 7. Speed Config & Model Foundation | 3/3 | Complete | 2026-03-01 |
 | 8. Animation Polish | 2/2 | Complete | 2026-03-02 |
-| 9. Navigation & HUD Consolidation | 0/2 | Not started | - |
+| 9. Navigation & HUD Consolidation | 2/2 | Complete | 2026-03-02 |
 | 10. Overlay HUD Layouts | 0/TBD | Not started | - |
 | 11. Stats Screen | 0/TBD | Not started | - |
 
