@@ -43,15 +43,17 @@ const STAT_ABBREVS: Record<string, string> = {
 
 // ── Canvas management ──────────────────────────────────────────────────────
 
-let compositeCanvas: HTMLCanvasElement | null = null;
-
+/**
+ * Create a fresh canvas context for each composite render.
+ * We must NOT reuse a singleton canvas because buildAndCacheComposites
+ * runs multiple builders concurrently via Promise.all — a shared canvas
+ * gets stomped when one builder yields (await) and another resizes it.
+ */
 function getCompositeCtx(w: number, h: number): CanvasRenderingContext2D {
-  if (!compositeCanvas) {
-    compositeCanvas = document.createElement('canvas');
-  }
-  compositeCanvas.width = w;
-  compositeCanvas.height = h;
-  const ctx = compositeCanvas.getContext('2d');
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D context unavailable');
   return ctx;
 }

@@ -230,6 +230,18 @@ export class GlassAdapterImpl implements GlassAdapter {
 
     const imageContainers: ImageContainerProperty[] = [];
 
+    // Include a 1x1 off-screen teamBar container so the SDK rebuild clears
+    // any lingering teamBar image left by showOverlayHud. Without this,
+    // the team bar from the decision screen persists as green artifacts.
+    imageContainers.push(new ImageContainerProperty({
+      xPosition: 0,
+      yPosition: 0,
+      width: 1,
+      height: 1,
+      containerID: CONTAINER_IDS.teamBar,
+      containerName: CONTAINER_NAMES.teamBar,
+    }));
+
     // Opponent sprite: top-right, vertically centered in top half
     if (oppSprite) {
       const oppY = GLASS_LAYOUT.y + Math.floor((halfH - s) / 2);
@@ -274,31 +286,17 @@ export class GlassAdapterImpl implements GlassAdapter {
     const statusContainer = this.makeStatusContainer(statusText);
 
     await this.renderContainers({
-      imageObject: imageContainers.length > 0 ? imageContainers : undefined,
+      imageObject: imageContainers,
       textObject: [textContainer, statusContainer],
     });
 
     // Send BMP image data AFTER container creation (sequential — no concurrent sends)
     if (this.bridge) {
       if (oppSprite) {
-        console.log(`[GlassAdapter] sending oppSprite BMP: ${oppSprite.length} bytes`);
-        await this.bridge.updateImageRawData(
-          new ImageRawDataUpdate({
-            containerID: CONTAINER_IDS.oppSprite,
-            containerName: CONTAINER_NAMES.oppSprite,
-            imageData: oppSprite,
-          }),
-        );
+        await this.sendBmpData(CONTAINER_IDS.oppSprite, CONTAINER_NAMES.oppSprite, oppSprite);
       }
       if (playerSprite) {
-        console.log(`[GlassAdapter] sending playerSprite BMP: ${playerSprite.length} bytes`);
-        await this.bridge.updateImageRawData(
-          new ImageRawDataUpdate({
-            containerID: CONTAINER_IDS.playerSprite,
-            containerName: CONTAINER_NAMES.playerSprite,
-            imageData: playerSprite,
-          }),
-        );
+        await this.sendBmpData(CONTAINER_IDS.playerSprite, CONTAINER_NAMES.playerSprite, playerSprite);
       }
     }
   }
@@ -368,9 +366,14 @@ export class GlassAdapterImpl implements GlassAdapter {
       }),
     });
 
+    // Include an empty status text container so the SDK rebuild clears the
+    // status bar left over from showBattleHud (prevents stale green text lines).
+    const emptyStatus = this.makeStatusContainer('');
+
     await this.renderContainers({
       imageObject: [teamBarContainer, oppContainer, playerContainer],
       listObject: [listContainer],
+      textObject: [emptyStatus],
     });
 
     // Send BMP image data sequentially after container creation
