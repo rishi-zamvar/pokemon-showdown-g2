@@ -34,6 +34,7 @@ import { SpriteService } from '../sprites/SpriteService.js';
 import { blankSprite } from '../animation/SpriteEffects.js';
 import { ANIM } from '../config/constants.js';
 import { SpeedConfig } from '../config/SpeedConfig.js';
+import { buildOppComposite, buildPlayerComposite, buildTeamBar, emptyComposite, emptyTeamBarBmp } from '../sprites/CompositeBuilder.js';
 
 export class ScreenController {
   private readonly glass: GlassAdapter;
@@ -46,6 +47,12 @@ export class ScreenController {
   private forfeitPending = false;
   private playerDexNums: number[] = [];
   private opponentDexNums: number[] = [];
+  // Overlay composite caches (rebuilt after each turn/switch resolution)
+  private oppCompositeBmp: Uint8Array | null = null;
+  private playerCompositeBmp: Uint8Array | null = null;
+  private teamBarBmp: Uint8Array | null = null;
+  // Track which opponent Pokemon have been revealed (for team bar pokeball display)
+  private revealedOpponentIndices: Set<number> = new Set();
 
   constructor(glass: GlassAdapter) {
     this.glass = glass;
@@ -149,6 +156,7 @@ export class ScreenController {
           // Second double-tap: forfeit
           DataLoader.clearMatchData();
           this.forfeitPending = false;
+          this.resetCompositeCache();
           this.state = { screen: 'MAIN_MENU', cursorIndex: 0, battleState: null };
           await this.render();
         } else {
@@ -308,10 +316,12 @@ export class ScreenController {
   private async handleEndScreen(idx: number): Promise<void> {
     switch (idx) {
       case 0: // "New Battle"
+        this.resetCompositeCache();
         await this.startNewBattle();
         break;
       case 1: // "Main Menu"
         DataLoader.clearMatchData();
+        this.resetCompositeCache();
         this.state = {
           screen: 'MAIN_MENU',
           cursorIndex: 0,
@@ -441,6 +451,11 @@ export class ScreenController {
       console.log(`[SPRITES] player dex=${num} back cached=${cached ? cached.length + ' bytes BMP' : 'NULL'}`);
     }
 
+    // Build initial composites so first BATTLE_HUD render has them ready
+    this.revealedOpponentIndices.clear();
+    this.updateRevealedOpponents(battleState);
+    await this.buildAndCacheComposites(battleState);
+
     // Step 5: Play opening intro scene
     //   Order: player switch-in → opponent switch-in → abilities/weather/terrain
     if (initialLog.length > 0 && !SpeedConfig.isInstant()) {
@@ -486,6 +501,10 @@ export class ScreenController {
       battleState: result.nextState,
     };
 
+    // Pre-compute composites concurrently with animation playback
+    this.updateRevealedOpponents(result.nextState);
+    const compositesPromise = this.buildAndCacheComposites(result.nextState);
+
     // Step 1: Show battle HUD layout with sprites (uses PREVIOUS state for current HP display)
     const hudResult = renderBattleHud(prevState);
     await this.glass.showBattleHud(
@@ -503,6 +522,9 @@ export class ScreenController {
       result.nextState,
       this.glass,
     );
+
+    // Ensure composites are ready before transitioning to decision screen
+    await compositesPromise;
 
     // Instant mode: show turn result text, wait for tap to advance
     if (SpeedConfig.isInstant()) {
@@ -566,6 +588,10 @@ export class ScreenController {
       cursorIndex: 0,
     };
 
+    // Pre-compute composites concurrently with animation playback
+    this.updateRevealedOpponents(bs);
+    const compositesPromise = this.buildAndCacheComposites(bs);
+
     // Step 1: Show HUD with prevState (animation drains from correct starting HP)
     const prevHud = renderBattleHud(prevState);
     await this.glass.showBattleHud(
@@ -575,6 +601,9 @@ export class ScreenController {
 
     // Step 2: Play switch animation (completes instantly when SpeedConfig.isInstant())
     await this.animationEngine.playTurn(log, prevState, bs, this.glass);
+
+    // Ensure composites are ready before transitioning to decision screen
+    await compositesPromise;
 
     // Instant mode: show switch log text, wait for tap to advance
     if (SpeedConfig.isInstant()) {
@@ -624,6 +653,10 @@ export class ScreenController {
             cursorIndex: 0,
           };
 
+          // Pre-compute composites concurrently with animation playback
+          this.updateRevealedOpponents(result.nextState);
+          const compositesPromise = this.buildAndCacheComposites(result.nextState);
+
           // Play switch animation for opponent
           const prevHud = renderBattleHud(nextState);
           await this.glass.showBattleHud(
@@ -636,6 +669,7 @@ export class ScreenController {
             finalHud.oppText, finalHud.playerText, finalHud.status,
             finalHud.oppSprite, finalHud.playerSprite,
           );
+          await compositesPromise;
           await this.delay(ANIM.POST_ANIM_DELAY_MS);
 
           // Recurse — the new state might need further transitions
@@ -655,6 +689,32 @@ export class ScreenController {
   }
 
   // ---------------------------------------------------------------------------
+  // Composite caching helpers
+  // ---------------------------------------------------------------------------
+
+  private async buildAndCacheComposites(state: BattleState): Promise<void> {
+    const [opp, player, bar] = await Promise.all([
+      buildOppComposite(state),
+      buildPlayerComposite(state),
+      buildTeamBar(state, this.revealedOpponentIndices),
+    ]);
+    this.oppCompositeBmp = opp;
+    this.playerCompositeBmp = player;
+    this.teamBarBmp = bar;
+  }
+
+  private updateRevealedOpponents(state: BattleState): void {
+    this.revealedOpponentIndices.add(state.opponentSide.activeIndex);
+  }
+
+  private resetCompositeCache(): void {
+    this.oppCompositeBmp = null;
+    this.playerCompositeBmp = null;
+    this.teamBarBmp = null;
+    this.revealedOpponentIndices.clear();
+  }
+
+  // ---------------------------------------------------------------------------
   // Render dispatch
   // ---------------------------------------------------------------------------
 
@@ -669,7 +729,13 @@ export class ScreenController {
       case 'BATTLE_HUD': {
         const bs = this.state.battleState!;
         const result = renderBattleHudActions(bs, this.isTrapped());
-        await this.glass.showList(result.items, result.status);
+        await this.glass.showOverlayHud(
+          this.teamBarBmp ?? emptyTeamBarBmp(),
+          this.oppCompositeBmp ?? emptyComposite(),
+          this.playerCompositeBmp ?? emptyComposite(),
+          result.items,
+          result.status,
+        );
         break;
       }
       case 'ATTACK_SELECT': {
@@ -677,14 +743,26 @@ export class ScreenController {
         const items = this.teraQueued
           ? ['[TERA QUEUED]', ...result.items]
           : result.items;
-        await this.glass.showList(items, result.status);
+        await this.glass.showOverlayHud(
+          this.teamBarBmp ?? emptyTeamBarBmp(),
+          this.oppCompositeBmp ?? emptyComposite(),
+          this.playerCompositeBmp ?? emptyComposite(),
+          items,
+          result.status,
+        );
         break;
       }
       case 'SWITCH_SELECT': {
         const result = renderSwitchSelect(this.state.battleState!, this.forcedSwitch);
         this.switchIndexMap = result.indexMap;
-        const status = this.forcedSwitch ? 'MUST SWITCH' : result.status;
-        await this.glass.showList(result.items, status);
+        const listStatus = this.forcedSwitch ? 'MUST SWITCH' : result.status;
+        await this.glass.showOverlayHud(
+          this.teamBarBmp ?? emptyTeamBarBmp(),
+          this.oppCompositeBmp ?? emptyComposite(),
+          this.playerCompositeBmp ?? emptyComposite(),
+          result.items,
+          listStatus,
+        );
         break;
       }
       case 'TURN_RESULT': {
