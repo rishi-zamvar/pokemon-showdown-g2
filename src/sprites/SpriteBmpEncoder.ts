@@ -169,6 +169,15 @@ export function emptyBmp(size: number = SPRITE_CONFIG.SIZE): Uint8Array {
   return encodeBmp(pixels, size, size);
 }
 
+/**
+ * Create an empty (all black) BMP of arbitrary non-square dimensions.
+ * Used for fallback rendering when composite generation fails.
+ */
+export function emptyBmpRect(width: number, height: number): Uint8Array {
+  const pixels = new Uint8Array(width * height); // all zeros = all black
+  return encodeBmp(pixels, width, height);
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -179,4 +188,12 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
     img.src = url;
   });
+}
+
+/**
+ * Public wrapper for loadImage — allows CompositeBuilder and other modules
+ * to load PNG images from URLs for canvas compositing.
+ */
+export function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
+  return loadImage(url);
 }

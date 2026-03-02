@@ -27,6 +27,7 @@ export const CONTAINER_IDS = {
   playerSprite: 5,
   oppInfo: 6,
   playerInfo: 7,
+  teamBar: 8,
 } as const;
 
 export const CONTAINER_NAMES = {
@@ -37,6 +38,7 @@ export const CONTAINER_NAMES = {
   playerSprite: "plySpr",
   oppInfo: "oppInfo",
   playerInfo: "plyInfo",
+  teamBar: "teamBar",
 } as const;
 
 export const SPRITE_CONFIG = {
@@ -79,6 +81,25 @@ export const ANIM = {
   LUNGE_FRAMES: 2,
   /** Duration of each lunge frame (ms) -- uses base timing, speed-scaled. */
   LUNGE_FRAME_MS: 60,
+} as const;
+
+export const OVERLAY_LAYOUT = {
+  TEAM_BAR_W: 576,
+  TEAM_BAR_H: 24,
+  COMPOSITE_W: 144,
+  COMPOSITE_H: 132,
+  NAMEPLATE_H: 36,
+  SPRITE_SIZE: 96,
+  OPP_X: 432,        // 576 - 144
+  OPP_Y: 24,         // below team bar
+  PLAYER_X: 0,
+  PLAYER_Y: 156,     // 24 + 132
+  LIST_X: 288,       // right half
+  LIST_Y: 156,       // 24 + 132
+  LIST_W: 288,
+  LIST_H: 132,
+  MINI_SPRITE_SIZE: 20,
+  MINI_SLOT_W: 48,   // 288 / 6
 } as const;
 
 export const DISPLAY_BUDGET = {
