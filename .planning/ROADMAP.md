@@ -244,7 +244,7 @@ Plans:
 - [x] 09-02-PLAN.md — Battle HUD as action list, ScreenController refactor, screen elimination, tera toggle, trapping
 
 ### Phase 10: Overlay HUD Layouts
-**Goal**: The attack select and switch select screens show both Pokemon sprites and HP bars in the upper portion of the display while the move or team list occupies the lower portion
+**Goal**: All decision screens (battle HUD, attack select, switch select) use a unified 4-container overlay layout with both Pokemon sprite composites, a team preview bar, and the selectable list visible simultaneously
 **Depends on**: Phase 9 (attack/switch screens must already be consolidated before layout changes)
 **Requirements**: ATK-01, ATK-02, ATK-03, SWT-01, SWT-02, SWT-03
 **Success Criteria** (what must be TRUE):
@@ -253,7 +253,11 @@ Plans:
   3. While choosing a switch target, both Pokemon HP bars are visible above the team list
   4. While choosing a switch target, both Pokemon sprites are visible above the team list
   5. The move list and team list render in the lower portion of the screen; battle context (sprites, HP) occupies the upper portion
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — CompositeBuilder module, OVERLAY_LAYOUT constants, showOverlayHud adapter method
+- [ ] 10-02-PLAN.md — ScreenController overlay wiring, composite caching, pre-computation, opponent reveal tracking
 
 ### Phase 11: Stats Screen
 **Goal**: Players can open a stats screen from the battle HUD that shows their active Pokemon's stat stages, ability, status, and the opponent's speed range and possible abilities
@@ -286,7 +290,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 | 7. Speed Config & Model Foundation | 3/3 | Complete | 2026-03-01 |
 | 8. Animation Polish | 2/2 | Complete | 2026-03-02 |
 | 9. Navigation & HUD Consolidation | 2/2 | Complete | 2026-03-02 |
-| 10. Overlay HUD Layouts | 0/TBD | Not started | - |
+| 10. Overlay HUD Layouts | 0/2 | Not started | - |
 | 11. Stats Screen | 0/TBD | Not started | - |
 
 ---
