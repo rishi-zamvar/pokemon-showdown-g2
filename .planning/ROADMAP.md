@@ -225,8 +225,9 @@ Plans:
 Plans:
 - [x] 08-01-PLAN.md — Speed scaling + Instant mode (wire SpeedConfig into AnimationEngine timing)
 - [x] 08-02-PLAN.md — Text box frame + lunge animation (bordered text display, contact move sprite shift)
+
 ### Phase 9: Navigation & HUD Consolidation
-**Goal**: Double-tap navigates back throughout the app; the battle HUD is a unified action list with Attack/Switch/Tera/Stats/Back; ACTION_MENU and TERA_CONFIRM screens are gone; Tera queues directly into attack select
+**Goal**: Double-tap navigates back throughout the app; the battle HUD is a unified action list with Attack/Switch/Tera/Stats; ACTION_MENU and TERA_CONFIRM screens are gone; Tera queues directly into attack select
 **Depends on**: Phase 7 (needs OPT-02 clean-up from Phase 7 so removed screen types don't conflict)
 **Requirements**: NAV2-01, NAV2-02, NAV2-03, NAV2-04, HUD-01, HUD-02, HUD-03, HUD-04, TERA-01, TERA-02, TERA-03
 **Success Criteria** (what must be TRUE):
@@ -236,7 +237,11 @@ Plans:
   4. Tapping Attack or Switch on the battle HUD goes directly to that selection screen in one tap (no intermediate action menu step)
   5. After Tera is used, the battle HUD shows "Tera (used)" as a non-selectable item
   6. Selecting Tera on the battle HUD immediately opens the attack select screen with a "Tera queued" indicator visible
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — DOUBLE_TAP gesture kind + remove "< Back" from attack/switch renderers
+- [ ] 09-02-PLAN.md — Battle HUD as action list, ScreenController refactor, screen elimination, tera toggle, trapping
 
 ### Phase 10: Overlay HUD Layouts
 **Goal**: The attack select and switch select screens show both Pokemon sprites and HP bars in the upper portion of the display while the move or team list occupies the lower portion
@@ -280,7 +285,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 5.1 -> 5.2 -> 5.3 -> 6
 | 6. Integration | 0/2 | Not started | - |
 | 7. Speed Config & Model Foundation | 3/3 | Complete | 2026-03-01 |
 | 8. Animation Polish | 2/2 | Complete | 2026-03-02 |
-| 9. Navigation & HUD Consolidation | 0/TBD | Not started | - |
+| 9. Navigation & HUD Consolidation | 0/2 | Not started | - |
 | 10. Overlay HUD Layouts | 0/TBD | Not started | - |
 | 11. Stats Screen | 0/TBD | Not started | - |
 
