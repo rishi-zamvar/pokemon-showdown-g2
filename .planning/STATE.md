@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 9 — Navigation & HUD Consolidation — In progress
-Plan: 1/2 complete
-Status: In progress
-Last activity: 2026-03-02 — Completed 09-01-PLAN.md (Gesture Foundation & Renderer Cleanup)
+Phase: 9 — Navigation & HUD Consolidation — Complete
+Plan: 2/2 complete
+Status: Phase complete
+Last activity: 2026-03-02 — Completed 09-02-PLAN.md (ScreenController refactor, HUD action list, double-tap nav)
 
 ```
 Milestone v1.1 Progress:
 [██        ] Phase 7  Speed Config & Model Foundation ✓
 [██        ] Phase 8  Animation Polish ✓
-[█         ] Phase 9  Navigation & HUD Consolidation (1/2)
+[██        ] Phase 9  Navigation & HUD Consolidation ✓
 [          ] Phase 10 Overlay HUD Layouts
 [          ] Phase 11 Stats Screen
-44% complete
+56% complete
 ```
 
 ## Performance Metrics
@@ -150,6 +150,11 @@ Recent decisions affecting current work:
 - [09-01]: DOUBLE_TAP has no listIndex — double-tap is a back-navigation gesture, not a list selection; listIndex only meaningful on TAP
 - [09-01]: List renderers omit '< Back' — renderers produce only real content at 0-based indices; ScreenController handles back via DOUBLE_TAP gesture kind
 - [09-01]: indexMap[displayIndex] = teamIndex directly — -1 offset removed along with '< Back' slot 0
+- [09-02]: BATTLE_HUD dual render mode — sprite HUD (renderBattleHud) called by resolveTurn/resolveSwitch during animation; action list (renderBattleHudActions) called by render() during player decision phase
+- [09-02]: [TERA QUEUED] is a list item (not status bar) — prepended to items array; handleAttackSelect shifts moveIndex by -1 when present
+- [09-02]: Tera toggle stays on BATTLE_HUD when un-queueing — handleBattleHud calls render() without changing screen
+- [09-02]: HUD-02 superseded by CONTEXT.md — no 'Back to Menu' list item; back-to-menu is exclusively via double-tap forfeit
+- [09-02]: forfeitPending flag: first double-tap on BATTLE_HUD shows message, second double-tap forfeits; clears on any TAP or after 3s
 
 ### v1.1 Research Context
 
@@ -192,6 +197,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-02T11:34:34Z
-Stopped at: Completed 09-01-PLAN.md (Gesture Foundation & Renderer Cleanup)
+Last session: 2026-03-02T11:55:39Z
+Stopped at: Completed 09-02-PLAN.md (ScreenController refactor, HUD action list, double-tap navigation)
 Resume file: None
