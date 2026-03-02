@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 9 — Navigation & HUD Consolidation — Complete
-Plan: 2/2 complete
-Status: Phase complete
-Last activity: 2026-03-02 — Completed 09-02-PLAN.md (ScreenController refactor, HUD action list, double-tap nav)
+Phase: 10 — Overlay HUD Layouts — In Progress
+Plan: 1/? complete
+Status: In progress
+Last activity: 2026-03-02 — Completed 10-01-PLAN.md (CompositeBuilder, OVERLAY_LAYOUT constants, showOverlayHud)
 
 ```
 Milestone v1.1 Progress:
 [██        ] Phase 7  Speed Config & Model Foundation ✓
 [██        ] Phase 8  Animation Polish ✓
 [██        ] Phase 9  Navigation & HUD Consolidation ✓
-[          ] Phase 10 Overlay HUD Layouts
+[█         ] Phase 10 Overlay HUD Layouts (Plan 01 complete)
 [          ] Phase 11 Stats Screen
-56% complete
+62% complete
 ```
 
 ## Performance Metrics
@@ -155,6 +155,10 @@ Recent decisions affecting current work:
 - [09-02]: Tera toggle stays on BATTLE_HUD when un-queueing — handleBattleHud calls render() without changing screen
 - [09-02]: HUD-02 superseded by CONTEXT.md — no 'Back to Menu' list item; back-to-menu is exclusively via double-tap forfeit
 - [09-02]: forfeitPending flag: first double-tap on BATTLE_HUD shows message, second double-tap forfeits; clears on any TAP or after 3s
+- [10-01]: CompositeBuilder buildSpriteComposite is the low-level primitive; buildOppComposite/buildPlayerComposite are BattleState wrappers — DRY compositing
+- [10-01]: Stat modifiers in overlay HUD use multiplier format (0.5x, 1.5x) not stage notation (+1, -2) — more readable at a glance
+- [10-01]: teamBar container ID=8 — no collision with existing 1-7 range; sendBmpData private helper sends BMP sequentially after renderContainers
+- [10-01]: loadImageFromUrl() wraps private loadImage() — additive export, no existing callers broken
 
 ### v1.1 Research Context
 
@@ -197,6 +201,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-02T11:55:39Z
-Stopped at: Completed 09-02-PLAN.md (ScreenController refactor, HUD action list, double-tap navigation)
+Last session: 2026-03-02T12:55:12Z
+Stopped at: Completed 10-01-PLAN.md (CompositeBuilder, OVERLAY_LAYOUT constants, showOverlayHud adapter)
 Resume file: None
