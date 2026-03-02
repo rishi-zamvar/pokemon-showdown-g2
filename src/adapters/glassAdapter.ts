@@ -21,6 +21,7 @@ import {
   SPRITE_CONFIG,
   TIMING,
 } from "../config/constants";
+import { emptyTeamBarBmp } from "../sprites/CompositeBuilder";
 import type { GestureEvent, GlassAdapter, StatusBar, Unsubscribe } from "../types/contracts";
 
 /**
@@ -273,6 +274,32 @@ export class GlassAdapterImpl implements GlassAdapter {
     const statusText = `${status.left}  ${status.right}`;
     const statusContainer = this.makeStatusContainer(statusText);
 
+    // Blank out container 8 (teamBar) before rebuilding.
+    //
+    // The SDK's rebuildPageContainer does NOT remove containers that are absent
+    // from the new config — they persist on screen with their last-rendered
+    // content. showOverlayHud always includes container 8 (a 576x24 team bar
+    // image at y=0). When showBattleHud is called next (for animation), that
+    // container 8 remains visible as a green horizontal strip across the top.
+    //
+    // Fix: overwrite container 8's image data with an all-black BMP before
+    // the rebuild, effectively hiding it. We use a try/catch because this call
+    // may fail if container 8 has never been created yet (first animation before
+    // any overlay was shown) — that failure is harmless and expected.
+    if (this.bridge) {
+      try {
+        await this.bridge.updateImageRawData(
+          new ImageRawDataUpdate({
+            containerID: CONTAINER_IDS.teamBar,
+            containerName: CONTAINER_NAMES.teamBar,
+            imageData: emptyTeamBarBmp(),
+          }),
+        );
+      } catch {
+        // Container 8 doesn't exist yet — nothing to blank, safe to ignore.
+      }
+    }
+
     await this.renderContainers({
       imageObject: imageContainers.length > 0 ? imageContainers : undefined,
       textObject: [textContainer, statusContainer],
@@ -367,6 +394,29 @@ export class GlassAdapterImpl implements GlassAdapter {
         isItemSelectBorderEn: 1,
       }),
     });
+
+    // Blank out container 2 (status text bar) before rebuilding.
+    //
+    // showBattleHud includes container 2 (status text at y=256) in its config.
+    // When showOverlayHud runs next, rebuildPageContainer does NOT remove
+    // container 2 — it persists as stale status text at the bottom of the
+    // overlay. Clearing it with a zero-length textContainerUpgrade hides it.
+    // Try/catch: silently ignored if container 2 doesn't exist yet.
+    if (this.bridge) {
+      try {
+        await this.bridge.textContainerUpgrade(
+          new TextContainerUpgrade({
+            containerID: CONTAINER_IDS.status,
+            containerName: CONTAINER_NAMES.status,
+            contentOffset: 0,
+            contentLength: 0,
+            content: '',
+          }),
+        );
+      } catch {
+        // Container 2 doesn't exist yet — safe to ignore.
+      }
+    }
 
     await this.renderContainers({
       imageObject: [teamBarContainer, oppContainer, playerContainer],

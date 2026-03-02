@@ -43,15 +43,27 @@ const STAT_ABBREVS: Record<string, string> = {
 
 // ── Canvas management ──────────────────────────────────────────────────────
 
-let compositeCanvas: HTMLCanvasElement | null = null;
-
+/**
+ * Create a fresh canvas context for each composite render call.
+ *
+ * Previously this was a singleton (module-level canvas resized on each call).
+ * That caused a race condition: buildOppComposite, buildPlayerComposite, and
+ * buildTeamBar are all launched concurrently via Promise.all in
+ * ScreenController.buildAndCacheComposites. Each calls getCompositeCtx before
+ * its first `await loadImageFromUrl`, so all three resize the same canvas
+ * synchronously. The last resize (buildTeamBar: 576x24) wins. When the earlier
+ * composites resume after their awaits, they draw onto a 576x24 canvas instead
+ * of 144x132, then binarizeCanvas reads the wrong dimensions — producing an
+ * all-black output.
+ *
+ * Fix: allocate a new canvas per call. Canvas creation is cheap; the cost is
+ * dwarfed by the PNG fetch + draw + getImageData that follows.
+ */
 function getCompositeCtx(w: number, h: number): CanvasRenderingContext2D {
-  if (!compositeCanvas) {
-    compositeCanvas = document.createElement('canvas');
-  }
-  compositeCanvas.width = w;
-  compositeCanvas.height = h;
-  const ctx = compositeCanvas.getContext('2d');
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D context unavailable');
   return ctx;
 }
