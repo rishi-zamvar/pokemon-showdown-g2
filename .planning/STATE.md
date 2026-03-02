@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 10 — Overlay HUD Layouts — In Progress
-Plan: 1/? complete
-Status: In progress
-Last activity: 2026-03-02 — Completed 10-01-PLAN.md (CompositeBuilder, OVERLAY_LAYOUT constants, showOverlayHud)
+Phase: 10 — Overlay HUD Layouts — Complete
+Plan: 2/2 complete
+Status: Phase complete
+Last activity: 2026-03-02 — Completed 10-02-PLAN.md (ScreenController overlay HUD wiring)
 
 ```
 Milestone v1.1 Progress:
 [██        ] Phase 7  Speed Config & Model Foundation ✓
 [██        ] Phase 8  Animation Polish ✓
 [██        ] Phase 9  Navigation & HUD Consolidation ✓
-[█         ] Phase 10 Overlay HUD Layouts (Plan 01 complete)
+[██        ] Phase 10 Overlay HUD Layouts ✓
 [          ] Phase 11 Stats Screen
-62% complete
+75% complete
 ```
 
 ## Performance Metrics
@@ -159,6 +159,10 @@ Recent decisions affecting current work:
 - [10-01]: Stat modifiers in overlay HUD use multiplier format (0.5x, 1.5x) not stage notation (+1, -2) — more readable at a glance
 - [10-01]: teamBar container ID=8 — no collision with existing 1-7 range; sendBmpData private helper sends BMP sequentially after renderContainers
 - [10-01]: loadImageFromUrl() wraps private loadImage() — additive export, no existing callers broken
+- [10-02]: Composites built concurrently with animation via fire-and-await: const compositesPromise = buildAndCacheComposites() fires before animation, awaited after animation — maximizes parallelism
+- [10-02]: Null fallback at render call site (cache ?? emptyFallback()) — cache fields are Uint8Array | null; fallbacks are valid all-black BMPs of correct dimensions
+- [10-02]: resetCompositeCache() helper called on forfeit and both handleEndScreen branches — prevents cross-battle contamination
+- [10-02]: revealedOpponentIndices cleared at battle start before first updateRevealedOpponents() call — fresh tracking per battle
 
 ### v1.1 Research Context
 
@@ -201,6 +205,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-02T12:55:12Z
-Stopped at: Completed 10-01-PLAN.md (CompositeBuilder, OVERLAY_LAYOUT constants, showOverlayHud adapter)
+Last session: 2026-03-02T13:01:30Z
+Stopped at: Completed 10-02-PLAN.md (ScreenController overlay HUD wiring, Phase 10 complete)
 Resume file: None
