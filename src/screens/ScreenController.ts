@@ -7,11 +7,13 @@
  * content, and pushes content to the glass display.
  *
  * Navigation graph:
- *   MAIN_MENU -> BATTLE_HUD -> ACTION_MENU -> ATTACK_SELECT
- *                                           -> SWITCH_SELECT
- *                                           -> TERA_CONFIRM -> ATTACK_SELECT
+ *   MAIN_MENU -> BATTLE_HUD -> ATTACK_SELECT
+ *                            -> SWITCH_SELECT
+ *                            -> (Tera queues, opens ATTACK_SELECT)
  *   TURN_RESULT -> BATTLE_HUD | SWITCH_SELECT (forced) | END_SCREEN
- *   END_SCREEN -> MAIN_MENU | BATTLE_HUD (new battle)
+ *   Double-tap back: ATTACK_SELECT -> BATTLE_HUD, SWITCH_SELECT -> BATTLE_HUD
+ *   Double-tap on BATTLE_HUD -> forfeit confirmation
+ *   Sprite HUD (renderBattleHud) is called directly by resolveTurn/resolveSwitch, not via render()
  */
 
 import type { GlassAdapter, GestureEvent } from '../types/contracts.js';
@@ -22,11 +24,9 @@ import { SimAIOpponent } from '../battle/SimAIOpponent.js';
 import { DataLoader } from '../data/DataLoader.js';
 import { AnimationEngine } from '../animation/AnimationEngine.js';
 import { renderMainMenu } from './renderers/mainMenuRenderer.js';
-import { renderBattleHud } from './renderers/battleHudRenderer.js';
-import { renderActionMenu } from './renderers/actionMenuRenderer.js';
+import { renderBattleHud, renderBattleHudActions } from './renderers/battleHudRenderer.js';
 import { renderAttackSelect } from './renderers/attackSelectRenderer.js';
 import { renderSwitchSelect } from './renderers/switchSelectRenderer.js';
-import { renderTeraConfirm } from './renderers/teraConfirmRenderer.js';
 import { renderTurnResult } from './renderers/turnResultRenderer.js';
 import { renderEndScreen } from './renderers/endScreenRenderer.js';
 import { renderSpriteRefresh } from './renderers/spriteRefreshRenderer.js';
@@ -43,6 +43,7 @@ export class ScreenController {
   private switchIndexMap: number[] = [];
   private forcedSwitch = false;
   private teraQueued = false;
+  private forfeitPending = false;
   private playerDexNums: number[] = [];
   private opponentDexNums: number[] = [];
 
@@ -67,7 +68,7 @@ export class ScreenController {
   async handleGesture(event: GestureEvent): Promise<void> {
     // Animation gesture blocking (ANIM-05, ANIM-06)
     if (this.animationEngine.isRunning()) {
-      if (event.kind === 'TAP') {
+      if (event.kind === 'TAP' || event.kind === 'DOUBLE_TAP') {
         this.animationEngine.skip();
       }
       // All other gestures swallowed during animation
@@ -77,6 +78,9 @@ export class ScreenController {
     switch (event.kind) {
       case 'TAP':
         await this.onTap(event.listIndex);
+        break;
+      case 'DOUBLE_TAP':
+        await this.onDoubleTap();
         break;
       case 'FOREGROUND_ENTER':
         await this.render();
@@ -102,13 +106,8 @@ export class ScreenController {
         break;
 
       case 'BATTLE_HUD':
-        // Any tap on HUD opens action menu
-        this.state = { ...this.state, screen: 'ACTION_MENU', cursorIndex: 0 };
-        await this.render();
-        break;
-
-      case 'ACTION_MENU':
-        await this.handleActionMenu(idx);
+        this.forfeitPending = false; // Any tap clears forfeit pending
+        await this.handleBattleHud(idx);
         break;
 
       case 'ATTACK_SELECT':
@@ -117,10 +116,6 @@ export class ScreenController {
 
       case 'SWITCH_SELECT':
         await this.handleSwitchSelect(idx);
-        break;
-
-      case 'TERA_CONFIRM':
-        await this.handleTeraConfirm(idx);
         break;
 
       case 'TURN_RESULT':
@@ -133,6 +128,38 @@ export class ScreenController {
 
       case 'SPRITE_REFRESH':
         await this.handleSpriteRefresh(idx);
+        break;
+    }
+  }
+
+  private async onDoubleTap(): Promise<void> {
+    switch (this.state.screen) {
+      case 'ATTACK_SELECT':
+        this.teraQueued = false;
+        this.state = { ...this.state, screen: 'BATTLE_HUD', cursorIndex: 0 };
+        await this.render();
+        break;
+      case 'SWITCH_SELECT':
+        if (this.forcedSwitch) return; // Blocked -- must pick a Pokemon
+        this.state = { ...this.state, screen: 'BATTLE_HUD', cursorIndex: 0 };
+        await this.render();
+        break;
+      case 'BATTLE_HUD':
+        if (this.forfeitPending) {
+          // Second double-tap: forfeit
+          DataLoader.clearMatchData();
+          this.forfeitPending = false;
+          this.state = { screen: 'MAIN_MENU', cursorIndex: 0, battleState: null };
+          await this.render();
+        } else {
+          // First double-tap: show confirmation
+          this.forfeitPending = true;
+          await this.glass.showMessage('Double-tap again to forfeit');
+          // Auto-clear after 3 seconds
+          setTimeout(() => { this.forfeitPending = false; }, 3000);
+        }
+        break;
+      default:
         break;
     }
   }
@@ -189,45 +216,49 @@ export class ScreenController {
     }
   }
 
-  private async handleActionMenu(idx: number): Promise<void> {
+  private async handleBattleHud(idx: number): Promise<void> {
+    const bs = this.state.battleState!;
     switch (idx) {
-      case 0: // "< Back"
-        this.state = { ...this.state, screen: 'BATTLE_HUD', cursorIndex: 0 };
-        await this.render();
-        break;
-      case 1: // "Attack"
+      case 0: // "Attack"
         this.teraQueued = false;
         this.state = { ...this.state, screen: 'ATTACK_SELECT', cursorIndex: 0 };
         await this.render();
         break;
-      case 2: // "Switch"
+      case 1: // "Switch"
+        if (this.isTrapped()) return; // Trapped -- can't switch
         this.forcedSwitch = false;
         this.state = { ...this.state, screen: 'SWITCH_SELECT', cursorIndex: 0 };
         await this.render();
         break;
-      case 3: // "Terastallize"
-        if (this.state.battleState?.playerSide.teraUsed) {
-          // Already used — ignore tap
-          return;
+      case 2: // "Terastallize"
+        if (bs.playerSide.teraUsed) return; // Already used
+        {
+          const activeMon = bs.playerSide.team[bs.playerSide.activeIndex]!;
+          if (activeMon.teraActive) return; // Already active
+          // Toggle behavior: if already queued, UN-queue and stay on BATTLE_HUD
+          if (this.teraQueued) {
+            this.teraQueued = false;
+            await this.render(); // Re-render BATTLE_HUD action list (NOT ATTACK_SELECT)
+          } else {
+            this.teraQueued = true;
+            this.state = { ...this.state, screen: 'ATTACK_SELECT', cursorIndex: 0 };
+            await this.render();
+          }
         }
-        this.state = { ...this.state, screen: 'TERA_CONFIRM', cursorIndex: 0 };
-        await this.render();
+        break;
+      case 3: // "Stats" -- no-op until Phase 11
         break;
     }
   }
 
   private async handleAttackSelect(idx: number): Promise<void> {
-    if (idx === 0) {
-      // "< Back"
-      this.teraQueued = false;
-      this.state = { ...this.state, screen: 'ACTION_MENU', cursorIndex: 0 };
-      await this.render();
-      return;
-    }
+    // If tera banner is present at index 0, ignore tap on it (non-selectable)
+    if (this.teraQueued && idx === 0) return;
 
-    // Move indices 1-4 map to moves[0]-moves[3]
+    // Move index: shift by -1 when tera banner is prepended at index 0
+    const moveIndex = this.teraQueued ? idx - 1 : idx;
+
     const bs = this.state.battleState!;
-    const moveIndex = idx - 1;
     const mon = bs.playerSide.team[bs.playerSide.activeIndex]!;
     const moveSlug = mon.moves[moveIndex];
     if (!moveSlug) return;
@@ -243,39 +274,14 @@ export class ScreenController {
   }
 
   private async handleSwitchSelect(idx: number): Promise<void> {
-    if (idx === 0) {
-      // "< Back" — blocked on forced switch
-      if (this.forcedSwitch) return;
-      this.state = { ...this.state, screen: 'ACTION_MENU', cursorIndex: 0 };
-      await this.render();
-      return;
-    }
-
-    // Map display index to team index
-    const toIndex = this.switchIndexMap[idx - 1];
+    // Map display index directly to team index (no offset -- no "< Back" item)
+    const toIndex = this.switchIndexMap[idx];
     if (toIndex === undefined || toIndex < 0) return;
 
     if (this.forcedSwitch) {
       await this.resolveSwitch(toIndex);
     } else {
       await this.resolveTurn({ type: 'SWITCH', toIndex });
-    }
-  }
-
-  private async handleTeraConfirm(idx: number): Promise<void> {
-    if (idx === 0) {
-      // "< Back"
-      this.teraQueued = false;
-      this.state = { ...this.state, screen: 'ACTION_MENU', cursorIndex: 0 };
-      await this.render();
-      return;
-    }
-
-    if (idx === 1) {
-      // "Confirm" — queue tera and navigate to attack select
-      this.teraQueued = true;
-      this.state = { ...this.state, screen: 'ATTACK_SELECT', cursorIndex: 0 };
-      await this.render();
     }
   }
 
@@ -313,6 +319,22 @@ export class ScreenController {
         };
         await this.render();
         break;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Trapping detection
+  // ---------------------------------------------------------------------------
+
+  private isTrapped(): boolean {
+    try {
+      const battle = SimBattleAdapter.getBattle();
+      if (!battle) return false;
+      const request = (battle.sides[0]?.activeRequest as any);
+      if (!request?.active?.[0]) return false;
+      return !!request.active[0].trapped;
+    } catch {
+      return false;
     }
   }
 
@@ -444,7 +466,7 @@ export class ScreenController {
       await this.delay(ANIM.POST_ANIM_DELAY_MS);
     }
 
-    // Step 6: Now show the interactive battle HUD with sprites
+    // Step 6: Now show the interactive battle HUD with action list
     console.log('[BATTLE] Step 6: rendering battle HUD...');
     await this.render();
     console.log('[BATTLE] Step 7: render complete!');
@@ -645,49 +667,24 @@ export class ScreenController {
         break;
       }
       case 'BATTLE_HUD': {
-        const result = renderBattleHud(this.state.battleState!);
-        console.log('[RENDER] BATTLE_HUD oppSprite:', result.oppSprite ? `${result.oppSprite.length} bytes BMP` : 'NONE');
-        console.log('[RENDER] BATTLE_HUD playerSprite:', result.playerSprite ? `${result.playerSprite.length} bytes BMP` : 'NONE');
-        try {
-          await this.glass.showBattleHud(
-            result.oppText,
-            result.playerText,
-            result.status,
-            result.oppSprite,
-            result.playerSprite,
-          );
-        } catch (e: unknown) {
-          console.error('[RENDER] showBattleHud threw:', e);
-          // Retry without sprites to see if sprites are the issue
-          console.log('[RENDER] Retrying WITHOUT sprites...');
-          await this.glass.showBattleHud(
-            result.oppText,
-            result.playerText,
-            result.status,
-          );
-        }
-        break;
-      }
-      case 'ACTION_MENU': {
         const bs = this.state.battleState!;
-        const result = renderActionMenu({ teraUsed: bs.playerSide.teraUsed });
+        const result = renderBattleHudActions(bs, this.isTrapped());
         await this.glass.showList(result.items, result.status);
         break;
       }
       case 'ATTACK_SELECT': {
         const result = renderAttackSelect(this.state.battleState!);
-        await this.glass.showList(result.items, result.status);
+        const items = this.teraQueued
+          ? ['[TERA QUEUED]', ...result.items]
+          : result.items;
+        await this.glass.showList(items, result.status);
         break;
       }
       case 'SWITCH_SELECT': {
         const result = renderSwitchSelect(this.state.battleState!, this.forcedSwitch);
         this.switchIndexMap = result.indexMap;
-        await this.glass.showList(result.items, result.status);
-        break;
-      }
-      case 'TERA_CONFIRM': {
-        const result = renderTeraConfirm(this.state.battleState!);
-        await this.glass.showList(result.items, result.status);
+        const status = this.forcedSwitch ? 'MUST SWITCH' : result.status;
+        await this.glass.showList(result.items, status);
         break;
       }
       case 'TURN_RESULT': {
