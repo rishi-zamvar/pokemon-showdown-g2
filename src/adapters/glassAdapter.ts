@@ -56,6 +56,46 @@ export class GlassAdapterImpl implements GlassAdapter {
   }
 
   /**
+   * Bootstrap the SDK startup page with a minimal single text container.
+   * Must be called once before any other render calls.
+   * Uses position 0,0 and full display dimensions — matching proven working apps.
+   */
+  async bootstrapStartup(): Promise<void> {
+    if (!this.bridge) throw new Error('Not connected');
+    if (this.startupDone) return;
+
+    const config = {
+      containerTotalNum: 1,
+      textObject: [
+        new TextContainerProperty({
+          xPosition: 0,
+          yPosition: 0,
+          width: 576,
+          height: 288,
+          containerID: CONTAINER_IDS.content,
+          containerName: CONTAINER_NAMES.content,
+          content: 'Loading...',
+          isEventCapture: 1,
+        }),
+      ],
+    };
+
+    console.log('[GlassAdapter] bootstrapStartup config:', JSON.stringify(config));
+    const result = await this.bridge.createStartUpPageContainer(
+      new CreateStartUpPageContainer(config),
+    );
+    console.log('[GlassAdapter] bootstrapStartup result:', result);
+
+    if (result === StartUpPageCreateResult.success) {
+      this.startupDone = true;
+    } else {
+      console.error('[GlassAdapter] bootstrapStartup failed with code:', result);
+      // Force startupDone so subsequent renders use rebuildPageContainer
+      this.startupDone = true;
+    }
+  }
+
+  /**
    * Show a scrollable list on glasses.
    * Always rebuilds because list items can't be updated in-place.
    */
@@ -181,8 +221,8 @@ export class GlassAdapterImpl implements GlassAdapter {
     oppText: string,
     playerText: string,
     status: StatusBar,
-    oppSprite?: string,
-    playerSprite?: string,
+    oppSprite?: Uint8Array,
+    playerSprite?: Uint8Array,
   ): Promise<void> {
     const s = SPRITE_CONFIG.SIZE;
     const halfH = Math.floor(GLASS_LAYOUT.height / 2);
@@ -237,9 +277,10 @@ export class GlassAdapterImpl implements GlassAdapter {
       textObject: [textContainer, statusContainer],
     });
 
-    // Send image data AFTER container creation (sequential — no concurrent sends)
+    // Send BMP image data AFTER container creation (sequential — no concurrent sends)
     if (this.bridge) {
       if (oppSprite) {
+        console.log(`[GlassAdapter] sending oppSprite BMP: ${oppSprite.length} bytes`);
         await this.bridge.updateImageRawData(
           new ImageRawDataUpdate({
             containerID: CONTAINER_IDS.oppSprite,
@@ -249,6 +290,7 @@ export class GlassAdapterImpl implements GlassAdapter {
         );
       }
       if (playerSprite) {
+        console.log(`[GlassAdapter] sending playerSprite BMP: ${playerSprite.length} bytes`);
         await this.bridge.updateImageRawData(
           new ImageRawDataUpdate({
             containerID: CONTAINER_IDS.playerSprite,
@@ -270,13 +312,13 @@ export class GlassAdapterImpl implements GlassAdapter {
    * @param containerName - Name of the image container (from CONTAINER_NAMES).
    * @param base64 - Raw base64 PNG string without the `data:` prefix.
    */
-  async updateImage(containerID: number, containerName: string, base64: string): Promise<void> {
+  async updateImage(containerID: number, containerName: string, bmpData: Uint8Array): Promise<void> {
     if (!this.bridge) throw new Error('Not connected');
     await this.bridge.updateImageRawData(
       new ImageRawDataUpdate({
         containerID,
         containerName,
-        imageData: base64,
+        imageData: bmpData,
       }),
     );
   }
@@ -349,18 +391,22 @@ export class GlassAdapterImpl implements GlassAdapter {
     };
 
     if (!this.startupDone) {
-      const result = await this.bridge.createStartUpPageContainer(
-        new CreateStartUpPageContainer(config),
-      );
-
-      if (result !== StartUpPageCreateResult.success) {
-        throw new Error(
-          `createStartUpPageContainer failed with code: ${String(result)}`,
+      // Try createStartUpPageContainer once — if it fails, fall through to rebuildPageContainer
+      try {
+        const result = await this.bridge.createStartUpPageContainer(
+          new CreateStartUpPageContainer(config),
         );
+        console.log('[GlassAdapter] createStartUpPageContainer result:', result);
+        if (result === StartUpPageCreateResult.success) {
+          this.startupDone = true;
+          return;
+        }
+      } catch (e) {
+        console.warn('[GlassAdapter] createStartUpPageContainer threw:', e);
       }
-
+      // Failed — mark as done and fall through to rebuildPageContainer
+      console.warn('[GlassAdapter] startup failed, falling through to rebuild');
       this.startupDone = true;
-      return;
     }
 
     let ok = await this.bridge.rebuildPageContainer(
@@ -423,7 +469,7 @@ export class GlassAdapterImpl implements GlassAdapter {
     }
 
     if (eventType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
-      return { kind: "TAP", listIndex: event.listEvent?.currentSelectItemIndex };
+      return { kind: "DOUBLE_TAP" };
     }
 
     // CLICK_EVENT = 0 becomes undefined during SDK deserialization
