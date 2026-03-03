@@ -423,7 +423,29 @@ export class GlassAdapterImpl implements GlassAdapter {
       listObject: [listContainer],
     });
 
-    // Send BMP image data sequentially after container creation
+    // Diagnostic: log BMP sizes so we can verify correct data reaches each container.
+    // Expected: teamBar ~1790B (576x24 1-bit), opp/player ~2702B (144x132 1-bit).
+    // If playerBmp length equals teamBarBmp length, cache swapped them.
+    console.debug(
+      `[showOverlayHud] BMP sizes: teamBar=${teamBarBmp.length}B ` +
+      `opp=${oppCompositeBmp.length}B player=${playerCompositeBmp.length}B`,
+    );
+
+    // Wait 50ms after rebuildPageContainer before sending image data.
+    //
+    // The SDK's rebuildPageContainer reconfigures container slots asynchronously
+    // on the hardware side. If updateImageRawData is called too soon, the SDK
+    // may route image data using the container mapping from the *previous*
+    // rebuildPageContainer call (e.g. showBattleHud's 2-image layout) instead
+    // of the new 3-image layout. This produces the "wrong BMP in wrong container"
+    // symptom where the player composite slot shows team bar pixel data.
+    //
+    // 50ms is enough for the hardware to process the rebuild response before
+    // the first updateImageRawData call arrives.
+    await this.delay(50);
+
+    // Send BMP image data sequentially after container creation.
+    // Order must match the imageObject array order above (teamBar, opp, player).
     await this.sendBmpData(CONTAINER_IDS.teamBar, CONTAINER_NAMES.teamBar, teamBarBmp);
     await this.sendBmpData(CONTAINER_IDS.oppSprite, CONTAINER_NAMES.oppSprite, oppCompositeBmp);
     await this.sendBmpData(CONTAINER_IDS.playerSprite, CONTAINER_NAMES.playerSprite, playerCompositeBmp);
