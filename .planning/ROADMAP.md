@@ -24,7 +24,7 @@ v1.1 (UI Enhancement & Polish) adds five more phases (7-11) that transform the b
 - [x] **Phase 7: Speed Config & Model Foundation** - SpeedConfig singleton, battle speed menu, BattleState data model extensions, dead code removal
 - [x] **Phase 8: Animation Polish** - Text box frame, lunge animation, speed-scaled timing, instant skip
 - [x] **Phase 9: Navigation & HUD Consolidation** - Double-tap back gesture, merged battle HUD, Tera simplification
-- [ ] **Phase 10: Overlay HUD Layouts** - Attack and switch screens with persistent sprites and HP bars
+- [x] **Phase 10: Overlay HUD Layouts** - Attack and switch screens with persistent sprites and HP bars
 - [ ] **Phase 11: Stats Screen** - New stats screen showing stat stages, ability, opponent speed range, possible abilities
 
 ## Phase Details
