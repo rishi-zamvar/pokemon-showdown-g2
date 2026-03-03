@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 10 — Overlay HUD Layouts — Complete
-Plan: 2/2 complete
-Status: Phase complete
-Last activity: 2026-03-02 — Completed 10-02-PLAN.md (ScreenController overlay HUD wiring)
+Phase: 10 — Overlay HUD Layouts — Gap closure in progress
+Plan: 3/4 complete (gap closure)
+Status: In progress
+Last activity: 2026-03-03 — Completed 10-03-PLAN.md (player composite BMP routing fix)
 
 ```
 Milestone v1.1 Progress:
@@ -163,6 +163,8 @@ Recent decisions affecting current work:
 - [10-02]: Null fallback at render call site (cache ?? emptyFallback()) — cache fields are Uint8Array | null; fallbacks are valid all-black BMPs of correct dimensions
 - [10-02]: resetCompositeCache() helper called on forfeit and both handleEndScreen branches — prevents cross-battle contamination
 - [10-02]: revealedOpponentIndices cleared at battle start before first updateRevealedOpponents() call — fresh tracking per battle
+- [10-03]: 50ms delay between renderContainers and first sendBmpData in showOverlayHud — SDK container mapping from prior rebuildPageContainer (showBattleHud 2-image layout) persists; delay ensures new 3-image mapping propagates before image data arrives
+- [10-03]: BMP size diagnostic at console.debug level — fires on every overlay HUD render; debug level keeps production logs clean
 
 ### v1.1 Research Context
 
@@ -205,6 +207,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-02T13:01:30Z
-Stopped at: Completed 10-02-PLAN.md (ScreenController overlay HUD wiring, Phase 10 complete)
+Last session: 2026-03-03T00:16:00Z
+Stopped at: Completed 10-03-PLAN.md (player composite BMP routing fix, gap closure)
 Resume file: None
