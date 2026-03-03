@@ -212,7 +212,13 @@ export async function buildSpriteComposite(
   }
 
   const pixels = binarizeCanvas(ctx, COMPOSITE_W, COMPOSITE_H);
-  return encodeBmp(pixels, COMPOSITE_W, COMPOSITE_H);
+  const bmp = encodeBmp(pixels, COMPOSITE_W, COMPOSITE_H);
+  if (bmp.length < 100) {
+    console.error(
+      `[CompositeBuilder] Suspiciously small composite BMP: ${bmp.length}B for ${COMPOSITE_W}x${COMPOSITE_H}`,
+    );
+  }
+  return bmp;
 }
 
 /**
@@ -368,7 +374,13 @@ export async function buildTeamBar(
   }
 
   const pixels = binarizeCanvas(ctx, TEAM_BAR_W, TEAM_BAR_H);
-  return encodeBmp(pixels, TEAM_BAR_W, TEAM_BAR_H);
+  const bmp = encodeBmp(pixels, TEAM_BAR_W, TEAM_BAR_H);
+  if (bmp.length < 100) {
+    console.error(
+      `[CompositeBuilder] Suspiciously small team bar BMP: ${bmp.length}B for ${TEAM_BAR_W}x${TEAM_BAR_H}`,
+    );
+  }
+  return bmp;
 }
 
 /** Return an empty (all-black) 144x132 composite BMP. Fallback for missing Pokemon. */
