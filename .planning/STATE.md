@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-02-26)
 
 ## Current Position
 
-Phase: 10 — Overlay HUD Layouts — Gap closure in progress
-Plan: 3/4 complete (gap closure)
-Status: In progress
-Last activity: 2026-03-03 — Completed 10-03-PLAN.md (player composite BMP routing fix)
+Phase: 10 — Overlay HUD Layouts — Gap closure complete
+Plan: 4/4 complete (gap closure done)
+Status: Phase complete
+Last activity: 2026-03-03 — Completed 10-04-PLAN.md (HP carryover fix after voluntary switch)
 
 ```
 Milestone v1.1 Progress:
@@ -165,6 +165,8 @@ Recent decisions affecting current work:
 - [10-02]: revealedOpponentIndices cleared at battle start before first updateRevealedOpponents() call — fresh tracking per battle
 - [10-03]: 50ms delay between renderContainers and first sendBmpData in showOverlayHud — SDK container mapping from prior rebuildPageContainer (showBattleHud 2-image layout) persists; delay ensures new 3-image mapping propagates before image data arrives
 - [10-03]: BMP size diagnostic at console.debug level — fires on every overlay HUD render; debug level keeps production logs clean
+- [10-04]: deriveSide triple-strategy activeIndex: (1) set.species match, (2) species.name match, (3) isActive flag scan — ordered by reliability; isActive fallback catches edge cases where species normalisation fails
+- [10-04]: Post-derivation HP invariant: team[activeIndex].currentHp must equal simSide.active[0].hp — if not, correct in-place and console.warn; ensures composite always shows true HP after any switch
 
 ### v1.1 Research Context
 
@@ -207,6 +209,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-03T00:16:00Z
-Stopped at: Completed 10-03-PLAN.md (player composite BMP routing fix, gap closure)
+Last session: 2026-03-03T09:43:43Z
+Stopped at: Completed 10-04-PLAN.md (HP carryover fix, Phase 10 gap closure complete)
 Resume file: None
