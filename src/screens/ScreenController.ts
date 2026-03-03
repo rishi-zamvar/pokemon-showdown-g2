@@ -588,7 +588,9 @@ export class ScreenController {
       cursorIndex: 0,
     };
 
-    // Pre-compute composites concurrently with animation playback
+    // Pre-compute composites concurrently with animation playback.
+    // deriveSide's HP correction (10-04) applies here too: submitSwitch → deriveBattleState
+    // → deriveSide, which now corrects HP mismatches for the replacement Pokemon.
     this.updateRevealedOpponents(bs);
     const compositesPromise = this.buildAndCacheComposites(bs);
 
