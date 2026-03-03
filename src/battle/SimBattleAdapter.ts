@@ -357,7 +357,17 @@ function deriveSide(
     } satisfies ActivePokemon;
   });
 
-  // Find activeIndex by matching the sim's active pokemon to our team order
+  // Find activeIndex by matching the sim's active pokemon to our team order.
+  //
+  // Strategy:
+  //  1. Primary: match simSide.active[0] by set.species/species.name (robust for formes)
+  //  2. Secondary: scan simSide.pokemon for the mon with isActive=true (catches
+  //     edge cases where active[0] species match fails — e.g., mid-battle forme
+  //     changes not reflected in teamData species strings)
+  //
+  // The primary match was the previous sole strategy; the secondary match is a
+  // defensive fallback to ensure HP carryover does not occur after voluntary
+  // switches when species string normalisation misses a match.
   const activeSimMon = simSide.active[0];
   let activeIndex = prevSideState.activeIndex;
   if (activeSimMon) {
@@ -369,13 +379,53 @@ function deriveSide(
     if (idx >= 0) {
       activeIndex = idx;
     } else {
-      // Fallback: try current species.name if set.species didn't match
+      // Fallback 1: try current species.name if set.species didn't match
       const fallbackKey = normalizeSpecies(activeSimMon.species.name);
       const fallbackIdx = teamData.findIndex(
         td => normalizeSpecies(td.species) === fallbackKey || td.name.toLowerCase() === activeSimMon.species.name.toLowerCase(),
       );
-      if (fallbackIdx >= 0) activeIndex = fallbackIdx;
-      console.warn(`[deriveSide] Active mon "${activeSimMon.species.name}" (set: ${setSpecies}) not found in teamData:`, teamData.map(t => t.species));
+      if (fallbackIdx >= 0) {
+        activeIndex = fallbackIdx;
+      } else {
+        // Fallback 2: scan all sim pokemon for the one with isActive=true.
+        // After a switch, exactly one pokemon per side has isActive=true.
+        // We match that mon to teamData using the same species-key strategy.
+        const activeByFlag = simSide.pokemon.find(
+          (mon) => (mon as unknown as { isActive?: boolean }).isActive,
+        );
+        if (activeByFlag) {
+          const flagSetSpecies = (activeByFlag as unknown as { set?: { species?: string } }).set?.species;
+          const flagKey = normalizeSpecies(flagSetSpecies ?? activeByFlag.species.name);
+          const flagIdx = teamData.findIndex(
+            td => normalizeSpecies(td.species) === flagKey || td.name.toLowerCase() === (flagSetSpecies ?? activeByFlag.species.name).toLowerCase(),
+          );
+          if (flagIdx >= 0) activeIndex = flagIdx;
+        }
+        console.warn(`[deriveSide] Active mon "${activeSimMon.species.name}" (set: ${setSpecies}) not found in teamData:`, teamData.map(t => t.species));
+      }
+    }
+    // Diagnostic: confirm the derived activeIndex has the correct HP from the sim.
+    // If team[activeIndex].currentHp disagrees with activeSimMon.hp, the findSimMon
+    // call for this slot returned the wrong sim mon (e.g., a collision or stale match).
+    // Correct the HP in place so the composite always shows the active mon's true HP.
+    const derivedMon = team[activeIndex];
+    if (derivedMon) {
+      if (derivedMon.currentHp !== activeSimMon.hp || derivedMon.stats.hp !== activeSimMon.maxhp) {
+        console.warn(
+          `[deriveSide] HP mismatch at activeIndex=${activeIndex}: ` +
+          `team has ${derivedMon.currentHp}/${derivedMon.stats.hp}, ` +
+          `sim active has ${activeSimMon.hp}/${activeSimMon.maxhp}. Correcting.`,
+        );
+        // Replace the team slot with corrected HP from the sim's active mon
+        team[activeIndex] = {
+          ...derivedMon,
+          currentHp: activeSimMon.hp,
+          stats: derivedMon.stats.hp !== activeSimMon.maxhp
+            ? { ...derivedMon.stats, hp: activeSimMon.maxhp }
+            : derivedMon.stats,
+        };
+      }
+      console.debug(`[deriveSide] ${simSide.id} active=${team[activeIndex]!.species} idx=${activeIndex} hp=${team[activeIndex]!.currentHp}/${team[activeIndex]!.stats.hp} simHp=${activeSimMon.hp}/${activeSimMon.maxhp}`);
     }
   } else {
     console.log(`[deriveSide] active[0] is null (side: ${simSide.id}) — keeping prevActiveIndex=${activeIndex}`);

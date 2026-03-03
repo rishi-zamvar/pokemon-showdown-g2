@@ -693,6 +693,8 @@ export class ScreenController {
   // ---------------------------------------------------------------------------
 
   private async buildAndCacheComposites(state: BattleState): Promise<void> {
+    const playerMon = state.playerSide.team[state.playerSide.activeIndex];
+    console.debug(`[buildComposites] player active=${playerMon?.species} hp=${playerMon?.currentHp}/${playerMon?.stats.hp} idx=${state.playerSide.activeIndex}`);
     const [opp, player, bar] = await Promise.all([
       buildOppComposite(state),
       buildPlayerComposite(state),
