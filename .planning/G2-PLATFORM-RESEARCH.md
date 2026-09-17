@@ -176,10 +176,11 @@ Verified by instrumentation, not inspection.
 | 10 | `update_image_raw_data: container 8 not found` on every boot — the team bar BMP is pushed before its container exists | simulator stdout, Phase 12 wave 2 | open (REND-06) |
 | 11 | `TextContainerUpgrade failed: container 2 not found` — the "blank out container 2" workaround in `showOverlayHud` fires against a container that isn't there | simulator stdout, Phase 12 wave 2 | open (Phase 13/14) |
 | 12 | `POST /api/input` returns `{"ok":true}` for inputs the simulator then DROPS (`inject_input: no active event container`). The HTTP result is not evidence the input was handled | simulator stdout, Phase 12 wave 2 | open (harness + Phase 16) |
+| 13 | HP bars pad with `U+2591` (light shade), which the panel font has no glyph for — `lv_draw_letter: glyph dsc. not found for U+2591` on every HP-bar text render, so the empty part of every bar draws as nothing. `U+2588` (full block) does render | simulator stdout, Phase 12 wave 3 | open (Phase 13/14; `battleHudRenderer.ts:26`) |
 
-### Why 10-12 were invisible before
+### Why 10-13 were invisible before
 
-All three are written to simulator **stdout** and appear nowhere in
+All four are written to simulator **stdout** and appear nowhere in
 `/api/console`. During one boot the console held 119 entries and not one of
 them mentioned any of these. This is HARN-02's entire justification, and it
 paid for itself the first time the tee ran against the real app.

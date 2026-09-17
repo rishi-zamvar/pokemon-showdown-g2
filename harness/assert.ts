@@ -116,8 +116,9 @@ export const KNOWN_DEFECTS: readonly KnownDefect[] = [
       "showOverlayHud's 'blank out container 2' workaround fires against a container that is not there, on every boot. Same reason: the fix is a rendering change.",
   },
   {
-    // FOUND BY THIS HARNESS on its first green run — not previously known.
-    id: "research-12",
+    // FOUND BY THIS HARNESS on its first green run — not previously known,
+    // now row 13 of .planning/G2-PLATFORM-RESEARCH.md.
+    id: "research-13",
     match: /\blv_draw_letter: glyph dsc\. not found for U\+2591 lv_draw_label\.c:\d+$/,
     owner: "Phase 13/14 (HP bar text rendering)",
     why:

@@ -108,3 +108,39 @@ The endpoint exists (confirmed in the binary's route table alongside `/api/ping`
 immediately after boot and 200 once the first WKWebView snapshot exists. The
 probe now polls it with `waitFor` rather than reading it once. `/api/screenshot/
 glasses` has no such race — it answered on the first try in every run.
+
+## D1 — CLOSED in 12-03
+
+The version check now runs as a plain-JS `node -e` preflight inside the
+`harness` npm script, which an old runtime can load (an entry file it cannot
+resolve is the whole failure mode). Boundary proven by selfCheck check 31,
+which reads THE SHIPPED STRING out of package.json, substitutes a fabricated
+`process.versions.node`, and runs it: 20.19.0 / 21.9.0 / 22.0.0 / 22.17.9
+exit 1; 22.18.0 / 22.20.0 / 23.1.0 / 24.0.0 exit 0; unmodified on the running
+runtime exits 0. The in-file guards stay as documented no-ops.
+
+## D6. The seven-input step leaves the app in an unpredictable state
+
+**Found during:** 12-03 Task 3 (three consecutive `npm run harness` runs)
+**Owner:** Phase 16 (INPUT-01/02)
+
+`glassAdapter.mapEventToGesture` (glassAdapter.ts:629) maps **every unknown
+`eventType` — including `undefined` — to `TAP`**. `long_press`,
+`long_press_release` and `context_menu` therefore do not "do nothing": each can
+arrive as a tap, commit a move, and start a turn. Firing all seven actions in a
+row consequently ends on a different screen every run (observed: BATTLE_HUD,
+TURN_RESULT, and stuck in ANIMATING for 12 further inputs).
+
+12-03 stopped depending on where that storm stops rather than papering over it
+with retries. Phase 16 should decide what those three actions mean and make the
+mapping explicit; until then no scenario may assume the post-storm screen.
+
+## D7. `/api/console` has no timestamps the harness can order against stdout
+
+**Found during:** 12-03 Task 3
+
+`LogStream.seq` orders lines by ARRIVAL at the harness, not by when the app or
+simulator emitted them. Console entries arrive in batches at poll time, so a
+console line can be ordered after a stdout line it actually preceded. This is
+fine for `expectConsoleClean` (a set test) and for `waitScreen` (a watermark
+test), but Phase 19's timing work must not read `seq` as a clock.
