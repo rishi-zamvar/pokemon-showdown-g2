@@ -22,6 +22,9 @@ import { INK_THRESHOLD, greyLevels, inkRatio, saveFrame, toFrame } from "./frame
 import type { Frame } from "./frame.ts";
 import { REGIONS } from "./regions.ts";
 import { DISPLAY, OVERLAY_LAYOUT } from "../src/config/constants.ts";
+import { LogStream, isFailureLine } from "./logs.ts";
+import type { LogLine } from "./logs.ts";
+import type { ConsoleEntry, Driver } from "./driver.ts";
 
 // ---------------------------------------------------------------------------
 // check runner
@@ -37,6 +40,41 @@ async function check(name: string, fn: () => void | Promise<void>): Promise<void
     failures++;
     console.log(`FAIL  ${name}: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// stub automation API (log-policy checks need no simulator)
+// ---------------------------------------------------------------------------
+
+function entry(id: number, level: string, message: string): ConsoleEntry {
+  return { id, level, message, ts: new Date(id * 1000).toISOString() };
+}
+
+/**
+ * Serves one batch per poll() and records the since_id it was asked for, which
+ * is how check 26 proves D-04's incremental polling rather than assuming it.
+ */
+function stubDriver(batches: ConsoleEntry[][]) {
+  const sinceIds: number[] = [];
+  let i = 0;
+  const state = {
+    sinceIds,
+    cleared: 0,
+    async consoleSince(id: number) {
+      sinceIds.push(id);
+      const entries = batches[i++] ?? [];
+      return { entries, total: entries.length };
+    },
+    async clearConsole() {
+      state.cleared++;
+    },
+    // LogStream only ever touches those two methods; the rest of Driver is
+    // network I/O that these checks deliberately do not exercise.
+    asDriver(): Driver {
+      return state as unknown as Driver;
+    },
+  };
+  return state;
 }
 
 // ---------------------------------------------------------------------------
@@ -463,7 +501,177 @@ async function main(): Promise<void> {
     assert.equal(inkRatio(lit, REGIONS.FULL), 1);
   });
 
-  const total = 21;
+  // =========================================================================
+  // 12-02: log capture and failure policy (HARN-02, HARN-05, D-04, D-05)
+  // =========================================================================
+
+  // -- 22: the stdout-only failures — THE point of Phase 12 ------------------
+  // A harness that reads only /api/console passes the defect that made this
+  // app unplayable. The first line below appears nowhere in the console API.
+  await check("22 stdout-only failure lines are classified as failures", () => {
+    const mustFail = [
+      "[2026-09-17T16:36:58Z WARN evenhub_simulator_lib::flutter] RebuildPageContainer validation failed: image container size 576x24 exceeds maximum 288x144",
+      "[2026-09-17T16:36:59Z ERROR evenhub_simulator_lib] container 8 not found",
+    ];
+    for (const message of mustFail) {
+      assert.ok(
+        isFailureLine({ seq: 0, source: "stdout", level: "warn", message }),
+        `stdout line was NOT classified as a failure: ${message}`,
+      );
+    }
+  });
+
+  // -- 23: console failures, including a mere WARN (D-05) --------------------
+  await check("23 console failure lines are classified as failures", () => {
+    const mustFail: Array<[string, string]> = [
+      ["error", "[GlassAdapter] bootstrapStartup failed with code: 2"],
+      ["log", "[uncaught] TypeError: x is not a function"],
+      ["log", "[unhandledrejection] Error: boom"],
+      ["log", "[fetch] 404 /data/learnsets.json"],
+      // a WARN: the game was unplayable the whole time this was being logged
+      ["warn", "[glass] rebuildPageContainer failed after retry"],
+    ];
+    for (const [level, message] of mustFail) {
+      assert.ok(
+        isFailureLine({ seq: 0, source: "console", level, message }),
+        `console ${level} line was NOT classified as a failure: ${message}`,
+      );
+    }
+  });
+
+  // -- 24: healthy lines must NOT fail the run -------------------------------
+  // Without this the policy could be `() => true` and check 22/23 would pass.
+  await check("24 healthy lines on both streams are not failures", () => {
+    const mustPass: LogLine[] = [
+      {
+        seq: 0,
+        source: "console",
+        level: "log",
+        message: "[BATTLE] Step 6: rendering battle HUD...",
+      },
+      {
+        seq: 0,
+        source: "console",
+        level: "debug",
+        message: "[buildComposites] player active=Mudsdale hp=100/100 idx=0",
+      },
+      {
+        seq: 0,
+        source: "stdout",
+        level: "info",
+        message:
+          "[2026-09-17T16:36:50Z INFO evenhub_simulator_lib] automation server listening on 127.0.0.1:9898",
+      },
+    ];
+    for (const l of mustPass) {
+      assert.ok(!isFailureLine(l), `healthy line was classified as a failure: ${l.message}`);
+    }
+  });
+
+  // -- 25: hostCalls counts both real image-send paths (D-13) ----------------
+  await check("25 hostCalls counts both updateImageRawData paths", async () => {
+    const driver = stubDriver([
+      [
+        entry(1, "log", "[GlassAdapter] sendBmpData container=oppSpr size=1234B"),
+        entry(2, "log", "[GlassAdapter] sendBmpData container=oppSpr size=1234B"),
+        entry(3, "log", "[GlassAdapter] createStartUpPageContainer result: 0"),
+      ],
+    ]);
+    const logs = new LogStream(driver.asDriver());
+    await logs.poll();
+    assert.deepEqual(logs.hostCalls(), { updateImageRawData: 2, createStartUpPageContainer: 1 });
+
+    // the other live path (showBattleHud) must land on the same counter
+    const other = stubDriver([
+      [
+        entry(1, "log", "[GlassAdapter] sending oppSprite BMP: 1234 bytes"),
+        entry(2, "log", "[GlassAdapter] sending playerSprite BMP: 4321 bytes"),
+      ],
+    ]);
+    const logs2 = new LogStream(other.asDriver());
+    await logs2.poll();
+    assert.deepEqual(logs2.hostCalls(), { updateImageRawData: 2 });
+  });
+
+  // -- 26: since_id advances, so nothing is counted twice (D-04) -------------
+  await check("26 poll() never yields a duplicate line", async () => {
+    const driver = stubDriver([
+      [entry(1, "log", "a"), entry(2, "log", "b"), entry(3, "log", "c")],
+      [entry(4, "log", "d"), entry(5, "log", "e")],
+    ]);
+    const logs = new LogStream(driver.asDriver());
+    const first = await logs.poll();
+    const second = await logs.poll();
+    assert.equal(first.length, 3);
+    assert.equal(second.length, 2);
+    assert.deepEqual(driver.sinceIds, [0, 3], "second poll did not advance since_id");
+    assert.equal(logs.all().length, 5);
+    assert.equal(new Set(logs.all().map((l) => l.message)).size, 5);
+  });
+
+  // -- 27: blank stdout lines are not lines ----------------------------------
+  await check("27 empty stdout lines add nothing and do not inflate the count", () => {
+    const logs = new LogStream(stubDriver([]).asDriver());
+    logs.pushStdout("");
+    logs.pushStdout("   ");
+    assert.equal(logs.all().length, 0);
+    assert.equal(logs.stdoutLineCount, 0);
+  });
+
+  // -- 28: reset() scopes assertions to one step (D-04) ----------------------
+  await check("28 reset() clears the console, the buffer and since_id", async () => {
+    const driver = stubDriver([
+      [entry(7, "log", "before")],
+      [entry(1, "log", "after")],
+    ]);
+    const logs = new LogStream(driver.asDriver());
+    await logs.poll();
+    assert.equal(logs.all().length, 1);
+    await logs.reset();
+    assert.equal(driver.cleared, 1, "reset() did not DELETE /api/console");
+    assert.equal(logs.all().length, 0);
+    await logs.poll();
+    assert.deepEqual(driver.sinceIds, [0, 0], "reset() did not put since_id back to 0");
+  });
+
+  // -- 29: THE B2 GUARD — reset() must not zero stdoutLineCount --------------
+  // Without this, a dead stdout tee is indistinguishable from a clean run: the
+  // first ctx.step() erases the evidence and HARN-02 switches itself off in
+  // silence while every assertion keeps passing.
+  await check("29 stdoutLineCount is monotonic across reset()", async () => {
+    const logs = new LogStream(stubDriver([]).asDriver());
+    logs.pushStdout("[INFO x] one");
+    logs.pushStdout("[INFO x] two");
+    logs.pushStdout("[INFO x] three");
+    assert.equal(logs.stdoutLineCount, 3);
+    await logs.reset();
+    assert.equal(logs.stdoutLineCount, 3, "reset() zeroed stdoutLineCount");
+    logs.pushStdout("[INFO x] four");
+    assert.equal(logs.stdoutLineCount, 4);
+    assert.equal(logs.all().length, 1, "reset() did not clear the line buffer");
+  });
+
+  // -- 30: nextSeq() is a usable watermark (B4) ------------------------------
+  await check("30 nextSeq() separates lines before an action from lines after", async () => {
+    const driver = stubDriver([[entry(1, "log", "[screen] stale")], [entry(2, "log", "[screen] fresh")]]);
+    const logs = new LogStream(driver.asDriver());
+    logs.pushStdout("[INFO x] older");
+    await logs.poll();
+    const mark = logs.nextSeq();
+    for (const l of logs.all()) {
+      assert.ok(l.seq < mark, `seq ${l.seq} of an earlier line is not < nextSeq ${mark}`);
+    }
+    logs.pushStdout("[INFO x] newer");
+    await logs.poll();
+    const after = logs.all().filter((l) => l.seq >= mark);
+    assert.deepEqual(
+      after.map((l) => l.message),
+      ["[INFO x] newer", "[screen] fresh"],
+      "watermark filter did not select exactly the lines added after the mark",
+    );
+  });
+
+  const total = 30;
   console.log(
     failures === 0
       ? `\nOK  ${total}/${total} checks passed`
