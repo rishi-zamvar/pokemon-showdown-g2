@@ -141,7 +141,12 @@ function makeCtx(driver: Driver, logs: LogStream, runDir: string, sim: boolean, 
     needSim("capture()");
     const frame = toFrame(await driver.glasses());
     const safe = label.replace(/[^A-Za-z0-9._-]+/g, "-");
-    await saveFrame(frame, path.join(runDir, `${String(++captureSeq).padStart(3, "0")}-${safe}.png`));
+    // scenario-prefixed: captureSeq restarts per scenario, so two scenarios
+    // capturing the same label would otherwise overwrite each other's artifact.
+    await saveFrame(
+      frame,
+      path.join(runDir, `${scenario}-${String(++captureSeq).padStart(3, "0")}-${safe}.png`),
+    );
     return frame;
   };
 
@@ -156,12 +161,17 @@ function makeCtx(driver: Driver, logs: LogStream, runDir: string, sim: boolean, 
       await logs.poll();
     },
     async step(name, fn, opts) {
+      // Scan for waived known-defect lines BEFORE reset() destroys the buffer:
+      // a waiver nobody ever sees is a waiver that has been forgotten.
+      if (sim) collectWaived(logs);
       if (sim && !opts?.keepLogs) await logs.reset();
       const t0 = Date.now();
       try {
         await fn();
+        if (sim) collectWaived(logs);
         record({ scenario, step: name, ok: true, ms: Date.now() - t0, hostCalls: logs.hostCalls() });
       } catch (e) {
+        if (sim) collectWaived(logs);
         if (sim) {
           // the frame at the moment of failure is the whole point of D-09
           try {

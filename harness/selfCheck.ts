@@ -25,6 +25,19 @@ import { DISPLAY, OVERLAY_LAYOUT } from "../src/config/constants.ts";
 import { LogStream, isFailureLine } from "./logs.ts";
 import type { LogLine } from "./logs.ts";
 import type { ConsoleEntry, Driver } from "./driver.ts";
+import { spawnSync } from "node:child_process";
+import {
+  AssertionError,
+  KNOWN_DEFECTS,
+  expectConsoleClean,
+  expectFrameDiff,
+  expectFrameInk,
+  expectGreyLevels,
+  expectHostCalls,
+  expectLoggedLine,
+  expectRegionPersists,
+  expectScreen,
+} from "./assert.ts";
 
 // ---------------------------------------------------------------------------
 // check runner
@@ -32,13 +45,25 @@ import type { ConsoleEntry, Driver } from "./driver.ts";
 
 let failures = 0;
 
+export interface CheckResult {
+  name: string;
+  ok: boolean;
+  error?: string;
+}
+
+/** every check run so far, so runChecks() can hand results to the scenario runner */
+const results: CheckResult[] = [];
+
 async function check(name: string, fn: () => void | Promise<void>): Promise<void> {
   try {
     await fn();
+    results.push({ name, ok: true });
     console.log(`PASS  ${name}`);
   } catch (e) {
     failures++;
-    console.log(`FAIL  ${name}: ${e instanceof Error ? e.message : String(e)}`);
+    const error = e instanceof Error ? e.message : String(e);
+    results.push({ name, ok: false, error });
+    console.log(`FAIL  ${name}: ${error}`);
   }
 }
 
@@ -263,7 +288,13 @@ function fixture(name: string): Frame {
 // checks
 // ---------------------------------------------------------------------------
 
-async function main(): Promise<void> {
+/**
+ * Runs every pure check and RETURNS the results — no printing of a total, no
+ * process.exit. `harness/scenarios/selfCheck.ts` calls this so `npm run harness`
+ * proves the harness's own primitives before it boots anything and blames the
+ * app; the CLI entry point at the bottom of this file calls the same function.
+ */
+export async function runChecks(): Promise<CheckResult[]> {
   // -- 01: minimal 2x2 RGBA, filter 0 everywhere ---------------------------
   await check("01 decodePng 2x2 RGBA colorType 6 filter None", () => {
     const px = Uint8Array.from([
@@ -671,13 +702,186 @@ async function main(): Promise<void> {
     );
   });
 
-  const total = 30;
-  console.log(
-    failures === 0
-      ? `\nOK  ${total}/${total} checks passed`
-      : `\nFAILED  ${failures}/${total} check(s)`,
-  );
-  process.exit(failures ? 1 : 0);
+  // -------------------------------------------------------------------------
+  // 31-36 — plan 12-03: the assertion vocabulary, the screen oracle and the
+  // Node preflight. Appended; checks 01-30 above are untouched.
+  // -------------------------------------------------------------------------
+
+  // -- 31: THE D1 FIX — the preflight that an old runtime can actually load ---
+  // The in-file guards in run.ts/probe.ts/selfCheck.ts cannot fire for
+  // ERR_UNKNOWN_FILE_EXTENSION (deferred item D1): that failure happens at
+  // module resolution, before any byte of the entry file runs. The real guard
+  // is the plain-JS `node -e` preflight inside the `harness` npm script. This
+  // check runs THAT EXACT STRING, read from package.json, against fabricated
+  // version numbers -- so it tests the shipped expression, not a copy of it.
+  await check("31 the npm run harness preflight rejects old Node and accepts the floor", () => {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(import.meta.dirname, "..", "package.json"), "utf8"),
+    ) as { scripts: Record<string, string> };
+    const script = pkg.scripts["harness"];
+    assert.ok(script, "package.json has no `harness` script");
+    const m = /^node -e "(.+)" && node harness\/run\.ts$/.exec(script!);
+    assert.ok(m, `harness script is not "node -e <preflight> && node harness/run.ts": ${script}`);
+    const expr = m![1]!;
+    assert.ok(
+      expr.includes("process.versions.node"),
+      "the preflight does not read process.versions.node, so it cannot be checking a version",
+    );
+
+    const run = (version: string | null): number => {
+      // Substituting the literal is the only way to exercise the boundary: a
+      // child process's process.versions.node is not writable from outside.
+      const src = version === null ? expr : expr.replaceAll("process.versions.node", JSON.stringify(version));
+      return spawnSync(process.execPath, ["-e", src], { encoding: "utf8" }).status ?? -1;
+    };
+
+    for (const bad of ["20.19.0", "21.9.0", "22.0.0", "22.17.9"]) {
+      assert.equal(run(bad), 1, `preflight did NOT reject Node ${bad}`);
+    }
+    for (const good of ["22.18.0", "22.20.0", "23.1.0", "24.0.0"]) {
+      assert.equal(run(good), 0, `preflight wrongly rejected Node ${good}`);
+    }
+    // ...and unmodified, on the runtime actually executing this check
+    assert.equal(run(null), 0, `preflight rejects the running Node ${process.versions.node}`);
+  });
+
+  // -- 32: the screen oracle is placed where waitScreen needs it --------------
+  // Placement is load-bearing, not stylistic. Logged before/inside the switch,
+  // the line announces a screen ~477ms before showOverlayHud's three image
+  // sends and rebuild have put its pixels on the framebuffer, so every
+  // expectFrameInk would assert against the OUTGOING screen.
+  await check("32 [screen] oracle is logged after render()'s switch, before updatePhoneCompanion", () => {
+    const src = fs.readFileSync(
+      path.join(import.meta.dirname, "..", "src", "screens", "ScreenController.ts"),
+      "utf8",
+    );
+    const emits = src.match(/console\.log\(`\[screen\] /g) ?? [];
+    assert.equal(emits.length, 1, `expected exactly one [screen] emit in src/, found ${emits.length}`);
+
+    const render = src.indexOf("private async render()");
+    assert.ok(render > 0, "render() funnel not found");
+    const lastCase = src.indexOf("case 'ANIMATING'", render); // last case of the switch
+    const emit = src.indexOf("console.log(`[screen] ", render);
+    const companion = src.indexOf("updatePhoneCompanion", render);
+    assert.ok(lastCase > render, "the render switch's last case not found");
+    assert.ok(emit > lastCase, "the [screen] emit is inside or above the switch, not after it");
+    assert.ok(emit < companion, "the [screen] emit is below the phone-companion update");
+  });
+
+  // -- 33: expectFrameInk really fails a blank region (HARN-03) ---------------
+  // If this ever passes on a blank region, every framebuffer assertion in every
+  // later phase is decoration. scenarios/negativeProof.ts proves the same thing
+  // against a live capture; this proves it without a simulator.
+  await check("33 expectFrameInk fails blank and saturated regions, passes an inked one", () => {
+    const blank = synthFrame(DISPLAY.WIDTH, DISPLAY.HEIGHT, () => 0);
+    const full = synthFrame(DISPLAY.WIDTH, DISPLAY.HEIGHT, () => 255);
+    const some = synthFrame(DISPLAY.WIDTH, DISPLAY.HEIGHT, (_x, y) => (y % 10 === 0 ? 255 : 0));
+
+    assert.throws(() => expectFrameInk(blank, REGIONS.CONTENT, 0.01, 0.6), AssertionError);
+    assert.throws(() => expectFrameInk(full, REGIONS.CONTENT, 0.01, 0.6), AssertionError);
+    expectFrameInk(some, REGIONS.CONTENT, 0.01, 0.6);
+    // the message must carry the observed value, because it IS the failure report
+    assert.throws(
+      () => expectFrameInk(blank, REGIONS.CONTENT, 0.01, 0.6),
+      /CONTENT: ink 0\.000 outside \[0\.01, 0\.6\]/,
+    );
+
+    // the rest of the framebuffer vocabulary, same shape
+    assert.throws(() => expectGreyLevels(blank, REGIONS.CONTENT, 2), /1 distinct grey levels/);
+    expectGreyLevels(synthFrame(DISPLAY.WIDTH, DISPLAY.HEIGHT, (x) => (x % 16) * 17), REGIONS.CONTENT, 10);
+    assert.throws(() => expectRegionPersists([some, blank, some], REGIONS.CONTENT), /frame 1 of 3/);
+    // an empty sequence must NOT pass vacuously
+    assert.throws(() => expectRegionPersists([], REGIONS.CONTENT), /zero frames/);
+    expectRegionPersists([some, some], REGIONS.CONTENT);
+  });
+
+  // -- 34: the log vocabulary ------------------------------------------------
+  await check("34 expectLoggedLine / expectScreen / expectHostCalls fail and pass on real streams", async () => {
+    const logs = new LogStream(
+      stubDriver([[entry(1, "log", "[screen] MAIN_MENU cursor=0"), entry(2, "log", "[GlassAdapter] sendBmpData container=1")]]).asDriver(),
+    );
+    await logs.poll();
+
+    assert.equal(expectLoggedLine(logs, /\[screen\] MAIN_MENU/).source, "console");
+    assert.throws(() => expectLoggedLine(logs, /\[screen\] END_SCREEN/), AssertionError);
+    // a mismatch must print what WAS seen, or it is not debuggable
+    assert.throws(() => expectLoggedLine(logs, /nope/), /\[screen\] MAIN_MENU cursor=0/);
+
+    expectScreen(logs, "MAIN_MENU");
+    assert.throws(() => expectScreen(logs, "BATTLE_HUD"), AssertionError);
+    // \b in expectScreen must not let a longer screen name satisfy a shorter one
+    const prefixed = new LogStream(stubDriver([[entry(1, "log", "[screen] MAIN_MENU_V2 cursor=0")]]).asDriver());
+    await prefixed.poll();
+    assert.throws(() => expectScreen(prefixed, "MAIN_MENU"), AssertionError);
+
+    expectHostCalls(logs, "updateImageRawData", 1);
+    assert.throws(() => expectHostCalls(logs, "updateImageRawData", 0), /1 host call\(s\), ceiling is 0/);
+    expectHostCalls(logs, "neverCalled", 0);
+  });
+
+  // -- 35: HARN-05 + the known-defect allow-list -----------------------------
+  // The allow-list is the one place D-05 ("warnings are not tolerated") is
+  // bent, so it gets the most sceptical check in this file: it must waive the
+  // two named boot lines and NOTHING else -- in particular not the
+  // container-validation line this whole phase exists to catch, and not the
+  // dropped-input line that makes a no-op look like a handled input.
+  await check("35 expectConsoleClean fails on stdout validation lines; the allow-list waives only its two", () => {
+    const logs = new LogStream(stubDriver([]).asDriver());
+    expectConsoleClean(logs);
+
+    logs.pushStdout(
+      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::flutter] RebuildPageContainer validation failed: image container size 576x24 exceeds maximum 288x144",
+    );
+    assert.throws(() => expectConsoleClean(logs), AssertionError);
+    assert.throws(() => expectConsoleClean(logs), /RebuildPageContainer validation failed/);
+
+    const waived = [
+      "[2026-01-01T00:00:00Z WARN  lvgl] [Warn]\t(9.769, +0)\t lv_draw_unit_draw_letter: lv_draw_letter: glyph dsc. not found for U+2591 lv_draw_label.c:575",
+      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::vm] update_image_raw_data: container 8 not found",
+      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::flutter] TextContainerUpgrade failed: container 2 not found",
+    ];
+    const clean = new LogStream(stubDriver([]).asDriver());
+    for (const w of waived) clean.pushStdout(w);
+    expectConsoleClean(clean); // the two known boot defects, waived by id
+
+    // nothing else is waived, including near-misses of the same families
+    const notWaived = [
+      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::vm] inject_input: no active event container",
+      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::vm] update_image_raw_data: container 3 not found",
+      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::vm] update_image_raw_data: container 8 not found, dropping 1440 bytes",
+      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::flutter] TextContainerUpgrade failed: container 4 not found",
+      // a DIFFERENT missing glyph is a different defect and must still fail
+      "[2026-01-01T00:00:00Z WARN  lvgl] [Warn]\t(9.769, +0)\t lv_draw_unit_draw_letter: lv_draw_letter: glyph dsc. not found for U+2588 lv_draw_label.c:575",
+    ];
+    for (const line of notWaived) {
+      const l = new LogStream(stubDriver([]).asDriver());
+      l.pushStdout(line);
+      assert.throws(() => expectConsoleClean(l), AssertionError, `allow-list swallowed: ${line}`);
+    }
+
+    // console-side failures are never waived: the allow-list is stdout-only
+    const con = new LogStream(stubDriver([[entry(1, "error", "boom")]]).asDriver());
+    assert.equal(KNOWN_DEFECTS.every((d) => d.owner.length > 0 && d.id.length > 0), true);
+    return con.poll().then(() => {
+      assert.throws(() => expectConsoleClean(con), AssertionError);
+    });
+  });
+
+  // -- 36: expectFrameDiff is a documented refusal, not a missing export ------
+  await check("36 expectFrameDiff throws naming D-10", () => {
+    const f = synthFrame(DISPLAY.WIDTH, DISPLAY.HEIGHT, () => 0);
+    assert.throws(() => expectFrameDiff(f, REGIONS.FULL, "golden.png"), /D-10/);
+    assert.throws(() => expectFrameDiff(f, REGIONS.FULL, "golden.png"), AssertionError);
+  });
+
+  return results;
 }
 
-void main();
+// CLI entry point. Guarded so importing this module from a scenario runs the
+// checks without exiting the harness process out from under it.
+if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+  const r = await runChecks();
+  const bad = r.filter((x) => !x.ok).length;
+  console.log(bad === 0 ? `\nOK  ${r.length}/${r.length} checks passed` : `\nFAILED  ${bad}/${r.length} check(s)`);
+  process.exit(bad ? 1 : 0);
+}

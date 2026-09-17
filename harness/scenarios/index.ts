@@ -12,5 +12,8 @@
  * probe, so nothing it does counts toward a suite requirement.
  */
 import type { Scenario } from "../run.ts";
+import { selfCheckScenario } from "./selfCheck.ts";
+import { bootScenario } from "./boot.ts";
+import { negativeProofScenario } from "./negativeProof.ts";
 
-export const SCENARIOS: Scenario[] = [];
+export const SCENARIOS: Scenario[] = [selfCheckScenario, bootScenario, negativeProofScenario];

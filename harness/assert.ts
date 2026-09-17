@@ -78,10 +78,11 @@ export function expectRegionPersists(frames: Frame[], r: Region, min = 0.01): vo
 // ---------------------------------------------------------------------------
 
 /**
- * D-05 says warnings are not tolerated, and these two ARE real defects, not
- * noise. They are waived here only so that `npm run harness` can exit 0 on the
- * app as it stands today; every waiver names one exact line, is anchored at
- * both ends, and carries the phase that must delete it.
+ * D-05 says warnings are not tolerated, and every entry here IS a real defect,
+ * not noise. They are waived only so that `npm run harness` can exit 0 on the
+ * app as it stands today; every waiver names one exact line, is anchored, and
+ * carries the phase that must fix the defect and then DELETE the entry.
+ * Phase 12 observes only, so none of them can be fixed here.
  *
  * Never add a blanket pattern here. A regex that waives a family of lines
  * waives the next defect in that family too, which is precisely how HARN-02
@@ -113,6 +114,14 @@ export const KNOWN_DEFECTS: readonly KnownDefect[] = [
     owner: "Phase 13/14",
     why:
       "showOverlayHud's 'blank out container 2' workaround fires against a container that is not there, on every boot. Same reason: the fix is a rendering change.",
+  },
+  {
+    // FOUND BY THIS HARNESS on its first green run — not previously known.
+    id: "research-12",
+    match: /\blv_draw_letter: glyph dsc\. not found for U\+2591 lv_draw_label\.c:\d+$/,
+    owner: "Phase 13/14 (HP bar text rendering)",
+    why:
+      "the HP bar built in battleHudRenderer.ts:26 pads with U+2591 (light shade), which the panel font has no glyph for, so the empty part of every HP bar draws as nothing. U+2588 (full block) does render. One codepoint is named here on purpose: any OTHER missing glyph must still fail the run.",
   },
 ];
 
