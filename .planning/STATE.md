@@ -5,18 +5,37 @@
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Milestone v2.0 — Showdown Parity
+**Current focus:** Milestone v2.0 — Showdown Parity (Phase 12 Automation Test Harness next)
 
 ## Current Position
 
-Phase: pending roadmap
-Status: v2.0 milestone defined, 34 requirements, roadmap in progress
-Last activity: 2026-09-17 — SDK 0.0.7->0.0.15 bump, two unplayability bugs fixed, platform research compiled
+Phase: 12 — Automation Test Harness — NOT STARTED
+Plan: none yet
+Status: v2.0 roadmap written. Phases 12-19, 34/34 requirements mapped, 0 orphans.
+Last activity: 2026-09-17 — v2.0 roadmap created; Phases 6 and 11 retired into 12 and 17-18
+
+```
+Milestone v2.0 Progress:
+[          ] Phase 12 Automation Test Harness          <- next, gates everything
+[          ] Phase 13 Container Safety Layer
+[          ] Phase 14 Battle Text & HUD Persistence
+[          ] Phase 15 4-bit Greyscale Sprite Pipeline
+[          ] Phase 16 Modern Input Model
+[          ] Phase 17 Context Menu & Inspect Navigation
+[          ] Phase 18 Move/Field/Team/Opponent Inspect
+[          ] Phase 19 Call-Count Performance Restructure
+0% complete (0/8 phases)
+```
 
 ### Milestone v1.1 closed out
 
-Phases 7-10 shipped and verified. Phase 11 (Stats Screen) was never started;
-its intent is subsumed by the v2.0 INFO- requirements.
+Phases 7-10 shipped and verified. Two phases are formally retired rather than
+left orphaned in the roadmap:
+
+- Phase 11 (Stats Screen) — never started. Subsumed by the v2.0 INFO-
+  requirements; STAT-01..03 land on Phase 17, STAT-04..05 on Phase 18.
+- Phase 6 (Integration) — never started. Its "full loop, validated end to end"
+  goal is exactly HARN-04, delivered as an automated check in Phase 12.
 
 ### Fixed this session
 
@@ -52,6 +71,14 @@ Recent decisions affecting current work:
 - [Roadmap]: Battle engine is pure (no glass calls) — screens are read-only views of BattleState
 - [Roadmap]: Load only 12 match Pokemon at battle start; clear all match data on battle end
 - [Roadmap]: Status conditions (burn, paralysis, poison, sleep, freeze) are IN scope for v0.1
+
+**v2.0 locked decisions (2026-09-17 — do not re-open):**
+- [Locked]: Information access is native context menu + dedicated inspect screens — the G2 has no hover and no pointer
+- [Locked]: Sprites use a full 4-bit greyscale pipeline; no app-side dithering (the host downsamples better)
+- [Locked]: Performance is restructured by cutting host call count, not payload (~104 ms fixed per image send dominates)
+- [Locked]: Do NOT add text containers to reduce rebuilds — break-even is 2 containers; the SDK-UPGRADE-AUDIT recommendation to split text out is superseded by G2-PLATFORM-RESEARCH.md §3
+- [Locked]: Phase 12 (harness) ships before any other v2.0 work; every phase after it is developed TDD against its assertions
+- [v2.0]: Every v2.0 phase detail names the specific harness assertions that prove it — see ROADMAP.md
 - [Roadmap]: No sprites on glasses — text/list only; sprites only on phone companion screen
 - [01-01]: Fetch .js not .json from PS CDN — .json paths return 404 HTML; .js paths return real data
 - [01-01]: Drop function-valued keys via JSON.stringify — Phase 1 only needs static fields (name, num, desc)
@@ -181,7 +208,12 @@ Key findings from research (2026-03-01):
 
 ### Pending Todos
 
-None.
+- PROJECT.md "Context" and "Constraints" still describe the display as 576x288
+  monochrome and sprites as "8-bit pixel art". It is 4-bit greyscale, 16 levels.
+  Correct before Phase 15 so the sprite work isn't planned against a stale spec.
+- The v2.0 brief referenced "49 requirements"; REQUIREMENTS.md defines 34
+  (HARN 6, REND 7, SPR 4, INFO 7, INPUT 6, PERF 4). All 34 are mapped. If 15
+  more were intended they are not written down anywhere and cannot be mapped.
 
 ### Roadmap Evolution
 
@@ -189,6 +221,9 @@ None.
 - Phase 5.2 inserted after Phase 5.1: Replace custom BattleEngine with @pkmn/sim for accurate Gen 9 mechanics (INSERTED)
 - Phase 5.3 inserted after Phase 5.2: Switch animation (pokeball→green square→checkbox), sprite slide, text polish, activeIndex fix (INSERTED)
 - Phases 7-11 added 2026-03-01: Milestone v1.1 UI Enhancement & Polish
+- Phase 6 RETIRED 2026-09-17: never started; absorbed by Phase 12 HARN-04
+- Phase 11 RETIRED 2026-09-17: never started; absorbed by Phases 17-18 (INFO-02, INFO-05)
+- Phases 12-19 added 2026-09-17: Milestone v2.0 Showdown Parity, harness-first
 
 ### Blockers/Concerns
 
@@ -203,6 +238,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-03
-Stopped at: Phase 10 verified ✓ — all 4 plans complete, 15/15 must-haves, 100/100 stress test
+Last session: 2026-09-17
+Stopped at: v2.0 roadmap written — Phases 12-19, 34/34 requirements mapped, Phases 6 and 11 retired
+Next: /gsd:plan-phase 12 (Automation Test Harness). Nothing else in v2.0 starts until it lands.
 Resume file: None

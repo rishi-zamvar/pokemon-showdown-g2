@@ -84,28 +84,28 @@ Players can play a complete random battle on their G2 glasses with attack, switc
 
 ## Context
 
-- G2 display is 576x288 monochrome, renders text and lists via SDK containers
+- G2 display is 576x288 **4-bit greyscale (16 levels of green)**, renders text, lists and images via SDK containers (corrected 2026-09-17 — was documented as monochrome, which is what led the sprite pipeline to encode 1-bit)
 - Max ~64 chars per line, ~8 lines of content visible
 - SDK supports text containers (content display) and list containers (scrollable selection)
-- Sprites must be very small pixel art to fit — Gen 1 style 8-bit sprites from Showdown CDN
+- Sprites come from the Showdown CDN, resized to container and converted to greyscale (BT.601), centred on black
 - Pokemon Showdown data already downloaded to `src/data/` (pokedex.json, moves.json, learnsets.json, typechart.json, abilities.json, items.json)
 - All menus displayed vertically — firmware handles list scrolling
 - Navigation: swipe = scroll up/down, tap = select, double-tap = go back
 
 ## Constraints
 
-- **Display**: G2 monochrome 576x288 — all UI must fit within text/list containers
+- **Display**: G2 4-bit greyscale 576x288 — all UI must fit within text/list/image containers; images capped at 20-288 x 20-144, max 4 per page, 12 containers total
 - **Input**: Gestures only (scroll, tap, double-tap) — no keyboard, no touch screen on glasses
 - **Data source**: Must use Pokemon Showdown public data — do not recreate mechanics from scratch
 - **SDK limits**: Text content max 1000 chars on rebuild, 2000 chars on in-place update
-- **Sprites**: Must be small enough to render on G2 — 8-bit pixel art style
+- **Sprites**: Sized to their container, sent as greyscale PNG with no app-side dithering — the host downsamples to 4-bit better than we can
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Pull all game data from Showdown repos | Avoid reimplementing Pokemon mechanics; stay accurate | — Pending |
-| 8-bit sprites from Showdown CDN | Smallest sprites that fit G2 display | — Pending |
+| Greyscale PNG sprites from Showdown CDN | Display is 4-bit greyscale; app-side 1-bit dithering produced dot noise | — Phase 15 |
 | Random battles only for v0.1 | Simplest battle format, no team builder needed | — Pending |
 | Defer status effects, abilities, items to v0.2 | Reduce v0.1 scope to core battle loop | — Pending |
 
