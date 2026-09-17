@@ -318,7 +318,7 @@ D-10 rules out golden-image diffing because simulator and hardware font renderin
 documented as divergent. Phases citing it must either justify a committed baseline or
 fall back to `expectFrameInk` / `expectGreyLevels`.
 
-**Plans**: 4 plans
+**Plans**: 4 plans (strictly sequential: each wave depends on the previous)
 
 Plans:
 - [ ] 12-01-PLAN.md — Zero-dependency PNG decode, ink/grey-level metrics, named regions derived from OVERLAY_LAYOUT
