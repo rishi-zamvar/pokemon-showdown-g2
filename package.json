@@ -14,7 +14,8 @@
     "qr": "node node_modules/@evenrealities/evenhub-cli/main.js qr",
     "pack": "npm run build && evenhub pack app.json ./dist --output pokemon-showdown.ehpk",
     "fix-data": "node scripts/fix-data.mjs",
-    "typecheck:harness": "tsc -p harness/tsconfig.json"
+    "typecheck:harness": "tsc -p harness/tsconfig.json",
+    "harness": "node -e \"const [a,b]=process.versions.node.split('.').map(Number); if(a<22||(a===22&&b<18)){console.error('harness needs Node >=22.18; this is '+process.versions.node);process.exit(1)}\" && node harness/run.ts"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "0.0.15",
