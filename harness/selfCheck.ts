@@ -193,6 +193,7 @@ function synthFrame(
   width: number,
   height: number,
   paint: (x: number, y: number) => number | [number, number, number],
+  alpha: (x: number, y: number) => number = () => 255,
 ): Frame {
   const rgba = new Uint8Array(width * height * 4);
   for (let y = 0; y < height; y++) {
@@ -203,10 +204,21 @@ function synthFrame(
       rgba[d] = rgb[0];
       rgba[d + 1] = rgb[1];
       rgba[d + 2] = rgb[2];
-      rgba[d + 3] = 255;
+      rgba[d + 3] = alpha(x, y);
     }
   }
   return { width, height, rgba, png: new Uint8Array(0), capturedAt: 0 };
+}
+
+/**
+ * Real 576x288 captures from `/api/screenshot/glasses`, committed under
+ * harness/fixtures/. Synthetic frames alone cannot validate these metrics:
+ * fixtures built by this file encode the same assumptions as the code, so they
+ * confirm rather than test. The simulator's actual pixel format (constant
+ * green RGB, brightness in alpha) is only discoverable from real output.
+ */
+function fixture(name: string): Frame {
+  return toFrame(new Uint8Array(fs.readFileSync(path.join(import.meta.dirname, "fixtures", name))));
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +414,56 @@ async function main(): Promise<void> {
     }
   });
 
-  const total = 17;
+  // -- 18: a sparse real screen must read sparse ----------------------------
+  // The UPPER bound is the load-bearing half. An alpha-blind luma reported
+  // FULL = 1.000 on this exact frame, and a "> 0" assertion would have passed
+  // it happily while the primitive was totally blind.
+  await check("18 real menu capture reads as sparse ink, not saturated", () => {
+    const f = fixture("glasses_menu.png");
+    assert.equal(f.width, W);
+    assert.equal(f.height, H);
+    const ink = inkRatio(f, REGIONS.FULL);
+    assert.ok(ink > 0, `menu FULL ink is ${ink}, expected > 0`);
+    assert.ok(ink < 0.1, `menu FULL ink is ${ink}, expected < 0.1 (saturated?)`);
+    // Menu shows no battle HUD at all, so these must be empty.
+    assert.equal(inkRatio(f, REGIONS.TEAM_BAR), 0);
+    assert.equal(inkRatio(f, REGIONS.LIST), 0);
+  });
+
+  // -- 19: real antialiased text genuinely has multiple grey levels ----------
+  await check("19 greyLevels on a real capture is > 1", () => {
+    for (const name of ["glasses_menu.png", "glasses_fixed.png"]) {
+      const levels = greyLevels(fixture(name), REGIONS.FULL);
+      assert.ok(levels > 1, `${name} reports ${levels} grey level(s), expected > 1`);
+    }
+  });
+
+  // -- 20: a full HUD lights every overlay region ---------------------------
+  await check("20 real HUD capture has ink in every overlay region", () => {
+    const f = fixture("glasses_fixed.png");
+    for (const name of ["TEAM_BAR", "OPP_COMPOSITE", "PLAYER_COMPOSITE", "LIST"] as const) {
+      const ink = inkRatio(f, REGIONS[name]);
+      assert.ok(ink > 0, `HUD ${name} ink is ${ink}, expected > 0`);
+    }
+    const full = inkRatio(f, REGIONS.FULL);
+    assert.ok(full > 0 && full < 0.2, `HUD FULL ink is ${full}, expected 0 < x < 0.2`);
+  });
+
+  // -- 21: direct regression guard for the alpha-blind luma bug -------------
+  await check("21 a fully transparent frame has zero ink", () => {
+    // The simulator's own encoding: RGB pinned to green, brightness in alpha.
+    // Alpha 0 everywhere is a blank screen and MUST score 0 — this is exactly
+    // the case HARN-03 exists to fail.
+    const blank = synthFrame(W, H, () => [0, 255, 0], () => 0);
+    assert.equal(inkRatio(blank, REGIONS.FULL), 0);
+    assert.equal(greyLevels(blank, REGIONS.FULL), 1);
+    // ...and the same green at full alpha is fully lit, so the metric is
+    // reading alpha rather than just always returning 0.
+    const lit = synthFrame(W, H, () => [0, 255, 0], () => 255);
+    assert.equal(inkRatio(lit, REGIONS.FULL), 1);
+  });
+
+  const total = 21;
   console.log(
     failures === 0
       ? `\nOK  ${total}/${total} checks passed`

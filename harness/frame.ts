@@ -26,20 +26,37 @@ export interface Frame {
 }
 
 /**
- * Luminance above this counts as lit. The glasses render on an LED panel where
- * black is off, so a small floor rejects encoder noise; the dimmest of the 16
- * grey levels is 17, which clears it.
+ * Premultiplied luminance above this counts as lit.
+ *
+ * The floor is stated on the 0..255 luma scale, but note the two very different
+ * ranges it has to straddle:
+ *   - opaque greyscale content (what the hardware panel gets): a lit pixel runs
+ *     up to 255, and the dimmest of the 16 grey levels is 17, which clears 16.
+ *   - simulator captures: RGB is the constant green (0,255,0) and brightness
+ *     lives entirely in alpha, so premultiplied luma tops out at
+ *     round(0.587 * 255) = 150. The dimmest alpha seen in real captures is 96,
+ *     giving 150 * 96/255 = 56 — still comfortably clear of 16.
+ * An unlit pixel is alpha 0 in both worlds and scores exactly 0.
  */
 export const INK_THRESHOLD = 16;
 
 /**
- * BT.601 luma, rounded. Matches the greyscale conversion the host applies, so
- * harness and device agree on what "lit" means. Rounding matters: the three
- * coefficients sum to 0.9999999999999999 in IEEE754, so an unrounded lum(16)
- * is 15.99… and would bucket and threshold one level low.
+ * BT.601 luma scaled by alpha (premultiplied). Matches the greyscale conversion
+ * the host applies, so harness and device agree on what "lit" means.
+ *
+ * Alpha is NOT optional. The simulator's framebuffer carries brightness in the
+ * alpha channel and leaves RGB at a constant (0,255,0) on every pixel, lit or
+ * not — so an alpha-blind luma returns 150 for all 165,888 pixels, making
+ * inkRatio exactly 1.0 on every region of every frame including a blank one.
+ * That silently defeats HARN-03, whose whole job is failing a blank screen.
+ * Black is LED-off on this panel, so an unlit pixel must score 0.
+ *
+ * Rounding matters too: the three coefficients sum to 0.9999999999999999 in
+ * IEEE754, so an unrounded lum(16,16,16,255) is 15.99… and would bucket and
+ * threshold one level low.
  */
-function lum(r: number, g: number, b: number): number {
-  return Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+function lum(r: number, g: number, b: number, a: number): number {
+  return Math.round((0.299 * r + 0.587 * g + 0.114 * b) * (a / 255));
 }
 
 /**
@@ -74,7 +91,7 @@ export function inkRatio(f: Frame, r: Region): number {
   for (let y = r.y; y < r.y + r.h; y++) {
     for (let x = r.x; x < r.x + r.w; x++) {
       const d = (y * f.width + x) * 4;
-      if (lum(f.rgba[d]!, f.rgba[d + 1]!, f.rgba[d + 2]!) > INK_THRESHOLD) lit++;
+      if (lum(f.rgba[d]!, f.rgba[d + 1]!, f.rgba[d + 2]!, f.rgba[d + 3]!) > INK_THRESHOLD) lit++;
     }
   }
   return lit / (r.w * r.h);
@@ -87,7 +104,7 @@ export function greyLevels(f: Frame, r: Region): number {
   for (let y = r.y; y < r.y + r.h; y++) {
     for (let x = r.x; x < r.x + r.w; x++) {
       const d = (y * f.width + x) * 4;
-      buckets.add(lum(f.rgba[d]!, f.rgba[d + 1]!, f.rgba[d + 2]!) >> 4);
+      buckets.add(lum(f.rgba[d]!, f.rgba[d + 1]!, f.rgba[d + 2]!, f.rgba[d + 3]!) >> 4);
     }
   }
   return buckets.size;
