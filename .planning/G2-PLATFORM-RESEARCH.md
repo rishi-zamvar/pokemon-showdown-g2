@@ -173,6 +173,20 @@ Verified by instrumentation, not inspection.
 | 7 | Root double-tap does not call `shutDownPageContainer(1)` — blocks Even Hub submission | `ScreenController.onDoubleTap` | open |
 | 8 | "You"/"Foe" labels baked into composites | `CompositeBuilder.ts:188` | open (user asked to remove) |
 | 9 | Stale `Desktop`-era absolute paths elsewhere in tooling | `even-dev` symlinks | fixed |
+| 10 | `update_image_raw_data: container 8 not found` on every boot — the team bar BMP is pushed before its container exists | simulator stdout, Phase 12 wave 2 | open (REND-06) |
+| 11 | `TextContainerUpgrade failed: container 2 not found` — the "blank out container 2" workaround in `showOverlayHud` fires against a container that isn't there | simulator stdout, Phase 12 wave 2 | open (Phase 13/14) |
+| 12 | `POST /api/input` returns `{"ok":true}` for inputs the simulator then DROPS (`inject_input: no active event container`). The HTTP result is not evidence the input was handled | simulator stdout, Phase 12 wave 2 | open (harness + Phase 16) |
+
+### Why 10-12 were invisible before
+
+All three are written to simulator **stdout** and appear nowhere in
+`/api/console`. During one boot the console held 119 entries and not one of
+them mentioned any of these. This is HARN-02's entire justification, and it
+paid for itself the first time the tee ran against the real app.
+
+Item 12 matters beyond this app: it means **no harness assertion may treat an
+`{"ok":true}` input response as proof of anything**. Scenarios must assert the
+framebuffer or the screen oracle changed.
 
 ## 7. Pokemon Showdown parity — the gap
 
