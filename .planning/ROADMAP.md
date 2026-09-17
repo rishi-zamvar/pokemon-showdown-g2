@@ -323,7 +323,7 @@ fall back to `expectFrameInk` / `expectGreyLevels`.
 Plans:
 - [x] 12-01-PLAN.md — Zero-dependency PNG decode, ink/grey-level metrics, named regions derived from OVERLAY_LAYOUT
 - [x] 12-02-PLAN.md — Simulator + Vite lifecycle, HTTP automation client, merged console+stdout capture with the failure policy
-- [ ] 12-03-PLAN.md — Assertion vocabulary, `npm run harness` runner, boot scenario, and the negative scenario that proves assertions can fail
+- [x] 12-03-PLAN.md — Assertion vocabulary, `npm run harness` runner, boot scenario, and the negative scenario that proves assertions can fail
 - [ ] 12-04-PLAN.md — Scripted end-to-end battle: boot → menu → attack → switch → faint → win/loss
 
 ### Phase 13: Container Safety Layer
@@ -527,7 +527,7 @@ Phases 6 and 11 are retired and skipped. Within v2.0, Phase 12 must complete bef
 | 9. Navigation & HUD Consolidation | 2/2 | Complete | 2026-03-02 |
 | 10. Overlay HUD Layouts | 4/4 | Complete | 2026-03-03 |
 | 11. Stats Screen | - | Retired -> Phases 17-18 | - |
-| 12. Automation Test Harness | 2/4 | In Progress|  |
+| 12. Automation Test Harness | 3/4 | In Progress|  |
 | 13. Container Safety Layer | 0/TBD | Not started | - |
 | 14. Battle Text & HUD Persistence | 0/TBD | Not started | - |
 | 15. 4-bit Greyscale Sprite Pipeline | 0/TBD | Not started | - |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Enhancement & Polish
-status: v2.0 in progress. Phase 12 Automation Test Harness — 2/4 plans complete.
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-09-17T23:16:55.882Z"
-last_activity: "2026-09-17 — 12-02 shipped: simulator/Vite lifecycle, automation HTTP client, dual-stream log capture with the HARN-02 stdout tee"
+status: completed
+stopped_at: Completed 12-03-PLAN.md
+last_updated: "2026-09-17T23:45:03.905Z"
+last_activity: "2026-09-17 — 12-03 shipped: assert.ts vocabulary, run.ts runner, `[screen]` oracle, selfCheck/boot/negativeProof scenarios. 36 primitive checks + 10 suite steps green three runs running; three real app defects allow-listed by name and printed every run (research rows 10, 11, and the newly found 13)."
 progress:
   total_phases: 22
   completed_phases: 11
   total_plans: 43
-  completed_plans: 40
+  completed_plans: 41
 ---
 
 # Project State
@@ -20,18 +20,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Milestone v2.0 — Showdown Parity (Phase 12 Automation Test Harness next)
+**Current focus:** Milestone v2.0 — Showdown Parity (Phase 12 Automation Test Harness, plan 12-04 next)
 
 ## Current Position
 
-Phase: 12 — Automation Test Harness — IN PROGRESS (2/4 plans)
-Plan: 12-01, 12-02 complete; 12-03 next
-Status: Driver + lifecycle + dual-stream log capture landed. HARN-01, HARN-02, HARN-03, HARN-05 complete.
-Last activity: 2026-09-17 — 12-02 shipped: cold-start Vite+simulator lifecycle, zero-dep automation client, merged console+stdout stream. Proven live: /api/console showed 119 entries and ZERO of the two container failures the stdout tee caught.
+Phase: 12 — Automation Test Harness — IN PROGRESS (3/4 plans)
+Plan: 12-01, 12-02, 12-03 complete; 12-04 next
+Status: `npm run harness` runs the suite unattended from nothing and exits non-zero on any failure. HARN-01, HARN-02, HARN-03, HARN-05, HARN-06 complete; HARN-04 (scripted battle) is 12-04.
+Last activity: 2026-09-17 — 12-03 shipped: assert.ts vocabulary, run.ts runner, `[screen]` oracle, selfCheck/boot/negativeProof scenarios. 36 primitive checks + 10 suite steps green three runs running; three real app defects allow-listed by name and printed every run (research rows 10, 11, and the newly found 13).
 
 ```
 Milestone v2.0 Progress:
-[===       ] Phase 12 Automation Test Harness          <- in progress (2/4), gates everything
+[=====     ] Phase 12 Automation Test Harness          <- in progress (3/4), gates everything
 [          ] Phase 13 Container Safety Layer
 [          ] Phase 14 Battle Text & HUD Persistence
 [          ] Phase 15 4-bit Greyscale Sprite Pipeline
@@ -39,7 +39,7 @@ Milestone v2.0 Progress:
 [          ] Phase 17 Context Menu & Inspect Navigation
 [          ] Phase 18 Move/Field/Team/Opponent Inspect
 [          ] Phase 19 Call-Count Performance Restructure
-6% complete (0/8 phases, 2/4 plans in Phase 12)
+9% complete (0/8 phases, 3/4 plans in Phase 12)
 ```
 
 ### Milestone v1.1 closed out
@@ -211,6 +211,7 @@ Recent decisions affecting current work:
 - [Phase 12]: Hand-rolled PNG decoder over node:zlib instead of pngjs/sharp; unsupported PNG shapes hard-throw
 - [Phase 12]: Framebuffer luminance is premultiplied by ALPHA - simulator carries brightness in alpha, RGB is constant green
 - [Phase 12]: Real simulator captures committed as harness fixtures; synthetic PNGs cannot validate the metrics
+- [Phase 12]: Phase 12 allow-lists three app defects by exact anchored line (research rows 10, 11, 13) instead of failing every run; each names its owning phase and is printed in every run's output
 
 ### v1.1 Research Context
 
@@ -263,7 +264,7 @@ Key findings from research (2026-03-01):
 
 ## Session Continuity
 
-Last session: 2026-09-17T23:16:55.878Z
-Stopped at: Completed 12-02-PLAN.md
+Last session: 2026-09-17T23:44:42.436Z
+Stopped at: Completed 12-03-PLAN.md
 Next: execute 12-02-PLAN.md (simulator lifecycle + HTTP client + merged log capture).
 Resume file: None

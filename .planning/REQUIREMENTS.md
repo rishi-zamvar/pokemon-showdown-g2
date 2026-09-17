@@ -266,7 +266,7 @@ Phases 17-18 as shown rather than being left orphaned.
 - [x] **HARN-03**: Assert on glasses framebuffer content (not just "no error"), so a blank or malformed screen fails a test
 - [ ] **HARN-04**: Scripted end-to-end battle: boot → menu → battle → attack → switch → faint → win/loss, as a single runnable check
 - [x] **HARN-05**: Fail the run on any console `error`, uncaught exception, failed fetch, or simulator validation warning
-- [ ] **HARN-06**: Headless regression run usable from CLI in one command
+- [x] **HARN-06**: Headless regression run usable from CLI in one command
 
 ### Render Correctness (fix what is broken)
 
@@ -327,7 +327,7 @@ Phases 17-18 as shown rather than being left orphaned.
 | HARN-03 | Phase 12 | Complete |
 | HARN-04 | Phase 12 | Pending |
 | HARN-05 | Phase 12 | Complete |
-| HARN-06 | Phase 12 | Pending |
+| HARN-06 | Phase 12 | Complete |
 | REND-03 | Phase 13 | Pending |
 | REND-04 | Phase 13 | Pending |
 | REND-05 | Phase 13 | Pending |
