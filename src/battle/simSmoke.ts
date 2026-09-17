@@ -16,7 +16,8 @@ console.log("=== SimBattleAdapter Smoke Test ===\n");
 
 // --- Test 1: startBattle() ---
 console.log("--- Test 1: startBattle() ---");
-const initialState = SimBattleAdapter.startBattle();
+const { state: initialState, initialLog } = SimBattleAdapter.startBattle();
+console.log(`Initial log entries: ${initialLog.length} (battle-start abilities/weather/terrain)`);
 
 console.log(`Phase: ${initialState.phase} (expected WAITING_FOR_ACTION)`);
 console.log(`Player team count: ${initialState.playerSide.team.length} (expected 6)`);

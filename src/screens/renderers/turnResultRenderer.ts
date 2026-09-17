@@ -65,11 +65,26 @@ export function formatEntry(entry: TurnLogEntry, state?: BattleState): string {
   const label = actorLabel(entry.actor, state);
 
   switch (entry.kind) {
+    // --- Move usage (always emitted for every |move| line) ---
+    case 'MOVE_USE': {
+      const moveName = moveDisplayName(d.move);
+      if (entry.actor === 'player') return `${actorPokemonName('player', state)} used ${moveName}!`;
+      return `Foe ${actorPokemonName('opponent', state)} used ${moveName}!`;
+    }
+
     // --- Original kinds (updated for PS-accurate text) ---
-    case 'DAMAGE':
-      return `${label} used ${moveDisplayName(d.move)}! ${d.damage} dmg`;
+    case 'DAMAGE': {
+      const dmg = Number(d.damage ?? 0);
+      // Show damage as percentage of target's max HP
+      const targetSide = entry.actor === 'player' ? state?.opponentSide : state?.playerSide;
+      const targetMon = targetSide ? targetSide.team[targetSide.activeIndex] : undefined;
+      const maxHp = targetMon?.stats?.hp ?? 0;
+      const pct = maxHp > 0 ? Math.round((dmg / maxHp) * 100) : 0;
+      if (d.isCrit) return `A critical hit! ${pct}% dmg`;
+      return `${pct}% dmg`;
+    }
     case 'MISS':
-      return `${label} used ${moveDisplayName(d.move)}... missed!`;
+      return 'The attack missed!';
     case 'FAINT':
       return `${d.pokemon} fainted!`;
     case 'STATUS_INFLICT': {

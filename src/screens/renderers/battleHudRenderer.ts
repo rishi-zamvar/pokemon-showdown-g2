@@ -12,6 +12,7 @@ import type { BattleState, ActivePokemon } from '../../types/battleState.js';
 import type { BattleHudScreen, ListScreen } from '../ScreenState.js';
 import { SpriteService } from '../../sprites/SpriteService.js';
 import { DataLoader } from '../../data/DataLoader.js';
+import { blankSprite } from '../../animation/SpriteEffects.js';
 
 export const HP_BAR_WIDTH = 10;
 
@@ -143,11 +144,12 @@ export function renderBattleHud(state: BattleState): BattleHudScreen {
   const playerStatus = formatStatus(playerMon);
   if (playerStatus) playerText += `\n${playerStatus}`;
 
-  // Get cached BMP sprites (Uint8Array)
+  // Get cached BMP sprites (Uint8Array) — fainted Pokemon get a blank (all-black) sprite
+  // to actively overwrite the previous sprite on screen (SDK persists old container content)
   const oppDexNum = getDexNum(opponentMon.species);
   const playerDexNum = getDexNum(playerMon.species);
-  const oppSprite = oppDexNum > 0 ? SpriteService.getBitmapCached(oppDexNum) : null;
-  const playerSpriteData = playerDexNum > 0 ? SpriteService.getBackBitmapCached(playerDexNum) : null;
+  const oppSprite = opponentMon.fainted ? blankSprite() : (oppDexNum > 0 ? SpriteService.getBitmapCached(oppDexNum) : null);
+  const playerSpriteData = playerMon.fainted ? blankSprite() : (playerDexNum > 0 ? SpriteService.getBackBitmapCached(playerDexNum) : null);
 
   console.log(`[HUD] oppDex=${oppDexNum} sprite=${oppSprite ? oppSprite.length + ' bytes' : 'null'}`);
   console.log(`[HUD] playerDex=${playerDexNum} sprite=${playerSpriteData ? playerSpriteData.length + ' bytes' : 'null'}`);

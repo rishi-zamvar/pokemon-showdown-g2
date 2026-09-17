@@ -181,10 +181,14 @@ export class AnimationEngine {
 
     // Shared mutable state for concurrent text + HP updates
     let currentText = '';
-    let hpStatus = '';
+    let playerHpText = '';
+    let oppHpText = '';
 
     const updateDisplay = async (): Promise<void> => {
-      await glass.updateText(renderTextBox(currentText), { left: hpStatus, right: '' });
+      // Combine both HP bars into a single status line (SDK only has 1 status container during animation)
+      // Player HP on left, opponent HP on right
+      const statusLine = [playerHpText, oppHpText].filter(Boolean).join('    ');
+      await glass.updateText(renderTextBox(currentText), { left: statusLine, right: '' });
     };
 
     // SWITCH: animation runs BEFORE text (sequential, not concurrent)
@@ -223,9 +227,12 @@ export class AnimationEngine {
       }
 
       tasks.push(this.spriteFlash(targetSide, 'hit', prevState, glass));
+      const setHp = targetSide === 'opponent'
+        ? (status: string) => { oppHpText = status; }
+        : (status: string) => { playerHpText = status; };
       tasks.push(this.hpDrain(
         targetSide, entry, prevState, glass,
-        (status) => { hpStatus = status; },
+        setHp,
         () => updateDisplay(),
       ));
     } else if (entry.kind === 'MISS') {
@@ -241,9 +248,12 @@ export class AnimationEngine {
     } else if (entry.kind === 'HEAL') {
       // Heal: reverse HP drain (bar fills up)
       const healSide: Side = entry.actor;
+      const setHealHp = healSide === 'opponent'
+        ? (status: string) => { oppHpText = status; }
+        : (status: string) => { playerHpText = status; };
       tasks.push(this.hpHeal(
         healSide, prevState, nextState, glass,
-        (status) => { hpStatus = status; },
+        setHealHp,
         () => updateDisplay(),
       ));
     } else if (entry.kind === 'STATUS_TICK') {

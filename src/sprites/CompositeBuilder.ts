@@ -164,30 +164,42 @@ export async function buildSpriteComposite(
 ): Promise<Uint8Array> {
   const ctx = getCompositeCtx(COMPOSITE_W, COMPOSITE_H);
 
-  // ── Nameplate region (y=0..NAMEPLATE_H, white background) ──
-  ctx.fillStyle = '#ffffff';
+  // ── Nameplate region (y=0..NAMEPLATE_H, black background with white text) ──
+  // On G2 glasses: white(1) = green pixels, black(0) = off. So white text on
+  // black background renders as green text on black — matching the sprite region.
+  ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, COMPOSITE_W, NAMEPLATE_H);
 
-  ctx.fillStyle = '#000000';
-  ctx.font = 'bold 10px monospace';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 12px monospace';
   ctx.textBaseline = 'top';
+
+  // Opponent nameplate: left-aligned (text starts at left edge, readable when composite is at right of screen)
+  // Player nameplate: right-aligned (text ends at right edge, readable when composite is at left of screen)
+  const alignText = (text: string, y: number): void => {
+    const metrics = ctx.measureText(text);
+    const x = isFront
+      ? 2                                                        // opponent: left-align
+      : Math.max(2, COMPOSITE_W - metrics.width - 2);           // player: right-align
+    ctx.fillText(text, x, y);
+  };
 
   // Line 1: Name + Level
   const label = isFront ? 'Foe' : 'You';
   const nameLine = `${label}: ${mon.name} Lv.${mon.level ?? 50}`;
-  ctx.fillText(nameLine.slice(0, 20), 2, 1);
+  alignText(nameLine.slice(0, 18), 2);
 
   // Line 2: HP bar
   const hpPct = mon.fainted
     ? 0
     : Math.max(1, Math.round((mon.currentHp / mon.stats.hp) * 100));
   const hpLine = buildHpBarText(hpPct);
-  ctx.fillText(hpLine.slice(0, 20), 2, 13);
+  alignText(hpLine.slice(0, 18), 18);
 
   // Line 3: Status + stat modifiers
   const statusLine = buildStatusLine(mon);
   if (statusLine) {
-    ctx.fillText(statusLine.slice(0, 20), 2, 25);
+    alignText(statusLine.slice(0, 18), 34);
   }
 
   // ── Sprite region (y=NAMEPLATE_H..COMPOSITE_H, black background) ──

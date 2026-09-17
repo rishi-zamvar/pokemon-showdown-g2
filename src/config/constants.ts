@@ -90,9 +90,9 @@ export const OVERLAY_LAYOUT = {
   COMPOSITE_H: 132,
   NAMEPLATE_H: 36,
   SPRITE_SIZE: 96,
-  OPP_X: 432,        // 576 - 144
+  OPP_X: 360,        // top-right, shifted toward center
   OPP_Y: 24,         // below team bar
-  PLAYER_X: 0,
+  PLAYER_X: 72,      // bottom-left, shifted toward center
   PLAYER_Y: 156,     // 24 + 132
   LIST_X: 288,       // right half
   LIST_Y: 156,       // 24 + 132

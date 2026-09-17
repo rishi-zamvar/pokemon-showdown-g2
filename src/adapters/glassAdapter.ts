@@ -177,15 +177,19 @@ export class GlassAdapterImpl implements GlassAdapter {
       }),
     );
 
-    await this.bridge.textContainerUpgrade(
-      new TextContainerUpgrade({
-        containerID: CONTAINER_IDS.statusRight,
-        containerName: CONTAINER_NAMES.statusRight,
-        contentOffset: 0,
-        contentLength: status.right.length,
-        content: status.right.slice(0, 2000),
-      }),
-    );
+    // Only update statusRight if it has content — container 3 doesn't exist
+    // during animation (showBattleHud only creates containers 1, 2, 4, 5).
+    if (status.right) {
+      await this.bridge.textContainerUpgrade(
+        new TextContainerUpgrade({
+          containerID: CONTAINER_IDS.statusRight,
+          containerName: CONTAINER_NAMES.statusRight,
+          contentOffset: 0,
+          contentLength: status.right.length,
+          content: status.right.slice(0, 2000),
+        }),
+      );
+    }
   }
 
   /**

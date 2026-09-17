@@ -84,10 +84,19 @@ export function parseLogLines(lines: string[]): TurnLogEntry[] {
     switch (cmd) {
       case "move": {
         // |move|POKEMON|MOVE|TARGET
-        // Set pending actor/name — do NOT emit a log entry yet (wait for damage/miss)
+        // Always emit a MOVE_USE entry so "X used Y!" is always displayed.
+        // Also set pending state so DAMAGE entries can reference the move.
         const pokemonIdent = parts[2] ?? "";
         pendingMoveActor = pokemonToActor(pokemonIdent);
         pendingMoveName = parts[3] ?? "";
+        entries.push({
+          kind: "MOVE_USE",
+          actor: pendingMoveActor,
+          detail: {
+            pokemon: extractName(pokemonIdent),
+            move: pendingMoveName,
+          },
+        });
         break;
       }
 
