@@ -9,17 +9,18 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "sim": "evenhub-simulator http://localhost:5173",
-    "qr": "evenhub qr",
+    "start:sim": "./scripts/start-sim.sh",
+    "start:glasses": "./scripts/start-glasses.sh",
+    "qr": "node node_modules/@evenrealities/evenhub-cli/main.js qr",
     "pack": "npm run build && evenhub pack app.json ./dist --output pokemon-showdown.ehpk",
     "fix-data": "node scripts/fix-data.mjs"
   },
   "dependencies": {
-    "@evenrealities/even_hub_sdk": "^0.0.7",
-    "@evenrealities/evenhub-cli": "^0.1.5",
-    "@evenrealities/evenhub-simulator": "^0.4.1",
-    "@pkmn/randoms": "^0.10.6",
-    "@smogon/calc": "^0.10.0"
+    "@evenrealities/even_hub_sdk": "0.0.15",
+    "@evenrealities/evenhub-cli": "0.1.14",
+    "@evenrealities/evenhub-simulator": "0.9.5",
+    "@pkmn/randoms": "0.10.11",
+    "@smogon/calc": "0.11.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

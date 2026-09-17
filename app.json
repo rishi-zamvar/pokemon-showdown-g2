@@ -3,7 +3,7 @@
   "edition": "202601",
   "name": "Pokemon Showdown",
   "version": "0.1.0",
-  "min_app_version": "0.1.0",
+  "min_app_version": "2.2.10",
   "tagline": "Pokemon battles on your G2 glasses",
   "description": "Battle wild Pokemon with turn-based combat on Even Realities G2 glasses. Scroll to navigate moves, tap to select.",
   "author": "Rishi Zamvar",
