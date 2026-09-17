@@ -263,7 +263,7 @@ Phases 17-18 as shown rather than being left orphaned.
 
 - [ ] **HARN-01**: Automated driver over the simulator HTTP automation API (`--automation-port`) that can send every input kind and read the glasses framebuffer, webview screenshot, and console
 - [ ] **HARN-02**: Capture simulator stdout alongside the console API — container validation failures are logged there and nowhere else
-- [ ] **HARN-03**: Assert on glasses framebuffer content (not just "no error"), so a blank or malformed screen fails a test
+- [x] **HARN-03**: Assert on glasses framebuffer content (not just "no error"), so a blank or malformed screen fails a test
 - [ ] **HARN-04**: Scripted end-to-end battle: boot → menu → battle → attack → switch → faint → win/loss, as a single runnable check
 - [ ] **HARN-05**: Fail the run on any console `error`, uncaught exception, failed fetch, or simulator validation warning
 - [ ] **HARN-06**: Headless regression run usable from CLI in one command
@@ -324,7 +324,7 @@ Phases 17-18 as shown rather than being left orphaned.
 |---|---|---|
 | HARN-01 | Phase 12 | Pending |
 | HARN-02 | Phase 12 | Pending |
-| HARN-03 | Phase 12 | Pending |
+| HARN-03 | Phase 12 | Complete |
 | HARN-04 | Phase 12 | Pending |
 | HARN-05 | Phase 12 | Pending |
 | HARN-06 | Phase 12 | Pending |

@@ -1,3 +1,18 @@
+---
+gsd_state_version: 1.0
+milestone: v1.1
+milestone_name: UI Enhancement & Polish
+status: v2.0 roadmap written. Phases 12-19, 34/34 requirements mapped, 0 orphans.
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-09-17T17:54:39.783Z"
+last_activity: 2026-09-17 — v2.0 roadmap created; Phases 6 and 11 retired into 12 and 17-18
+progress:
+  total_phases: 22
+  completed_phases: 11
+  total_plans: 43
+  completed_plans: 39
+---
+
 # Project State
 
 ## Project Reference
@@ -9,14 +24,14 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 ## Current Position
 
-Phase: 12 — Automation Test Harness — NOT STARTED
-Plan: none yet
-Status: v2.0 roadmap written. Phases 12-19, 34/34 requirements mapped, 0 orphans.
-Last activity: 2026-09-17 — v2.0 roadmap created; Phases 6 and 11 retired into 12 and 17-18
+Phase: 12 — Automation Test Harness — IN PROGRESS (1/4 plans)
+Plan: 12-01 complete; 12-02 next
+Status: Framebuffer analysis primitives landed. HARN-03 complete.
+Last activity: 2026-09-17 — 12-01 shipped: zero-dep PNG decoder, alpha-aware ink/grey metrics, layout-derived regions, 21-check self-check
 
 ```
 Milestone v2.0 Progress:
-[          ] Phase 12 Automation Test Harness          <- next, gates everything
+[==        ] Phase 12 Automation Test Harness          <- in progress (1/4), gates everything
 [          ] Phase 13 Container Safety Layer
 [          ] Phase 14 Battle Text & HUD Persistence
 [          ] Phase 15 4-bit Greyscale Sprite Pipeline
@@ -24,7 +39,7 @@ Milestone v2.0 Progress:
 [          ] Phase 17 Context Menu & Inspect Navigation
 [          ] Phase 18 Move/Field/Team/Opponent Inspect
 [          ] Phase 19 Call-Count Performance Restructure
-0% complete (0/8 phases)
+3% complete (0/8 phases, 1/4 plans in Phase 12)
 ```
 
 ### Milestone v1.1 closed out
@@ -34,6 +49,7 @@ left orphaned in the roadmap:
 
 - Phase 11 (Stats Screen) — never started. Subsumed by the v2.0 INFO-
   requirements; STAT-01..03 land on Phase 17, STAT-04..05 on Phase 18.
+
 - Phase 6 (Integration) — never started. Its "full loop, validated end to end"
   goal is exactly HARN-04, delivered as an automated check in Phase 12.
 
@@ -41,6 +57,7 @@ left orphaned in the roadmap:
 
 - Dangling `even-dev/public` asset symlinks pointed at a deleted `~/Desktop`
   path, so every asset 404'd and no battle ever started. Now relative links.
+
 - 576x24 team bar exceeded the 288x144 image container cap, failing the whole
   `rebuildPageContainer` and removing the action list — the app was
   unplayable. Commit `1684d66`.
@@ -57,7 +74,9 @@ left orphaned in the roadmap:
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23 (through v1.1)
+
+- Total plans completed: 24 (23 through v1.1, + 12-01)
+- 12-01: 2 tasks, 5 commits, 9 files, ~50 min
 - Average duration: ~2.3 min
 
 ## Accumulated Context
@@ -73,6 +92,7 @@ Recent decisions affecting current work:
 - [Roadmap]: Status conditions (burn, paralysis, poison, sleep, freeze) are IN scope for v0.1
 
 **v2.0 locked decisions (2026-09-17 — do not re-open):**
+
 - [Locked]: Information access is native context menu + dedicated inspect screens — the G2 has no hover and no pointer
 - [Locked]: Sprites use a full 4-bit greyscale pipeline; no app-side dithering (the host downsamples better)
 - [Locked]: Performance is restructured by cutting host call count, not payload (~104 ms fixed per image send dominates)
@@ -188,10 +208,14 @@ Recent decisions affecting current work:
 - [10-03]: BMP size diagnostic at console.debug level — fires on every overlay HUD render; debug level keeps production logs clean
 - [10-04]: deriveSide triple-strategy activeIndex: (1) set.species match, (2) species.name match, (3) isActive flag scan — ordered by reliability; isActive fallback catches edge cases where species normalisation fails
 - [10-04]: Post-derivation HP invariant: team[activeIndex].currentHp must equal simSide.active[0].hp — if not, correct in-place and console.warn; ensures composite always shows true HP after any switch
+- [Phase 12]: Hand-rolled PNG decoder over node:zlib instead of pngjs/sharp; unsupported PNG shapes hard-throw
+- [Phase 12]: Framebuffer luminance is premultiplied by ALPHA - simulator carries brightness in alpha, RGB is constant green
+- [Phase 12]: Real simulator captures committed as harness fixtures; synthetic PNGs cannot validate the metrics
 
 ### v1.1 Research Context
 
 Key findings from research (2026-03-01):
+
 - [v1.1]: Zero new npm dependencies needed for all v1.1 features
 - [v1.1]: 4-container SDK limit is the binding constraint for overlay HUD layouts (Phase 10)
 - [v1.1]: Double-tap needs new gesture kind — DOUBLE_CLICK_EVENT currently maps to TAP in gesture handler
@@ -211,6 +235,7 @@ Key findings from research (2026-03-01):
 - PROJECT.md "Context" and "Constraints" still describe the display as 576x288
   monochrome and sprites as "8-bit pixel art". It is 4-bit greyscale, 16 levels.
   Correct before Phase 15 so the sprite work isn't planned against a stale spec.
+
 - The v2.0 brief referenced "49 requirements"; REQUIREMENTS.md defines 34
   (HARN 6, REND 7, SPR 4, INFO 7, INPUT 6, PERF 4). All 34 are mapped. If 15
   more were intended they are not written down anywhere and cannot be mapped.
@@ -238,7 +263,7 @@ Key findings from research (2026-03-01):
 
 ## Session Continuity
 
-Last session: 2026-09-17
-Stopped at: v2.0 roadmap written — Phases 12-19, 34/34 requirements mapped, Phases 6 and 11 retired
-Next: /gsd:plan-phase 12 (Automation Test Harness). Nothing else in v2.0 starts until it lands.
+Last session: 2026-09-17T17:54:39.779Z
+Stopped at: Completed 12-01-PLAN.md
+Next: execute 12-02-PLAN.md (simulator lifecycle + HTTP client + merged log capture).
 Resume file: None
