@@ -789,6 +789,15 @@ export class ScreenController {
         break;
     }
 
+    // Harness screen oracle (Phase 12 / HARN-03, HARN-05, HARN-06; consumed by
+    // HARN-04's battle script in plan 12-04). Observation only -- no branch, no
+    // render change, no timing change. expectScreen() and waitScreen() read this.
+    // MUST stay after the switch: every decision screen awaits showOverlayHud
+    // (3 image sends ~104ms + ~165ms rebuild), so logging before the switch would
+    // announce a screen ~477ms before its pixels exist and every framebuffer
+    // assertion would read the OUTGOING screen.
+    console.log(`[screen] ${this.state.screen} cursor=${this.state.cursorIndex}`);
+
     if (this.state.battleState) {
       this.updatePhoneCompanion();
     }
