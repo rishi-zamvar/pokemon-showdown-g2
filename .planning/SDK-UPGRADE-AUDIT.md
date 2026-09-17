@@ -195,13 +195,26 @@ The simulator jumped 0.4.1 → **0.9.5**, five minor versions, and changed packa
 1. **Commit the 37 dirty Phase 10 files first.** Do not start an upgrade on top of uncommitted gap-closure work.
 2. **Bump the three `@evenrealities` packages, typecheck, run `simSmoke` + `stressTest`.** Purely additive API means this should be near-free, and it banks the LZ4 win immediately. Update `app.json` `min_app_version` to `2.2.10`.
 3. **Adopt `zOrderIndex` across `showOverlayHud`** (all four containers, unique values) and delete the 50 ms sleep and the blank-container-2 workaround. Re-verify against the Phase 10 bug list.
-4. **Split text out of the composites.** Nameplate + HP + status become text containers driven by `textContainerUpgrade`; `CompositeBuilder` renders sprite only. This is the real performance change.
+4. ~~**Split text out of the composites.**~~ **SUPERSEDED — this was wrong.**
+   Measured hardware costs (`textContainerUpgrade` ~83 ms vs `rebuildPageContainer`
+   ~165 ms flat) make break-even 2 containers, so splitting into 5-6 text
+   containers is ~3x *slower*. Compositing text into the bitmap, as the app
+   already does, is correct on this platform. The real win is merging image
+   containers (~104 ms fixed each). See `G2-PLATFORM-RESEARCH.md` §3.
 5. **Move Forfeit / Battle Speed / About into a contextual menu**; replace the `forfeitPending` timeout hack with long-press.
 6. **Then** Phase 11 Stats Screen — which becomes much easier with 8 text containers instead of 4 total.
 
 Steps 3–5 each touch `glassAdapter.ts` plus `constants.ts` and little else, thanks to the existing layering.
 
 ---
+
+## Superseded
+
+Parts of this document were written before the hardware performance data and
+community reference in `G2-PLATFORM-RESEARCH.md` were available. Where the two
+disagree, the research doc wins. Specifically: the 576-wide image container
+question below is now answered (it is a hard cap and it was breaking the app),
+and the text-container recommendation above is withdrawn.
 
 ## Open questions
 

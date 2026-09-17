@@ -1,0 +1,191 @@
+# G2 Platform Research — what is actually possible, and what this app gets wrong
+
+Compiled 2026-09-17 from: the SDK 0.0.15 type surface and README, the
+evenhub-simulator 0.9.5 README, the community reference
+[nickustinov/even-g2-notes](https://github.com/nickustinov/even-g2-notes)
+(display/input/performance docs, measured on real G2 firmware 2.2.7.14), and
+live instrumentation of this app through the simulator automation API.
+
+---
+
+## 1. The display is not monochrome
+
+`PROJECT.md` says "576x288 monochrome". It is **576x288, 4-bit greyscale — 16
+levels of green**. The host app converts everything you send via `imageToGray4`.
+
+This app ships `SpriteBmpEncoder.ts`, which encodes **1-bit** BMPs. The
+community reference is explicit that this is the wrong thing to do:
+
+> Do not perform 1-bit dithering in your app — the host does better 4-bit
+> downsampling; manual Floyd-Steinberg dithering creates noisy green dots on
+> the display.
+
+That is exactly what the captured frames show: Dragonite and Cryogonal render
+as scattered dot clouds rather than readable sprites. **The sprites look bad
+because the app throws away 15 of the 16 available brightness levels before the
+host ever sees them.**
+
+Correct pipeline per the reference: resize to fit the container preserving
+aspect, centre on black (black = LED off), convert to greyscale with BT.601
+luminance, encode PNG, send as `number[]` or base64. No dithering.
+
+Text has a parallel capability the app ignores: `textColor` (SDK 0.0.14+) sets
+brightness 0–4 per text container, and borders take `borderColor` 0–15.
+
+## 2. Hard container limits
+
+| Constraint | Value |
+|---|---|
+| Image containers per page | **4** |
+| Other containers per page | **8** (12 total, mixed) |
+| Image width | **20–288 px** |
+| Image height | **20–144 px** |
+| `isEventCapture: 1` | **exactly one** container per page |
+| Text content | 1000 chars (startup/rebuild), 2000 (`textContainerUpgrade`) |
+| `containerName` | max 16 chars |
+| Menu items (0.0.14+) | max 10, names ≤32 UTF-8 bytes |
+
+The 576x24 team bar violated the image width cap. One oversized container
+fails the **entire** `rebuildPageContainer`, which is why the action list
+vanished and the game was unplayable. Fixed in `1684d66`.
+
+Two more gotchas that bite this app directly:
+- **Tiling:** if image data is smaller than its container, the hardware
+  *repeats* it. Always match data dimensions to container dimensions.
+- **No concurrent image sends.** Queue `updateImageRawData` sequentially.
+- **Cannot send image data during `createStartUpPageContainer`.** Create an
+  empty placeholder, then update. This is the `container 8 not found` warning.
+
+## 3. Performance: call count is everything
+
+Measured on real hardware (firmware 2.2.7.14, SDK 0.0.13):
+
+| Call | Cost |
+|---|---|
+| `updateImageRawData` | **~104 ms fixed** + ~3.9 ms/KB of gray4 |
+| `rebuildPageContainer` | **~165 ms flat**, any container count |
+| `textContainerUpgrade` | **~83 ms** per call |
+| `createStartUpPageContainer` | ~100–135 ms |
+
+`ms ≈ 104 + 0.0039 × gray4Bytes`. **10.5x the data costs 1.6x the time.**
+Payload is nearly irrelevant; the fixed per-call cost dominates.
+
+**What this costs this app today.** Every overlay HUD render sends three
+images plus a rebuild:
+
+```
+3 × ~104 ms  (teamBar, opponent, player)  +  ~165 ms rebuild  ≈  477 ms
+```
+
+Nearly half a second per screen change, before any animation. The animation
+engine then drives *more* image uploads per frame for hit flashes and HP
+drain — at ~104 ms each, a "flash" of 2 cycles is ~400 ms of pure overhead.
+This is why the game feels sluggish, and it is a structural problem, not a
+tuning one.
+
+### Correction to my earlier audit
+
+In `SDK-UPGRADE-AUDIT.md` I recommended splitting nameplate/HP text out of the
+composite bitmaps into separate text containers, calling it "the single biggest
+win". **The measured data contradicts that and I was wrong.** Break-even is 2
+containers: `textContainerUpgrade` at ~83 ms versus ~165 ms for a whole
+rebuild, so 5–6 text containers cost ~415–500 ms against ~165 ms for one
+rebuild — about 3x worse. Compositing text into the bitmap, which is what this
+app already does, is the *right* call on this platform.
+
+The real win is the opposite direction: **merge image containers.** Two image
+containers cost ~208 ms in fixed overhead alone. Where two images fall inside
+one 288x144 box, compositing them onto a single canvas and sending once saves
+~104 ms for a couple of milliseconds of extra bytes. The 288x144 cap is the
+binding constraint on how far this can go.
+
+LZ4 (0.0.12+) is real but optimises the part that was already free.
+
+## 4. Input surface
+
+| Event | Value | Source |
+|---|---|---|
+| `CLICK_EVENT` | 0 | ring tap, temple tap |
+| `SCROLL_TOP_EVENT` | 1 | internal scroll hit top |
+| `SCROLL_BOTTOM_EVENT` | 2 | internal scroll hit bottom |
+| `DOUBLE_CLICK_EVENT` | 3 | ring/temple double-tap |
+| `FOREGROUND_ENTER/EXIT` | 4/5 | app lifecycle |
+| `ABNORMAL_EXIT_EVENT` | 6 | disconnect |
+| `LONG_PRESS_EVENT` | 9 | SDK 0.0.14+ |
+| `LONG_PRESS_RELEASE_EVENT` | 10 | SDK 0.0.14+ |
+
+Plus, new in 0.0.14/0.0.15: `menuItemClickEvent` (native context menu) and
+`sysEvent.eventSource` distinguishing `GLASSES_R`, `GLASSES_L` and **`RING`**.
+IMU head gestures are available via `imuControl` (0.0.8+).
+
+Quirks that matter:
+1. **`CLICK_EVENT = 0` normalises to `undefined`.** Must check for both. The
+   app already handles this.
+2. **`currentSelectItemIndex` is omitted for index 0.** Track selection in app
+   state as fallback. The app already does.
+3. **Simulator sends `sysEvent`; real hardware sends `listEvent`/`textEvent`.**
+   Handle all three.
+4. **Swipe throttling** — 300 ms cooldown. Already implemented.
+5. **Submission requirement:** the root page *must* call
+   `shutDownPageContainer(1)` on double-tap or Even Hub rejects the app.
+   **This app does not do that** — root double-tap currently does nothing.
+
+## 5. Automated testing is available (and this unblocks TDD)
+
+`evenhub-simulator` v0.7.0+ exposes an HTTP automation API, explicitly
+"intended to make it easier for scripts (and AI agents) to drive the
+simulator". It exists only because of the 0.4.1 → 0.9.5 bump.
+
+```bash
+evenhub-simulator http://127.0.0.1:5173 --automation-port 9898
+```
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/ping` | health |
+| GET | `/api/screenshot/glasses` | **576x288 RGBA PNG of the real framebuffer** |
+| GET | `/api/screenshot/webview` | companion webview PNG |
+| GET | `/api/console?since_id=N` | console, uncaught errors, failed fetches |
+| DELETE | `/api/console` | clear buffer |
+| POST | `/api/input` | `up`/`down`/`click`/`double_click`/`long_press`/`long_press_release`/`context_menu` |
+
+This is a full closed loop: drive input, read the framebuffer, read the
+console. It is what found both bugs in this session. Simulator-side validation
+failures are logged to simulator **stdout**, not the console API — capture both.
+
+Known simulator/hardware divergences: font rendering, list focus positioning,
+error-response handling, and image-size constraint enforcement.
+
+---
+
+## 6. What is wrong with this app, ranked
+
+Verified by instrumentation, not inspection.
+
+| # | Issue | Evidence | Status |
+|---|---|---|---|
+| 1 | Dangling asset symlinks in `even-dev/public` pointed at a deleted `~/Desktop` path → every asset 404 → battle never started | `[fetch] 404 /data/learnsets.json` | **fixed** (relative symlinks) |
+| 2 | 576x24 team bar exceeded the 288x144 image cap → whole page rebuild rejected → no action list → unplayable | simulator: `image container size 576x24 exceeds maximum 288x144` | **fixed** `1684d66` |
+| 3 | Sprites encoded 1-bit, discarding 15 of 16 grey levels → noisy dot clouds | captured frames; reference says do not dither | open |
+| 4 | ~477 ms per screen change from 3 image sends + rebuild | measured cost model | open |
+| 5 | Turn-result text renders as `[Mudsdale'` — malformed string | captured frame after attack | open |
+| 6 | Nameplates/HP disappear during animation | captured frame | open |
+| 7 | Root double-tap does not call `shutDownPageContainer(1)` — blocks Even Hub submission | `ScreenController.onDoubleTap` | open |
+| 8 | "You"/"Foe" labels baked into composites | `CompositeBuilder.ts:188` | open (user asked to remove) |
+| 9 | Stale `Desktop`-era absolute paths elsewhere in tooling | `even-dev` symlinks | fixed |
+
+## 7. Pokemon Showdown parity — the gap
+
+PS online surfaces, on demand, per Pokemon: stats, forme, level, HP, types,
+status, ability, nature, item, full moveset, spreads and boosts; per move:
+type, category, base power, accuracy, PP, effectiveness multiplier against the
+current target; and field state: weather, terrain, screens, hazards.
+
+The G2 has no hover and no pointer, so every one of those has to become a
+*navigable* surface. The available primitives are: list containers, the native
+context menu (≤10 items, 0.0.14+), long-press, double-tap, and the R1 ring.
+That is the design problem for the milestone — "all information accessible"
+means an inspect model, not tooltips.
+
+Currently the app shows: name, level, HP%, status, and a 4-move list. Nearly
+everything else is missing.
