@@ -313,7 +313,18 @@ Plans:
 | `expectHostCalls(action, n)` | a screen change issued at most n adapter calls |
 | `runBattleScript()` | the full boot → win/loss script completes |
 
-**Plans**: TBD
+`expectFrameDiff` is defined here but deliberately **not implemented** in Phase 12 —
+D-10 rules out golden-image diffing because simulator and hardware font rendering are
+documented as divergent. Phases citing it must either justify a committed baseline or
+fall back to `expectFrameInk` / `expectGreyLevels`.
+
+**Plans**: 4 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Zero-dependency PNG decode, ink/grey-level metrics, named regions derived from OVERLAY_LAYOUT
+- [ ] 12-02-PLAN.md — Simulator + Vite lifecycle, HTTP automation client, merged console+stdout capture with the failure policy
+- [ ] 12-03-PLAN.md — Assertion vocabulary, `npm run harness` runner, boot scenario, and the negative scenario that proves assertions can fail
+- [ ] 12-04-PLAN.md — Scripted end-to-end battle: boot → menu → attack → switch → faint → win/loss
 
 ### Phase 13: Container Safety Layer
 **Goal**: The adapter cannot issue an SDK call the hardware will reject or tile — every geometry and ordering invariant is enforced in one place, so no later phase can silently break a whole page rebuild again
@@ -491,7 +502,7 @@ Phases 6 and 11 are retired and skipped. Within v2.0, Phase 12 must complete bef
 | 9. Navigation & HUD Consolidation | 2/2 | Complete | 2026-03-02 |
 | 10. Overlay HUD Layouts | 4/4 | Complete | 2026-03-03 |
 | 11. Stats Screen | - | Retired -> Phases 17-18 | - |
-| 12. Automation Test Harness | 0/TBD | Not started | - |
+| 12. Automation Test Harness | 0/4 | Planned | - |
 | 13. Container Safety Layer | 0/TBD | Not started | - |
 | 14. Battle Text & HUD Persistence | 0/TBD | Not started | - |
 | 15. 4-bit Greyscale Sprite Pipeline | 0/TBD | Not started | - |
