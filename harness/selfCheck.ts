@@ -751,10 +751,14 @@ export async function runChecks(): Promise<CheckResult[]> {
   // sends and rebuild have put its pixels on the framebuffer, so every
   // expectFrameInk would assert against the OUTGOING screen.
   await check("32 [screen] oracle is logged after render()'s switch, before updatePhoneCompanion", () => {
-    const src = fs.readFileSync(
-      path.join(import.meta.dirname, "..", "src", "screens", "ScreenController.ts"),
-      "utf8",
-    );
+    // Line comments are stripped first: a commented-out emit is not an emit,
+    // and this check is the thing standing between a deleted oracle and a
+    // 60-second waitScreen timeout that reads like a hung app.
+    const src = fs
+      .readFileSync(path.join(import.meta.dirname, "..", "src", "screens", "ScreenController.ts"), "utf8")
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//"))
+      .join("\n");
     const emits = src.match(/console\.log\(`\[screen\] /g) ?? [];
     assert.equal(emits.length, 1, `expected exactly one [screen] emit in src/, found ${emits.length}`);
 

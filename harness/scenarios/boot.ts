@@ -107,29 +107,14 @@ export const bootScenario: Scenario = {
       await ctx.capture("after-seven-inputs");
       expectConsoleClean(ctx.logs);
 
-      // Leave the app on MAIN_MENU: negativeProof needs a known-blank region,
-      // and the team bar only exists on the overlay battle screens. Forfeit is
-      // double_click twice on BATTLE_HUD (the first arms it, the second
-      // confirms, and it auto-disarms after 3s) — one extra double_click gets
-      // us out of a select screen first, so four attempts covers every start.
-      let home = false;
-      for (let i = 0; i < 4 && !home; i++) {
-        const mark = ctx.logs.nextSeq();
-        await ctx.press("double_click");
-        try {
-          // short: the forfeit confirmation disarms itself after 3s, so a long
-          // wait here would walk out of the window it is trying to use.
-          await ctx.waitScreen("MAIN_MENU", 1500, mark);
-          home = true;
-        } catch {
-          /* not home yet — try the next double_click */
-        }
-      }
-      if (!home) {
-        throw new AssertionError(
-          "could not navigate back to MAIN_MENU with four double_clicks; negativeProof needs a known-blank TEAM_BAR region",
-        );
-      }
+      // Deliberately NOT navigating back to a known screen here. The seven
+      // actions land the app somewhere different run to run — glassAdapter's
+      // mapEventToGesture turns every UNKNOWN eventType into a TAP
+      // (glassAdapter.ts:629), so long_press / long_press_release /
+      // context_menu can each commit a move — and a scenario that depends on
+      // where this storm stops is flaky by construction (it was: "could not
+      // navigate back to MAIN_MENU in 12 inputs (last screen: ANIMATING)").
+      // negativeProof finds its own measured-blank target instead.
     });
 
     // -- 4. webview ---------------------------------------------------------

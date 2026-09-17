@@ -28,7 +28,8 @@ import type { InputAction } from "./driver.ts";
 import { LogStream } from "./logs.ts";
 import { startStack } from "./sim.ts";
 import type { SimHandle } from "./sim.ts";
-import { saveFrame, toFrame } from "./frame.ts";
+import { inkRatio, saveFrame, toFrame } from "./frame.ts";
+import { REGIONS } from "./regions.ts";
 import type { Frame } from "./frame.ts";
 import { expectConsoleClean, knownDefect } from "./assert.ts";
 import type { KnownDefect } from "./assert.ts";
@@ -137,9 +138,13 @@ function makeCtx(driver: Driver, logs: LogStream, runDir: string, sim: boolean, 
     if (!sim) throw new Error(`${what} requires a simulator, but scenario "${scenario}" declared needsSim: false`);
   };
 
-  const capture = async (label: string): Promise<Frame> => {
+  /** screenshot + decode, WITHOUT writing an artifact (used for polling) */
+  const snap = async (): Promise<Frame> => {
     needSim("capture()");
-    const frame = toFrame(await driver.glasses());
+    return toFrame(await driver.glasses());
+  };
+
+  const save = async (frame: Frame, label: string): Promise<void> => {
     const safe = label.replace(/[^A-Za-z0-9._-]+/g, "-");
     // scenario-prefixed: captureSeq restarts per scenario, so two scenarios
     // capturing the same label would otherwise overwrite each other's artifact.
@@ -147,6 +152,11 @@ function makeCtx(driver: Driver, logs: LogStream, runDir: string, sim: boolean, 
       frame,
       path.join(runDir, `${scenario}-${String(++captureSeq).padStart(3, "0")}-${safe}.png`),
     );
+  };
+
+  const capture = async (label: string): Promise<Frame> => {
+    const frame = await snap();
+    await save(frame, label);
     return frame;
   };
 
@@ -202,7 +212,29 @@ function makeCtx(driver: Driver, logs: LogStream, runDir: string, sim: boolean, 
         },
         { what: `screen ${name} (after seq ${from})`, timeoutMs },
       );
-      return capture(`screen-${name}`);
+
+      // The [screen] line means render()'s awaits resolved — but the
+      // simulator's compositor lags it, and a capture taken immediately after
+      // can still be the blank/previous framebuffer (measured: `CONTENT: ink
+      // 0.000` on roughly one run in three before this loop existed; the plan's
+      // "no settle is needed" claim is empirically wrong).
+      //
+      // So poll for pixels (D-15: a condition, never a sleep) — but GIVE UP
+      // after the budget and return the blank frame anyway. A screen that is
+      // genuinely blank must still fail at the assertion with its observed ink
+      // (HARN-03), not hide behind a timeout message from the wait helper.
+      let frame = await snap();
+      if (inkRatio(frame, REGIONS.FULL) === 0) {
+        frame = await waitFor(
+          async () => {
+            frame = await snap();
+            return inkRatio(frame, REGIONS.FULL) > 0 ? frame : null;
+          },
+          { what: `any lit pixel after [screen] ${name}`, timeoutMs: 5000, pollMs: 100 },
+        ).catch(() => frame);
+      }
+      await save(frame, `screen-${name}`);
+      return frame;
     },
   };
   return ctx;
