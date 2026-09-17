@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Enhancement & Polish
-status: v2.0 roadmap written. Phases 12-19, 34/34 requirements mapped, 0 orphans.
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-09-17T17:54:39.783Z"
-last_activity: 2026-09-17 — v2.0 roadmap created; Phases 6 and 11 retired into 12 and 17-18
+status: v2.0 in progress. Phase 12 Automation Test Harness — 2/4 plans complete.
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-09-17T23:16:55.882Z"
+last_activity: "2026-09-17 — 12-02 shipped: simulator/Vite lifecycle, automation HTTP client, dual-stream log capture with the HARN-02 stdout tee"
 progress:
   total_phases: 22
   completed_phases: 11
   total_plans: 43
-  completed_plans: 39
+  completed_plans: 40
 ---
 
 # Project State
@@ -24,14 +24,14 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 ## Current Position
 
-Phase: 12 — Automation Test Harness — IN PROGRESS (1/4 plans)
-Plan: 12-01 complete; 12-02 next
-Status: Framebuffer analysis primitives landed. HARN-03 complete.
-Last activity: 2026-09-17 — 12-01 shipped: zero-dep PNG decoder, alpha-aware ink/grey metrics, layout-derived regions, 21-check self-check
+Phase: 12 — Automation Test Harness — IN PROGRESS (2/4 plans)
+Plan: 12-01, 12-02 complete; 12-03 next
+Status: Driver + lifecycle + dual-stream log capture landed. HARN-01, HARN-02, HARN-03, HARN-05 complete.
+Last activity: 2026-09-17 — 12-02 shipped: cold-start Vite+simulator lifecycle, zero-dep automation client, merged console+stdout stream. Proven live: /api/console showed 119 entries and ZERO of the two container failures the stdout tee caught.
 
 ```
 Milestone v2.0 Progress:
-[==        ] Phase 12 Automation Test Harness          <- in progress (1/4), gates everything
+[===       ] Phase 12 Automation Test Harness          <- in progress (2/4), gates everything
 [          ] Phase 13 Container Safety Layer
 [          ] Phase 14 Battle Text & HUD Persistence
 [          ] Phase 15 4-bit Greyscale Sprite Pipeline
@@ -39,7 +39,7 @@ Milestone v2.0 Progress:
 [          ] Phase 17 Context Menu & Inspect Navigation
 [          ] Phase 18 Move/Field/Team/Opponent Inspect
 [          ] Phase 19 Call-Count Performance Restructure
-3% complete (0/8 phases, 1/4 plans in Phase 12)
+6% complete (0/8 phases, 2/4 plans in Phase 12)
 ```
 
 ### Milestone v1.1 closed out
@@ -263,7 +263,7 @@ Key findings from research (2026-03-01):
 
 ## Session Continuity
 
-Last session: 2026-09-17T17:54:39.779Z
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-09-17T23:16:55.878Z
+Stopped at: Completed 12-02-PLAN.md
 Next: execute 12-02-PLAN.md (simulator lifecycle + HTTP client + merged log capture).
 Resume file: None

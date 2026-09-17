@@ -322,7 +322,7 @@ fall back to `expectFrameInk` / `expectGreyLevels`.
 
 Plans:
 - [x] 12-01-PLAN.md — Zero-dependency PNG decode, ink/grey-level metrics, named regions derived from OVERLAY_LAYOUT
-- [ ] 12-02-PLAN.md — Simulator + Vite lifecycle, HTTP automation client, merged console+stdout capture with the failure policy
+- [x] 12-02-PLAN.md — Simulator + Vite lifecycle, HTTP automation client, merged console+stdout capture with the failure policy
 - [ ] 12-03-PLAN.md — Assertion vocabulary, `npm run harness` runner, boot scenario, and the negative scenario that proves assertions can fail
 - [ ] 12-04-PLAN.md — Scripted end-to-end battle: boot → menu → attack → switch → faint → win/loss
 
@@ -368,7 +368,23 @@ Plans:
   2. Each sprite is converted with BT.601 luminance, resized preserving aspect ratio, and centred on a black field sized exactly to its container
   3. A captured sprite region on the glasses framebuffer contains at least 6 distinct grey levels with ink density inside a legible band — the scattered dot-cloud rendering of Dragonite and Cryogonal no longer occurs
   4. Nameplate and HP text remain composited into the bitmap rather than split into text containers, and are drawn with greyscale anti-aliasing
-**Harness assertions that prove it**: `expectGreyLevels(SPRITE_REGION, 6)` and `expectFrameInk(SPRITE_REGION, min, max)` across a fixed roster of species; `expectFrameDiff(SPRITE_REGION, golden)` per species; `expectConsoleClean()`.
+**Harness assertions that prove it**: `expectGreyLevels(SPRITE_REGION, 6)` and `expectFrameInk(SPRITE_REGION, min, max)` across a fixed roster of species; `expectConsoleClean()`.
+
+> **Measurement ceiling (Phase 12, deferred item D3):** `greyLevels()` can return
+> **at most 10** on simulator captures, never 16. The simulator pins RGB to
+> (0,255,0) and carries brightness in alpha, so premultiplied luma maxes at
+> `round(0.587*255) = 150` and `lum >> 4` tops out at bucket 9. The goal line's
+> "all 16 grey levels" describes the *panel*, not anything assertable here —
+> criterion 3's `>= 6` is the testable form. Do NOT assert `=== 16`, and do NOT
+> "fix" the bucket shift: it is correct for the opaque hardware-shaped greyscale
+> this metric also has to serve. To prove 16-level output, assert on the alpha
+> histogram directly.
+>
+> `expectFrameDiff` was **removed** from this line: it is a throwing stub (D-10
+> forbids golden-image diffing — simulator and hardware render differently).
+> Also note deferred item **D2**: the repo's own `src/data/sprites/*.png` are
+> colour-type-3 palette PNGs, which the harness decoder hard-throws on by design.
+> If Phase 15 needs to read source sprites directly it must add PLTE support.
 **Plans**: TBD
 **UI hint**: yes
 
@@ -511,7 +527,7 @@ Phases 6 and 11 are retired and skipped. Within v2.0, Phase 12 must complete bef
 | 9. Navigation & HUD Consolidation | 2/2 | Complete | 2026-03-02 |
 | 10. Overlay HUD Layouts | 4/4 | Complete | 2026-03-03 |
 | 11. Stats Screen | - | Retired -> Phases 17-18 | - |
-| 12. Automation Test Harness | 1/4 | In Progress|  |
+| 12. Automation Test Harness | 2/4 | In Progress|  |
 | 13. Container Safety Layer | 0/TBD | Not started | - |
 | 14. Battle Text & HUD Persistence | 0/TBD | Not started | - |
 | 15. 4-bit Greyscale Sprite Pipeline | 0/TBD | Not started | - |

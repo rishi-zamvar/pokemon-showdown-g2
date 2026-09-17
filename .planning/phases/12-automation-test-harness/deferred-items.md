@@ -71,3 +71,40 @@ levels, and `greyLevels(...) === 16` can never hold against the simulator. Phase
 with N calibrated against a known-good 16-level capture. Do not "fix" this by
 loosening the bucket shift — the shift is correct for opaque hardware-shaped
 greyscale, which is the other input this metric has to serve.
+
+## D4. All seven inputs are accepted and silently dropped at menu level
+
+**Found during:** 12-02 Task 3 (first green `node harness/probe.ts`)
+**Owner:** 12-03 (scenario assertions)
+
+Live capture from a cold probe run — every one of the seven `POST /api/input`
+calls returned `{"ok":true}` while the simulator discarded them:
+
+```
+PASS  POST /api/input up            <- HTTP said ok
+...
+sim| [... WARN evenhub_simulator_lib::vm] inject_input: no active event container
+sim| [... WARN evenhub_simulator_lib::vm] inject_input: no active event container
+sim| [... WARN evenhub_simulator_lib::vm] inject_input: no active event container
+sim| [... WARN evenhub_simulator_lib::vm] inject_input: no active event container
+```
+
+This is the `isEventCapture: 1` constraint from 12-CONTEXT, observed for real.
+The evidence appears ONLY on the teed simulator stream — `/api/console` has no
+trace of it. `Driver.input()` therefore cannot tell "delivered" from "dropped"
+and 12-03 must assert the framebuffer changed, exactly as the plan says.
+
+Note the probe does NOT fail on this: it is a connectivity probe, and at the
+moment it fires inputs the app has not yet built an event-capture container.
+12-03's scenarios are where a dropped input must become a failure.
+
+## D5. `/api/screenshot/webview` 404s until WKWebView has rendered
+
+**Found during:** 12-02 Task 3
+**Owner:** closed in 12-02; recorded so nobody re-diagnoses it
+
+The endpoint exists (confirmed in the binary's route table alongside `/api/ping`,
+`/api/screenshot/glasses`, `/api/console`, `/api/input`) but returns HTTP 404
+immediately after boot and 200 once the first WKWebView snapshot exists. The
+probe now polls it with `waitFor` rather than reading it once. `/api/screenshot/
+glasses` has no such race — it answered on the first try in every run.
