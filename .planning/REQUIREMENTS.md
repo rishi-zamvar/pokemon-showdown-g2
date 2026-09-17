@@ -229,21 +229,26 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 | SWT-01 | Phase 10 | Complete |
 | SWT-02 | Phase 10 | Complete |
 | SWT-03 | Phase 10 | Complete |
-| STAT-01 | Phase 11 | Pending |
-| STAT-02 | Phase 11 | Pending |
-| STAT-03 | Phase 11 | Pending |
-| STAT-04 | Phase 11 | Pending |
-| STAT-05 | Phase 11 | Pending |
+| STAT-01 | Phase 17 (was 11) | Pending — absorbed by INFO-01/INFO-07 |
+| STAT-02 | Phase 17 (was 11) | Pending — absorbed by INFO-02 |
+| STAT-03 | Phase 17 (was 11) | Pending — absorbed by INFO-02 |
+| STAT-04 | Phase 18 (was 11) | Pending — absorbed by INFO-05 |
+| STAT-05 | Phase 18 (was 11) | Pending — absorbed by INFO-05 |
+
+Phase 11 (Stats Screen) is retired. It was never started, and the INFO- requirements
+specify a richer inspect model of which it is a strict subset. STAT-01..05 re-map to
+Phases 17-18 as shown rather than being left orphaned.
 
 **Coverage:**
 - v0.1 requirements: 42 total — all Complete
-- v1.1 requirements: 31 total — 20 Complete, 11 Pending
-- Mapped to phases: 42 (v0.1) + 31 (v1.1) = 73 total
+- v1.1 requirements: 31 total — 26 Complete, 5 Pending (STAT-01..05, re-mapped to v2.0 phases)
+- v2.0 requirements: 34 total — all Pending, all mapped
+- Mapped to phases: 42 (v0.1) + 31 (v1.1) + 34 (v2.0) = 107 total
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-03-02 — Phase 9 requirements marked Complete*
+*Last updated: 2026-09-17 — v2.0 Showdown Parity requirements mapped to Phases 12-19; Phase 11 retired into 17-18*
 
 ---
 
@@ -312,3 +317,52 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 - IMU head-gesture control — available, but not needed for a turn-based game
 - Camera, album picker, location APIs
 - Even Hub store submission itself (INPUT-05 removes the blocker; submission is a later call)
+
+### v2.0 Traceability
+
+| Requirement | Phase | Status |
+|---|---|---|
+| HARN-01 | Phase 12 | Pending |
+| HARN-02 | Phase 12 | Pending |
+| HARN-03 | Phase 12 | Pending |
+| HARN-04 | Phase 12 | Pending |
+| HARN-05 | Phase 12 | Pending |
+| HARN-06 | Phase 12 | Pending |
+| REND-03 | Phase 13 | Pending |
+| REND-04 | Phase 13 | Pending |
+| REND-05 | Phase 13 | Pending |
+| REND-06 | Phase 13 | Pending |
+| REND-01 | Phase 14 | Pending |
+| REND-02 | Phase 14 | Pending |
+| REND-07 | Phase 14 | Pending |
+| SPR-01 | Phase 15 | Pending |
+| SPR-02 | Phase 15 | Pending |
+| SPR-03 | Phase 15 | Pending |
+| SPR-04 | Phase 15 | Pending |
+| INPUT-01 | Phase 16 | Pending |
+| INPUT-02 | Phase 16 | Pending |
+| INPUT-03 | Phase 16 | Pending |
+| INPUT-04 | Phase 16 | Pending |
+| INPUT-05 | Phase 16 | Pending |
+| INPUT-06 | Phase 16 | Pending |
+| INFO-01 | Phase 17 | Pending |
+| INFO-02 | Phase 17 | Pending |
+| INFO-07 | Phase 17 | Pending |
+| INFO-03 | Phase 18 | Pending |
+| INFO-04 | Phase 18 | Pending |
+| INFO-05 | Phase 18 | Pending |
+| INFO-06 | Phase 18 | Pending |
+| PERF-01 | Phase 19 | Pending |
+| PERF-02 | Phase 19 | Pending |
+| PERF-03 | Phase 19 | Pending |
+| PERF-04 | Phase 19 | Pending |
+
+**Coverage: 34/34 v2.0 requirements mapped to exactly one phase each. 0 orphans, 0 duplicates.**
+Per-phase counts: 12 -> 6, 13 -> 4, 14 -> 3, 15 -> 4, 16 -> 6, 17 -> 3, 18 -> 4, 19 -> 4.
+
+Note: the v2.0 section above defines **34** requirement IDs (HARN 6, REND 7, SPR 4,
+INFO 7, INPUT 6, PERF 4), not 49. If 15 further requirements were intended, they are
+not written down anywhere in `.planning/` and need to be added before they can be mapped.
+
+---
+*v2.0 requirements mapped to phases: 2026-09-17*

@@ -2,50 +2,44 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-26)
+See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Milestone v1.1 — UI Enhancement & Polish (Phase 11 next)
+**Current focus:** Milestone v2.0 — Showdown Parity
 
 ## Current Position
 
-Phase: 10 — Overlay HUD Layouts — VERIFIED ✓
-Plan: 4/4 complete (all verified)
-Status: Phase complete, verified 15/15 must-haves
-Last activity: 2026-03-03 — Phase 10 verified, all gaps closed, 100/100 stress test passed
+Phase: pending roadmap
+Status: v2.0 milestone defined, 34 requirements, roadmap in progress
+Last activity: 2026-09-17 — SDK 0.0.7->0.0.15 bump, two unplayability bugs fixed, platform research compiled
 
-```
-Milestone v1.1 Progress:
-[██        ] Phase 7  Speed Config & Model Foundation ✓
-[██        ] Phase 8  Animation Polish ✓
-[██        ] Phase 9  Navigation & HUD Consolidation ✓
-[██        ] Phase 10 Overlay HUD Layouts ✓
-[          ] Phase 11 Stats Screen
-75% complete
-```
+### Milestone v1.1 closed out
+
+Phases 7-10 shipped and verified. Phase 11 (Stats Screen) was never started;
+its intent is subsumed by the v2.0 INFO- requirements.
+
+### Fixed this session
+
+- Dangling `even-dev/public` asset symlinks pointed at a deleted `~/Desktop`
+  path, so every asset 404'd and no battle ever started. Now relative links.
+- 576x24 team bar exceeded the 288x144 image container cap, failing the whole
+  `rebuildPageContainer` and removing the action list — the app was
+  unplayable. Commit `1684d66`.
+
+### Open defects carried into v2.0
+
+- Turn-result text renders malformed (`[Mudsdale'`)
+- Nameplates/HP vanish during animation
+- Sprites encoded 1-bit, discarding 15 of 16 grey levels
+- ~477 ms per HUD screen change
+- Root double-tap does not call `shutDownPageContainer(1)` (blocks Even Hub submission)
+- "You"/"Foe" labels baked into composites
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23
+- Total plans completed: 23 (through v1.1)
 - Average duration: ~2.3 min
-- Total execution time: ~54 min
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 01-data-foundation | 3 completed | ~10 min | ~3.3 min |
-| 02-team-generation | 2 completed | ~3 min | ~1.5 min |
-| 03-battle-engine | 4 completed | ~17.5 min | ~4.4 min |
-| 04-ai-opponent | 1 completed | ~2 min | ~2 min |
-| 05-screen-layer | 3 completed | ~6 min | ~2 min |
-
-**Recent Trend:**
-- Last 5 plans: 05.1-01 (~2 min), 05.1-02 (~2 min), 05.1-03 (~1.5 min), 05.3-02 (~1 min), 05.3-01 (~2 min)
-- Trend: stable ~1.5 min per plan
-
-*Updated after each plan completion*
 
 ## Accumulated Context
 
