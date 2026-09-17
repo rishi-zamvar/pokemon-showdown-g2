@@ -342,6 +342,15 @@ Plans:
 **Goal**: Turn results read like the Showdown battle log, nameplates and HP bars survive every animation, and the display never says "You" or "Foe"
 **Depends on**: Phase 13 (needs the sequential image queue before touching animation sends)
 **Requirements**: REND-01, REND-02, REND-07
+
+> **Note (2026-09-17):** the `[Mudsdale'` "malformed text" symptom that originally
+> motivated REND-01 was **withdrawn** — it is `"[Mudsdale's Stamina]".slice(0,10)`,
+> i.e. AnimationEngine.ts:298 rendering a progressive typewriter prefix, captured
+> mid-animation. Do not go looking for a string-corruption bug; there isn't one.
+> REND-01 remains worth doing as *coverage*: golden fixtures per log kind proving
+> final text is correct, and a harness rule that a mid-typewriter frame is never
+> mistaken for a settled one. REND-02 (nameplates vanishing during animation) was
+> observed in the same frame and **is** real.
 **Success Criteria** (what must be TRUE):
   1. After any turn, the turn-result area shows the complete parsed sentence for each log line — no truncated or bracketed fragment such as `[Mudsdale'` is produced by any of the ~30 protocol message types
   2. Nameplate and HP-bar regions are non-blank in every captured frame of a full attack sequence, including hit flash, HP drain, lunge, faint, and switch

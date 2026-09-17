@@ -270,7 +270,7 @@ Phases 17-18 as shown rather than being left orphaned.
 
 ### Render Correctness (fix what is broken)
 
-- [ ] **REND-01**: Turn-result text renders the parsed log line, not a malformed fragment (observed: `[Mudsdale'`)
+- [ ] **REND-01**: Turn-result text is verified complete, not mid-typewriter. (CORRECTED 2026-09-17: the `[Mudsdale'` fragment first reported as malformed is exactly `"[Mudsdale's Stamina]".slice(0,10)` — AnimationEngine renders progressive prefixes, so the capture landed mid-animation. No rendering defect. The real requirement is that the harness must not mistake a mid-typewriter frame for a settled one, and that every log kind produces correct final text.)
 - [ ] **REND-02**: Nameplates and HP bars remain visible for the duration of every animation
 - [ ] **REND-03**: No page declares a container outside the 20–288 x 20–144 image bounds; a guard rejects violations before the SDK call
 - [ ] **REND-04**: Image data dimensions always match container dimensions (hardware tiles mismatched data)

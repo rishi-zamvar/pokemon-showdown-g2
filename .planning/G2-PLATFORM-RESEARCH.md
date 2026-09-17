@@ -168,7 +168,7 @@ Verified by instrumentation, not inspection.
 | 2 | 576x24 team bar exceeded the 288x144 image cap → whole page rebuild rejected → no action list → unplayable | simulator: `image container size 576x24 exceeds maximum 288x144` | **fixed** `1684d66` |
 | 3 | Sprites encoded 1-bit, discarding 15 of 16 grey levels → noisy dot clouds | captured frames; reference says do not dither | open |
 | 4 | ~477 ms per screen change from 3 image sends + rebuild | measured cost model | open |
-| 5 | Turn-result text renders as `[Mudsdale'` — malformed string | captured frame after attack | open |
+| 5 | ~~Turn-result text malformed~~ **NOT A DEFECT** — `[Mudsdale'` is `"[Mudsdale's Stamina]".slice(0,10)`; the typewriter renders progressive prefixes and the capture landed mid-animation | verified against AnimationEngine.ts:298 | withdrawn |
 | 6 | Nameplates/HP disappear during animation | captured frame | open |
 | 7 | Root double-tap does not call `shutDownPageContainer(1)` — blocks Even Hub submission | `ScreenController.onDoubleTap` | open |
 | 8 | "You"/"Foe" labels baked into composites | `CompositeBuilder.ts:188` | open (user asked to remove) |
