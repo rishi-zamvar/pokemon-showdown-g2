@@ -84,7 +84,14 @@ export const ANIM = {
 } as const;
 
 export const OVERLAY_LAYOUT = {
-  TEAM_BAR_W: 576,
+  /**
+   * Image containers are capped at 288x144 by the firmware. A 576-wide team
+   * bar is rejected outright and takes the whole rebuildPageContainer call
+   * with it, so the page never builds and no action list appears.
+   * ponytail: half-width bar; split across two 288px image containers if the
+   * full-width strip is wanted back (image containers max out at 4).
+   */
+  TEAM_BAR_W: 288,
   TEAM_BAR_H: 24,
   COMPOSITE_W: 144,
   COMPOSITE_H: 132,
