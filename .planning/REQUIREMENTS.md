@@ -244,3 +244,71 @@ Requirements for UI Enhancement & Polish milestone. Each maps to roadmap phases.
 ---
 *Requirements defined: 2026-02-26*
 *Last updated: 2026-03-02 — Phase 9 requirements marked Complete*
+
+---
+
+## v2.0 Requirements — Showdown Parity
+
+**Defined:** 2026-09-17
+**Milestone goal:** The G2 app plays and reads like Pokemon Showdown online — correct rendering, every battle fact reachable without a pointer, and a render pipeline that respects the platform's real limits.
+
+**Grounding:** `.planning/G2-PLATFORM-RESEARCH.md` (measured hardware costs, container limits, 4-bit greyscale, automation API) and `.planning/SDK-UPGRADE-AUDIT.md`.
+
+### Test Harness (foundation — built first, TDD)
+
+- [ ] **HARN-01**: Automated driver over the simulator HTTP automation API (`--automation-port`) that can send every input kind and read the glasses framebuffer, webview screenshot, and console
+- [ ] **HARN-02**: Capture simulator stdout alongside the console API — container validation failures are logged there and nowhere else
+- [ ] **HARN-03**: Assert on glasses framebuffer content (not just "no error"), so a blank or malformed screen fails a test
+- [ ] **HARN-04**: Scripted end-to-end battle: boot → menu → battle → attack → switch → faint → win/loss, as a single runnable check
+- [ ] **HARN-05**: Fail the run on any console `error`, uncaught exception, failed fetch, or simulator validation warning
+- [ ] **HARN-06**: Headless regression run usable from CLI in one command
+
+### Render Correctness (fix what is broken)
+
+- [ ] **REND-01**: Turn-result text renders the parsed log line, not a malformed fragment (observed: `[Mudsdale'`)
+- [ ] **REND-02**: Nameplates and HP bars remain visible for the duration of every animation
+- [ ] **REND-03**: No page declares a container outside the 20–288 x 20–144 image bounds; a guard rejects violations before the SDK call
+- [ ] **REND-04**: Image data dimensions always match container dimensions (hardware tiles mismatched data)
+- [ ] **REND-05**: `updateImageRawData` calls are queued strictly sequentially — concurrent sends are not permitted
+- [ ] **REND-06**: No image data is sent during `createStartUpPageContainer`; placeholders are created then updated
+- [ ] **REND-07**: Remove "You" / "Foe" labels from the display entirely; identify Pokemon by name and screen position
+
+### Sprite Pipeline (4-bit greyscale)
+
+- [ ] **SPR-01**: Replace 1-bit BMP encoding with greyscale PNG output; remove all app-side dithering
+- [ ] **SPR-02**: Greyscale conversion uses BT.601 luminance, centred on black, resized to container preserving aspect
+- [ ] **SPR-03**: Sprites are visually legible on the glasses framebuffer — verified by harness capture, not by eye
+- [ ] **SPR-04**: Nameplate/HP text stays composited into the bitmap (per measured cost model), now rendered with greyscale anti-aliasing
+
+### Information Access (no pointer, no hover)
+
+- [ ] **INFO-01**: Native context menu (SDK 0.0.14+, max 10 items, ≤32 UTF-8 byte names) is the universal "more" affordance during battle
+- [ ] **INFO-02**: Pokemon inspect screen: species, level, types, current/max HP, status, ability, item, stat stages, Tera type
+- [ ] **INFO-03**: Move inspect screen: type, category, base power, accuracy, PP remaining/max, and effectiveness multiplier against the current target
+- [ ] **INFO-04**: Field inspect screen: weather, terrain, screens, hazards, and remaining turn counts
+- [ ] **INFO-05**: Opponent inspect shows only revealed information, with unrevealed abilities listed as the full possible set for the species
+- [ ] **INFO-06**: Team inspect: all six Pokemon with HP, status, and fainted state, for both sides
+- [ ] **INFO-07**: Every inspect screen is reachable in at most two inputs from the battle HUD, and exits back to it
+
+### Input Model
+
+- [ ] **INPUT-01**: Handle `LONG_PRESS_EVENT` (9) and `LONG_PRESS_RELEASE_EVENT` (10)
+- [ ] **INPUT-02**: Handle `menuItemClickEvent` from the native context menu
+- [ ] **INPUT-03**: Distinguish `eventSource` — `GLASSES_R`, `GLASSES_L`, `RING` — and keep R1 ring input working
+- [ ] **INPUT-04**: Replace the `forfeitPending` double-tap-twice-within-3s hack with an explicit menu action
+- [ ] **INPUT-05**: Root page double-tap calls `shutDownPageContainer(1)` — an Even Hub submission requirement the app currently fails
+- [ ] **INPUT-06**: Handle `sysEvent`, `listEvent` and `textEvent` for the same gesture (simulator and hardware differ)
+
+### Performance (call count is the only lever)
+
+- [ ] **PERF-01**: Merge image containers wherever two images fall inside one 288x144 box
+- [ ] **PERF-02**: Battle HUD screen change costs at most 2 host calls where geometry allows
+- [ ] **PERF-03**: Animation engine runs against an explicit frame budget derived from ~104 ms per image send
+- [ ] **PERF-04**: Measure and record actual per-screen call counts in the harness, so regressions are caught
+
+### Out of Scope (v2.0)
+
+- Online multiplayer, custom team building, sound (no speaker)
+- IMU head-gesture control — available, but not needed for a turn-based game
+- Camera, album picker, location APIs
+- Even Hub store submission itself (INPUT-05 removes the blocker; submission is a later call)

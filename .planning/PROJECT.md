@@ -8,23 +8,33 @@ A Pokemon Showdown random battle simulator for Even Realities G2 smart glasses. 
 
 Players can play a complete random battle on their G2 glasses with attack, switch, and Terastallize options — using real Pokemon Showdown data and mechanics.
 
-## Current Milestone: v1.1 UI Enhancement & Polish
+## Current Milestone: v2.0 Showdown Parity
 
-**Goal:** Make the battle experience cleaner, faster, and closer to Pokemon Showdown — redesigned screens, consolidated menus, animation polish, stats viewer, and speed controls.
+**Goal:** The G2 app plays and reads like Pokemon Showdown online — correct rendering, every battle fact reachable without a pointer, and a render pipeline built against the platform's measured limits.
+
+**Why now:** The app was unplayable. Two root causes, both found by instrumentation in Sept 2026: dangling asset symlinks meant no battle ever started, and a 576x24 team bar exceeded the 288x144 image container cap, which failed the entire page rebuild and removed the action list. Both are fixed. What the instrumentation then exposed is that the render layer was built against assumptions that are wrong — a monochrome display that is actually 4-bit greyscale, and a cost model where call count, not payload, dominates.
 
 **Target features:**
-- Main menu with battle speed control and additional options
-- Remove back buttons from all screens (double-tap only navigation)
-- Battle animation text displayed in a box
-- Attack/Switch/Tera menu on main battle screen (one less navigation level)
-- Attack screen preserves HP bars, sprites, Pokemon visibility
-- Switch screen preserves HP bars, sprites, Pokemon visibility
-- Tera selection without confirmation screen (notifier only)
-- Pokemon attack movement animation
-- Stats screen showing abilities, status conditions, stat modifiers, opponent speed range, possible abilities
-- Battle speed menu controlling animation speed and text streaming speed
-- Back to main menu option at bottom of menu screen
-- Code optimization pass
+- Automation-API test harness that reads the real glasses framebuffer — TDD foundation, built first
+- Correct rendering: turn text, persistent nameplates, container bounds guards
+- 4-bit greyscale sprite pipeline replacing the 1-bit dithered BMP encoder
+- Full information access via native context menu + inspect screens (no hover on G2)
+- Modern input model: long-press, context menu, ring/temple event sources, root-page exit
+- Performance restructured around call count (~104 ms per image send, ~165 ms per rebuild)
+- "You"/"Foe" labels removed from the display
+
+**Key context:**
+- Display is 576x288 **4-bit greyscale (16 levels)**, not monochrome
+- Image containers: 20-288 x 20-144, max 4 per page; 8 other containers; 12 total
+- Measured: `updateImageRawData` ~104 ms fixed, `rebuildPageContainer` ~165 ms flat, `textContainerUpgrade` ~83 ms
+- Current battle HUD costs ~477 ms per screen change
+- Simulator 0.9.5 exposes an HTTP automation API (input + framebuffer + console) — this is what makes TDD possible here
+- SDK moved 0.0.7 -> 0.0.15 (purely additive); simulator 0.4.1 -> 0.9.5
+
+**Decisions locked (2026-09-17):**
+- Information access: native context menu + dedicated inspect screens
+- Sprites: full 4-bit greyscale pipeline, no app-side dithering
+- Performance: restructure to cut host call count
 
 ## Requirements
 
