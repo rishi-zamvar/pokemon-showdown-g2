@@ -21,13 +21,14 @@ import { decodePng } from "./png.ts";
 import { INK_THRESHOLD, greyLevels, inkRatio, saveFrame, toFrame } from "./frame.ts";
 import type { Frame } from "./frame.ts";
 import { REGIONS } from "./regions.ts";
-import { DISPLAY, OVERLAY_LAYOUT } from "../src/config/constants.ts";
+import { CONTAINER_IDS, CONTAINER_NAMES, DISPLAY, GLASS_LAYOUT, OVERLAY_LAYOUT, SPRITE_CONFIG } from "../src/config/constants.ts";
 import { LogStream, isFailureLine } from "./logs.ts";
 import type { LogLine } from "./logs.ts";
 import type { ConsoleEntry, Driver } from "./driver.ts";
 import { spawnSync } from "node:child_process";
 import { firstSelectable, parseListItems } from "./scenarios/battle.ts";
-import { SendQueue } from "../src/adapters/containerGuards.ts";
+import { LIMITS, SendQueue, assertPageContainers } from "../src/adapters/containerGuards.ts";
+import type { ContainerLike, PageConfigLike } from "../src/adapters/containerGuards.ts";
 import {
   AssertionError,
   KNOWN_DEFECTS,
@@ -1021,6 +1022,215 @@ export async function runChecks(): Promise<CheckResult[]> {
     d.resolve[1]!("b");
     d.resolve[2]!("c");
     assert.deepEqual(await all, ["a", "b", "c"]);
+  });
+
+  // -------------------------------------------------------------------------
+  // 42-46: the container geometry / count guard (REND-03, plan 13-02)
+  // -------------------------------------------------------------------------
+  //
+  // The 576x24 team bar of defect #2 passed every validator the project had,
+  // including the SDK's own: validateEvenHubPageContainer() returns
+  // {valid:true} for it, and for a 9999x9999 image, and for
+  // containerTotalNum:13 (verified live against 0.0.15). It only covers
+  // z-order, menus and text brightness. So geometry and counts are ours, and
+  // these checks are the only thing standing between a future layout edit and
+  // another whole-page rebuild failure.
+  //
+  // Every refusal below asserts on the MESSAGE, not just that it threw. A
+  // guard that refuses everything with "error" passes a bare assert.throws and
+  // helps nobody at 3am — and check 45 is the other half of that: it proves
+  // the three configs the app really sends are still accepted.
+
+  /** Refused, carrying the ROADMAP literal plus every needle (id, value, limit). */
+  function refuses(config: PageConfigLike, needles: string[], what: string): void {
+    let msg: string | null = null;
+    try {
+      assertPageContainers(config);
+    } catch (e) {
+      msg = e instanceof Error ? e.message : String(e);
+    }
+    assert.ok(msg !== null, `${what}: expected a refusal, the guard accepted it`);
+    assert.match(
+      msg,
+      /adapter: rejected container/,
+      `${what}: refusal must contain the literal the ROADMAP harness assertion matches; got: ${msg}`,
+    );
+    for (const n of needles) {
+      assert.ok(msg.includes(n), `${what}: refusal should name ${JSON.stringify(n)}; got: ${msg}`);
+    }
+  }
+
+  function accepts(config: PageConfigLike, what: string): void {
+    try {
+      assertPageContainers(config);
+    } catch (e) {
+      assert.fail(`${what}: guard refused a legal page — ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  /** image container with legal defaults, so each case varies exactly one thing */
+  const img = (o: Partial<ContainerLike> = {}): ContainerLike => ({
+    containerID: CONTAINER_IDS.oppSprite,
+    containerName: CONTAINER_NAMES.oppSprite,
+    width: 100,
+    height: 100,
+    ...o,
+  });
+  /** the capture container every legal page needs exactly one of */
+  const capture = (o: Partial<ContainerLike> = {}): ContainerLike => ({
+    containerID: CONTAINER_IDS.content,
+    containerName: CONTAINER_NAMES.content,
+    width: GLASS_LAYOUT.width,
+    height: GLASS_LAYOUT.height,
+    isEventCapture: 1,
+    ...o,
+  });
+
+  await check("42 assertPageContainers refuses the container that made the game unplayable", () => {
+    // Defect #2 verbatim: OVERLAY_LAYOUT.TEAM_BAR_W was 576 until commit
+    // 1684d66, and one oversized container fails the ENTIRE rebuild, so the
+    // action list never appeared and the game could not be played.
+    refuses(
+      {
+        containerTotalNum: 2,
+        imageObject: [img({ containerID: CONTAINER_IDS.teamBar, containerName: CONTAINER_NAMES.teamBar, width: 576, height: 24 })],
+        textObject: [capture()],
+      },
+      ["id=8", "teamBar", "576", "288"],
+      "the 576x24 team bar",
+    );
+
+    // the other three ways out of bounds, each one dimension off
+    refuses({ imageObject: [img({ height: 16 })], textObject: [capture()] }, ["16", "20"], "height under the floor");
+    refuses({ imageObject: [img({ height: 145 })], textObject: [capture()] }, ["145", "144"], "height over the ceiling");
+    refuses({ imageObject: [img({ width: 19 })], textObject: [capture()] }, ["19", "20"], "width under the floor");
+    refuses({ imageObject: [img({ width: 289 })], textObject: [capture()] }, ["289", "288"], "width over the ceiling");
+
+    // an undefined dimension is a refusal too: the SDK types make width and
+    // height optional, and the firmware tiles whatever it gets.
+    refuses({ imageObject: [{ containerID: 4, containerName: "oppSpr", height: 100 }], textObject: [capture()] }, ["id=4", "width"], "missing width");
+    refuses({ imageObject: [{ containerID: 4, containerName: "oppSpr", width: 100 }], textObject: [capture()] }, ["id=4", "height"], "missing height");
+
+    // BOTH boundaries accepted. An off-by-one that refuses a legal container
+    // is exactly as bad as one that accepts an illegal one — it bricks a page
+    // that works today.
+    accepts({ containerTotalNum: 2, imageObject: [img({ width: 20, height: 20 })], textObject: [capture()] }, "minimum legal image 20x20");
+    accepts({ containerTotalNum: 2, imageObject: [img({ width: 288, height: 144 })], textObject: [capture()] }, "maximum legal image 288x144");
+  });
+
+  await check("43 assertPageContainers refuses count violations", () => {
+    const five = Array.from({ length: 5 }, (_, i) => img({ containerID: i + 1 }));
+    refuses({ imageObject: five, textObject: [capture()] }, ["5", "4"], "5 image containers");
+
+    const nine = Array.from({ length: 9 }, (_, i) => capture({ containerID: i + 1, isEventCapture: i === 0 ? 1 : 0 }));
+    refuses({ textObject: nine }, ["9", "8"], "9 non-image containers");
+
+    // 13 total. NOTE: MAX_IMAGE + MAX_OTHER === MAX_TOTAL, so the total rule
+    // can only ever be reached through one of the two rules ahead of it —
+    // it is a backstop, and this asserts it stays one rather than pretending
+    // the 13-total message is reachable.
+    assert.equal(LIMITS.MAX_IMAGE + LIMITS.MAX_OTHER, LIMITS.MAX_TOTAL, "total rule became independently reachable; give it its own case");
+    refuses(
+      { imageObject: five, textObject: Array.from({ length: 8 }, (_, i) => capture({ containerID: i + 1, isEventCapture: i === 0 ? 1 : 0 })) },
+      ["5", "4"],
+      "13 containers total",
+    );
+
+    // the config-lies-about-itself class, caught directly and cheaply
+    refuses(
+      { containerTotalNum: 4, imageObject: [img()], textObject: [capture()] },
+      ["4", "2"],
+      "containerTotalNum disagreeing with the actual count",
+    );
+  });
+
+  await check("44 assertPageContainers refuses the wrong number of event captures", () => {
+    refuses(
+      { containerTotalNum: 2, imageObject: [img()], textObject: [capture({ isEventCapture: 0 })] },
+      ["0", "isEventCapture"],
+      "no event capture anywhere",
+    );
+    refuses(
+      { containerTotalNum: 2, textObject: [capture(), capture({ containerID: CONTAINER_IDS.status, containerName: CONTAINER_NAMES.status })] },
+      ["2", "isEventCapture"],
+      "two event captures",
+    );
+    accepts({ containerTotalNum: 2, imageObject: [img()], textObject: [capture()] }, "exactly one event capture");
+  });
+
+  await check("45 the three configs the app really sends are accepted unchanged", () => {
+    // Built from the same constants glassAdapter.ts builds them from, so a
+    // layout edit that breaks the guard breaks this check instead of the app.
+    // 42-44 alone would pass against a guard that refuses everything; this is
+    // the half that stops one shipping.
+
+    // bootstrapStartup: one full-screen text container. 576x288 is far outside
+    // the image limits and must stay legal — the 20-288 x 20-144 cap is an
+    // IMAGE container rule only.
+    accepts(
+      {
+        containerTotalNum: 1,
+        textObject: [{ containerID: CONTAINER_IDS.content, containerName: CONTAINER_NAMES.content, width: DISPLAY.WIDTH, height: DISPLAY.HEIGHT, isEventCapture: 1 }],
+      },
+      "bootstrapStartup",
+    );
+
+    // showOverlayHud: 3 image + 1 list, the real OVERLAY_LAYOUT numbers.
+    accepts(
+      {
+        containerTotalNum: 4,
+        imageObject: [
+          { containerID: CONTAINER_IDS.teamBar, containerName: CONTAINER_NAMES.teamBar, width: OVERLAY_LAYOUT.TEAM_BAR_W, height: OVERLAY_LAYOUT.TEAM_BAR_H },
+          { containerID: CONTAINER_IDS.oppSprite, containerName: CONTAINER_NAMES.oppSprite, width: OVERLAY_LAYOUT.COMPOSITE_W, height: OVERLAY_LAYOUT.COMPOSITE_H },
+          { containerID: CONTAINER_IDS.playerSprite, containerName: CONTAINER_NAMES.playerSprite, width: OVERLAY_LAYOUT.COMPOSITE_W, height: OVERLAY_LAYOUT.COMPOSITE_H },
+        ],
+        listObject: [
+          { containerID: CONTAINER_IDS.content, containerName: CONTAINER_NAMES.content, width: OVERLAY_LAYOUT.LIST_W, height: OVERLAY_LAYOUT.LIST_H, isEventCapture: 1 },
+        ],
+      },
+      "showOverlayHud",
+    );
+
+    // showBattleHud: 2 sprite images + content + status.
+    accepts(
+      {
+        containerTotalNum: 4,
+        imageObject: [
+          { containerID: CONTAINER_IDS.oppSprite, containerName: CONTAINER_NAMES.oppSprite, width: SPRITE_CONFIG.SIZE, height: SPRITE_CONFIG.SIZE },
+          { containerID: CONTAINER_IDS.playerSprite, containerName: CONTAINER_NAMES.playerSprite, width: SPRITE_CONFIG.SIZE, height: SPRITE_CONFIG.SIZE },
+        ],
+        textObject: [
+          { containerID: CONTAINER_IDS.content, containerName: CONTAINER_NAMES.content, width: GLASS_LAYOUT.width, height: GLASS_LAYOUT.height, isEventCapture: 1 },
+          { containerID: CONTAINER_IDS.status, containerName: CONTAINER_NAMES.status, width: GLASS_LAYOUT.width, height: GLASS_LAYOUT.statusHeight, isEventCapture: 0 },
+        ],
+      },
+      "showBattleHud",
+    );
+
+    // showText's split status bar, the only page with three text containers.
+    accepts(
+      {
+        containerTotalNum: 3,
+        textObject: [
+          { containerID: CONTAINER_IDS.content, containerName: CONTAINER_NAMES.content, width: GLASS_LAYOUT.width, height: GLASS_LAYOUT.height, isEventCapture: 0 },
+          { containerID: CONTAINER_IDS.status, containerName: CONTAINER_NAMES.status, width: 400, height: GLASS_LAYOUT.statusHeight, isEventCapture: 0 },
+          { containerID: CONTAINER_IDS.statusRight, containerName: CONTAINER_NAMES.statusRight, width: 160, height: GLASS_LAYOUT.statusHeight, isEventCapture: 1 },
+        ],
+      },
+      "showText",
+    );
+  });
+
+  await check("46 assertPageContainers refuses an over-long containerName", () => {
+    // The firmware truncates at 16 chars silently, producing a container the
+    // app can then never address by name — every updateImageRawData and
+    // textContainerUpgrade against it fails with "container not found".
+    refuses(
+      { containerTotalNum: 1, textObject: [capture({ containerName: "seventeenCharsXX" + "Y" })] },
+      ["17", "16"],
+      "a 17-character containerName",
+    );
+    accepts({ containerTotalNum: 1, textObject: [capture({ containerName: "sixteenCharsXXXX" })] }, "a 16-character containerName");
   });
 
   return results;
