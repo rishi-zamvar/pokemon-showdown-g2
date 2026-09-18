@@ -601,8 +601,8 @@ export async function runChecks(): Promise<CheckResult[]> {
     }
   });
 
-  // -- 25: hostCalls counts both real image-send paths (D-13) ----------------
-  await check("25 hostCalls counts both updateImageRawData paths", async () => {
+  // -- 25: every image send lands on the updateImageRawData counter (D-13) ---
+  await check("25 hostCalls counts every updateImageRawData through sendBmpData", async () => {
     const driver = stubDriver([
       [
         entry(1, "log", "[GlassAdapter] sendBmpData container=oppSpr size=1234B"),
@@ -614,16 +614,27 @@ export async function runChecks(): Promise<CheckResult[]> {
     await logs.poll();
     assert.deepEqual(logs.hostCalls(), { updateImageRawData: 2, createStartUpPageContainer: 1 });
 
-    // the other live path (showBattleHud) must land on the same counter
-    const other = stubDriver([
+    // showBattleHud's sprite sends go through sendBmpData like every other
+    // send (13-01 deleted its inline copies), so they land on the same counter
+    // through the same pattern — the per-turn count that diagnosed research-14
+    // is preserved exactly.
+    const battleHud = stubDriver([
       [
-        entry(1, "log", "[GlassAdapter] sending oppSprite BMP: 1234 bytes"),
-        entry(2, "log", "[GlassAdapter] sending playerSprite BMP: 4321 bytes"),
+        entry(1, "log", "[GlassAdapter] sendBmpData container=oppSpr size=1234B"),
+        entry(2, "log", "[GlassAdapter] sendBmpData container=plySpr size=4321B"),
       ],
     ]);
-    const logs2 = new LogStream(other.asDriver());
+    const logs2 = new LogStream(battleHud.asDriver());
     await logs2.poll();
     assert.deepEqual(logs2.hostCalls(), { updateImageRawData: 2 });
+
+    // and the log shape it USED to emit is gone from the app, so it must no
+    // longer be counted — a pattern kept for a deleted call site is how this
+    // table starts lying.
+    const dead = stubDriver([[entry(1, "log", "[GlassAdapter] sending oppSprite BMP: 1234 bytes")]]);
+    const logs3 = new LogStream(dead.asDriver());
+    await logs3.poll();
+    assert.deepEqual(logs3.hostCalls(), {});
   });
 
   // -- 26: since_id advances, so nothing is counted twice (D-04) -------------

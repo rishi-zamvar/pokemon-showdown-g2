@@ -21,6 +21,7 @@ import {
   SPRITE_CONFIG,
   TIMING,
 } from "../config/constants";
+import { SendQueue } from "./containerGuards";
 import { emptyTeamBarBmp } from "../sprites/CompositeBuilder";
 import type { GestureEvent, GlassAdapter, StatusBar, Unsubscribe } from "../types/contracts";
 
@@ -42,6 +43,24 @@ export class GlassAdapterImpl implements GlassAdapter {
   private startupDone = false;
   private readonly gestureHandlers = new Set<(e: GestureEvent) => void>();
   private lastScrollTime = 0;
+  private readonly queue = new SendQueue();
+
+  /**
+   * EVERY SDK call in this file goes through here. That is what makes the
+   * serialisation total: two sends are never in flight at once no matter which
+   * caller issued them, including callers that do not exist yet (D-06,
+   * research-14 — the game hung ~1 turn in 20 because AnimationEngine.ts:282
+   * runs spriteFlash and hpDrain concurrently and both send images).
+   *
+   * NEVER call this from inside a task it runs: a queued method that queues
+   * again deadlocks on itself. `queue.run` appears exactly once in this file,
+   * and every enqueued task is exactly one bridge call.
+   */
+  private call<T>(fn: (b: EvenAppBridge) => Promise<T>): Promise<T> {
+    const b = this.bridge;
+    if (!b) throw new Error("Not connected. Call connect() first.");
+    return this.queue.run(() => fn(b));
+  }
 
   async connect(): Promise<void> {
     if (this.bridge) return;
@@ -63,7 +82,6 @@ export class GlassAdapterImpl implements GlassAdapter {
    * Uses position 0,0 and full display dimensions — matching proven working apps.
    */
   async bootstrapStartup(): Promise<void> {
-    if (!this.bridge) throw new Error('Not connected');
     if (this.startupDone) return;
 
     const config = {
@@ -83,8 +101,8 @@ export class GlassAdapterImpl implements GlassAdapter {
     };
 
     console.log('[GlassAdapter] bootstrapStartup config:', JSON.stringify(config));
-    const result = await this.bridge.createStartUpPageContainer(
-      new CreateStartUpPageContainer(config),
+    const result = await this.call((b) =>
+      b.createStartUpPageContainer(new CreateStartUpPageContainer(config)),
     );
     console.log('[GlassAdapter] bootstrapStartup result:', result);
 
@@ -153,41 +171,43 @@ export class GlassAdapterImpl implements GlassAdapter {
    * Uses textContainerUpgrade. Max 2000 chars per Nick Ustinov notes.
    */
   async updateText(text: string, status: StatusBar): Promise<void> {
-    if (!this.bridge) {
-      throw new Error("Not connected");
-    }
-
-    await this.bridge.textContainerUpgrade(
-      new TextContainerUpgrade({
-        containerID: CONTAINER_IDS.content,
-        containerName: CONTAINER_NAMES.content,
-        contentOffset: 0,
-        contentLength: text.length,
-        content: text.slice(0, 2000),
-      }),
+    await this.call((b) =>
+      b.textContainerUpgrade(
+        new TextContainerUpgrade({
+          containerID: CONTAINER_IDS.content,
+          containerName: CONTAINER_NAMES.content,
+          contentOffset: 0,
+          contentLength: text.length,
+          content: text.slice(0, 2000),
+        }),
+      ),
     );
 
-    await this.bridge.textContainerUpgrade(
-      new TextContainerUpgrade({
-        containerID: CONTAINER_IDS.status,
-        containerName: CONTAINER_NAMES.status,
-        contentOffset: 0,
-        contentLength: status.left.length,
-        content: status.left.slice(0, 2000),
-      }),
+    await this.call((b) =>
+      b.textContainerUpgrade(
+        new TextContainerUpgrade({
+          containerID: CONTAINER_IDS.status,
+          containerName: CONTAINER_NAMES.status,
+          contentOffset: 0,
+          contentLength: status.left.length,
+          content: status.left.slice(0, 2000),
+        }),
+      ),
     );
 
     // Only update statusRight if it has content — container 3 doesn't exist
     // during animation (showBattleHud only creates containers 1, 2, 4, 5).
     if (status.right) {
-      await this.bridge.textContainerUpgrade(
-        new TextContainerUpgrade({
-          containerID: CONTAINER_IDS.statusRight,
-          containerName: CONTAINER_NAMES.statusRight,
-          contentOffset: 0,
-          contentLength: status.right.length,
-          content: status.right.slice(0, 2000),
-        }),
+      await this.call((b) =>
+        b.textContainerUpgrade(
+          new TextContainerUpgrade({
+            containerID: CONTAINER_IDS.statusRight,
+            containerName: CONTAINER_NAMES.statusRight,
+            contentOffset: 0,
+            contentLength: status.right.length,
+            content: status.right.slice(0, 2000),
+          }),
+        ),
       );
     }
   }
@@ -290,18 +310,18 @@ export class GlassAdapterImpl implements GlassAdapter {
     // the rebuild, effectively hiding it. We use a try/catch because this call
     // may fail if container 8 has never been created yet (first animation before
     // any overlay was shown) — that failure is harmless and expected.
-    if (this.bridge) {
-      try {
-        await this.bridge.updateImageRawData(
+    try {
+      await this.call((b) =>
+        b.updateImageRawData(
           new ImageRawDataUpdate({
             containerID: CONTAINER_IDS.teamBar,
             containerName: CONTAINER_NAMES.teamBar,
             imageData: emptyTeamBarBmp(),
           }),
-        );
-      } catch {
-        // Container 8 doesn't exist yet — nothing to blank, safe to ignore.
-      }
+        ),
+      );
+    } catch {
+      // Container 8 doesn't exist yet — nothing to blank, safe to ignore.
     }
 
     await this.renderContainers({
@@ -309,28 +329,14 @@ export class GlassAdapterImpl implements GlassAdapter {
       textObject: [textContainer, statusContainer],
     });
 
-    // Send BMP image data AFTER container creation (sequential — no concurrent sends)
-    if (this.bridge) {
-      if (oppSprite) {
-        console.log(`[GlassAdapter] sending oppSprite BMP: ${oppSprite.length} bytes`);
-        await this.bridge.updateImageRawData(
-          new ImageRawDataUpdate({
-            containerID: CONTAINER_IDS.oppSprite,
-            containerName: CONTAINER_NAMES.oppSprite,
-            imageData: oppSprite,
-          }),
-        );
-      }
-      if (playerSprite) {
-        console.log(`[GlassAdapter] sending playerSprite BMP: ${playerSprite.length} bytes`);
-        await this.bridge.updateImageRawData(
-          new ImageRawDataUpdate({
-            containerID: CONTAINER_IDS.playerSprite,
-            containerName: CONTAINER_NAMES.playerSprite,
-            imageData: playerSprite,
-          }),
-        );
-      }
+    // Send BMP image data AFTER container creation. These were inline copies of
+    // sendBmpData with the same arguments — the duplication predated it and was
+    // the only reason one host call had two different log shapes.
+    if (oppSprite) {
+      await this.sendBmpData(CONTAINER_IDS.oppSprite, CONTAINER_NAMES.oppSprite, oppSprite);
+    }
+    if (playerSprite) {
+      await this.sendBmpData(CONTAINER_IDS.playerSprite, CONTAINER_NAMES.playerSprite, playerSprite);
     }
   }
 
@@ -406,9 +412,9 @@ export class GlassAdapterImpl implements GlassAdapter {
     // container 2 — it persists as stale status text at the bottom of the
     // overlay. Clearing it with a zero-length textContainerUpgrade hides it.
     // Try/catch: silently ignored if container 2 doesn't exist yet.
-    if (this.bridge) {
-      try {
-        await this.bridge.textContainerUpgrade(
+    try {
+      await this.call((b) =>
+        b.textContainerUpgrade(
           new TextContainerUpgrade({
             containerID: CONTAINER_IDS.status,
             containerName: CONTAINER_NAMES.status,
@@ -416,10 +422,10 @@ export class GlassAdapterImpl implements GlassAdapter {
             contentLength: 0,
             content: '',
           }),
-        );
-      } catch {
-        // Container 2 doesn't exist yet — safe to ignore.
-      }
+        ),
+      );
+    } catch {
+      // Container 2 doesn't exist yet — safe to ignore.
     }
 
     await this.renderContainers({
@@ -466,13 +472,14 @@ export class GlassAdapterImpl implements GlassAdapter {
    * @param base64 - Raw base64 PNG string without the `data:` prefix.
    */
   async updateImage(containerID: number, containerName: string, bmpData: Uint8Array): Promise<void> {
-    if (!this.bridge) throw new Error('Not connected');
-    await this.bridge.updateImageRawData(
-      new ImageRawDataUpdate({
-        containerID,
-        containerName,
-        imageData: bmpData,
-      }),
+    await this.call((b) =>
+      b.updateImageRawData(
+        new ImageRawDataUpdate({
+          containerID,
+          containerName,
+          imageData: bmpData,
+        }),
+      ),
     );
   }
 
@@ -527,10 +534,6 @@ export class GlassAdapterImpl implements GlassAdapter {
     textObject?: TextContainerProperty[];
     imageObject?: ImageContainerProperty[];
   }): Promise<void> {
-    if (!this.bridge) {
-      throw new Error("Not connected. Call connect() first.");
-    }
-
     const containerTotalNum =
       (payload.listObject?.length ?? 0) +
       (payload.textObject?.length ?? 0) +
@@ -546,8 +549,8 @@ export class GlassAdapterImpl implements GlassAdapter {
     if (!this.startupDone) {
       // Try createStartUpPageContainer once — if it fails, fall through to rebuildPageContainer
       try {
-        const result = await this.bridge.createStartUpPageContainer(
-          new CreateStartUpPageContainer(config),
+        const result = await this.call((b) =>
+          b.createStartUpPageContainer(new CreateStartUpPageContainer(config)),
         );
         console.log('[GlassAdapter] createStartUpPageContainer result:', result);
         if (result === StartUpPageCreateResult.success) {
@@ -562,15 +565,11 @@ export class GlassAdapterImpl implements GlassAdapter {
       this.startupDone = true;
     }
 
-    let ok = await this.bridge.rebuildPageContainer(
-      new RebuildPageContainer(config),
-    );
+    let ok = await this.call((b) => b.rebuildPageContainer(new RebuildPageContainer(config)));
 
     if (!ok) {
       await this.delay(300);
-      ok = await this.bridge.rebuildPageContainer(
-        new RebuildPageContainer(config),
-      );
+      ok = await this.call((b) => b.rebuildPageContainer(new RebuildPageContainer(config)));
     }
 
     if (!ok) {
@@ -654,14 +653,19 @@ export class GlassAdapterImpl implements GlassAdapter {
     containerName: string,
     bmpData: Uint8Array,
   ): Promise<void> {
-    if (!this.bridge) return;
+    // No `if (!this.bridge) return` — every caller already requires a live
+    // bridge, so a null one here is a programming error. Returning silently
+    // turned it into a sprite that never appeared with nothing in any log;
+    // call() throws instead.
     console.log(`[GlassAdapter] sendBmpData container=${containerName} size=${bmpData.length}B`);
-    await this.bridge.updateImageRawData(
-      new ImageRawDataUpdate({
-        containerID,
-        containerName,
-        imageData: bmpData,
-      }),
+    await this.call((b) =>
+      b.updateImageRawData(
+        new ImageRawDataUpdate({
+          containerID,
+          containerName,
+          imageData: bmpData,
+        }),
+      ),
     );
   }
 

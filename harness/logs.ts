@@ -74,16 +74,13 @@ export function isFailureLine(l: LogLine): boolean {
  * / PERF-04 owns turning this into an enforced ceiling and must add the
  * adapter-side log lines first.
  *
- * Both image patterns map to `updateImageRawData` and are NOT a double count —
- * they are mutually exclusive code paths, verified against source:
- *   - `sendBmpData container=` (glassAdapter.ts:658) lives inside `sendBmpData`,
- *     whose only callers are showOverlayHud:453/454/455. That is the path
- *     render() uses for every decision screen.
- *   - `sending (opp|player)Sprite BMP` (glassAdapter.ts:315/325) lives inside
- *     `showBattleHud`, which calls bridge.updateImageRawData DIRECTLY and never
- *     goes through sendBmpData. Still live via ScreenController
- *     473/510/539/599/620/664/670.
- * Dropping either pattern undercounts one of the two real paths.
+ * `sendBmpData container=` is now the SINGLE marker for `updateImageRawData`.
+ * It used to be one of two: `showBattleHud` carried inline copies of
+ * sendBmpData's call that logged `sending (opp|player)Sprite BMP` instead.
+ * Plan 13-01 collapsed those two sites onto sendBmpData, which moves two calls
+ * from one log pattern to the other — one line each way, so the per-turn count
+ * is unchanged. That count is the evidence that diagnosed research-14 (5 sends
+ * on the hung turn against 10-21 on healthy ones), so it must keep counting.
  *
  * KNOWN INACCURACY 1 — `rebuildPageContainer` is a known-zero placeholder. The
  * ONLY console line in the app mentioning it is the failure warning at
@@ -97,7 +94,6 @@ export function isFailureLine(l: LogLine): boolean {
  */
 const HOST_CALL_PATTERNS: Array<[RegExp, string]> = [
   [/\[GlassAdapter\] sendBmpData container=/, "updateImageRawData"],
-  [/\[GlassAdapter\] sending (opp|player)Sprite BMP/, "updateImageRawData"],
   [/\[GlassAdapter\] createStartUpPageContainer result/, "createStartUpPageContainer"],
   // known-zero, see KNOWN INACCURACY 1 above. Kept in the table so Phase 19 has
   // an obvious place to point the new success log at.
