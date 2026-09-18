@@ -336,7 +336,24 @@ Plans:
   3. Two `updateImageRawData` calls are never in flight at once — all sends pass through a single sequential queue
   4. `createStartUpPageContainer` is never called carrying image data; placeholders are created empty and filled by a following update, and the `container 8 not found` warning no longer appears
 **Harness assertions that prove it**: `expectConsoleClean()` across `runBattleScript()` (no stdout validation lines for an entire battle); `expectLoggedLine(/adapter: rejected container/)` in a negative test that deliberately declares the old 576x24 team bar; `expectFrameDiff(SPRITE_REGION, golden)` on an undersized-payload fixture, which fails if tiling occurs.
-**Plans**: TBD
+
+> **Planning note (2026-09-18):** two of those three land differently, for
+> reasons recorded in the plans. The `/adapter: rejected container/` assertion
+> is proved by a deterministic `harness/selfCheck.ts` check rather than a live
+> scenario, because the harness drives the app only through inputs and cannot
+> make it build a bad config — a live version would mean shipping a
+> deliberately-broken code path in production. `expectFrameDiff` is a
+> documented refusal (D-10) and the tiling case is proved by refusing the
+> undersized payload at the adapter, which is strictly stronger than detecting
+> the tiled render after the fact. `expectConsoleClean()` across
+> `runBattleScript()` lands as specified, three consecutive runs.
+
+**Plans**: 3 plans (strictly sequential — all three touch glassAdapter.ts)
+
+Plans:
+- [ ] 13-01-PLAN.md — Serialising send queue in the adapter; fixes the 1-in-20 mid-battle hang (REND-05)
+- [ ] 13-02-PLAN.md — Geometry/count/event-capture guard + SDK validator + cumulative container registry (REND-03)
+- [ ] 13-03-PLAN.md — Image data/container dimension match, no updates to undeclared containers, KNOWN_DEFECTS waivers deleted (REND-04, REND-06)
 
 ### Phase 14: Battle Text & HUD Persistence
 **Goal**: Turn results read like the Showdown battle log, nameplates and HP bars survive every animation, and the display never says "You" or "Foe"
