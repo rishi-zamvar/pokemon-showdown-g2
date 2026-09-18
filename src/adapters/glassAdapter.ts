@@ -10,8 +10,11 @@ import {
   StartUpPageCreateResult,
   TextContainerProperty,
   TextContainerUpgrade,
+  formatEvenHubPageContainerValidationError,
+  validateEvenHubPageContainer,
   waitForEvenAppBridge,
   type EvenHubEvent,
+  type EvenHubPageContainerLike,
 } from "@evenrealities/even_hub_sdk";
 import {
   CONTAINER_IDS,
@@ -21,7 +24,8 @@ import {
   SPRITE_CONFIG,
   TIMING,
 } from "../config/constants";
-import { SendQueue } from "./containerGuards";
+import { SendQueue, assertPageContainers } from "./containerGuards";
+import type { ContainerLike, PageConfigLike } from "./containerGuards";
 import { emptyTeamBarBmp } from "../sprites/CompositeBuilder";
 import type { GestureEvent, GlassAdapter, StatusBar, Unsubscribe } from "../types/contracts";
 
@@ -46,6 +50,27 @@ export class GlassAdapterImpl implements GlassAdapter {
   private readonly queue = new SendQueue();
 
   /**
+   * Every container ever successfully declared, with its latest kind and size.
+   *
+   * CUMULATIVE ON PURPOSE. rebuildPageContainer does NOT remove containers that
+   * are absent from the new config — they persist on screen with their last
+   * rendered content (see the comment in showBattleHud; both blanking
+   * workarounds in this file exist because of it). So "does this container
+   * exist on the hardware" means "was it ever declared by a create/rebuild that
+   * SUCCEEDED", not "is it in the config we just sent". A per-page map would
+   * report container 8 as absent while it is visibly on screen, and plan 13-03
+   * would then skip a blank that is genuinely needed.
+   *
+   * Nothing reads it yet; plan 13-03 does.
+   */
+  private readonly declaredContainers = new Map<number, {
+    kind: "image" | "text" | "list";
+    name: string;
+    width: number;
+    height: number;
+  }>();
+
+  /**
    * EVERY SDK call in this file goes through here. That is what makes the
    * serialisation total: two sends are never in flight at once no matter which
    * caller issued them, including callers that do not exist yet (D-06,
@@ -60,6 +85,58 @@ export class GlassAdapterImpl implements GlassAdapter {
     const b = this.bridge;
     if (!b) throw new Error("Not connected. Call connect() first.");
     return this.queue.run(() => fn(b));
+  }
+
+  /**
+   * Two guards, because neither covers the other (D-05). Verified live against
+   * SDK 0.0.15: validateEvenHubPageContainer() returned {valid:true} for a
+   * 9999x9999 image container, for a 13-image page and for
+   * containerTotalNum:13, so it cannot be trusted for geometry or counts.
+   * Ours does not cover z-order, menus or text brightness, so it cannot
+   * replace the SDK's either. Both are pure local calls — no host round-trip.
+   *
+   * REFUSES, never clamps (D-02): a page outside the limits is a layout bug in
+   * the caller, and one oversized container fails the entire rebuild.
+   */
+  private assertPage(config: PageConfigLike & EvenHubPageContainerLike): void {
+    try {
+      assertPageContainers(config);
+    } catch (e) {
+      // Log here rather than inside the guard so the guard stays side-effect
+      // free, while the refusal is still visible in the harness console stream
+      // even if a caller swallows the exception. Catch, log, rethrow.
+      console.error(`[glass] ${e instanceof Error ? e.message : String(e)}`);
+      throw e;
+    }
+
+    const r = validateEvenHubPageContainer(config);
+    if (!r.valid) {
+      const detail = formatEvenHubPageContainerValidationError(r);
+      console.error(`[glass] adapter: rejected container page (SDK): ${detail}`);
+      throw new Error(`adapter: rejected container page (SDK): ${detail}`);
+    }
+  }
+
+  /**
+   * Record what a create/rebuild that ACTUALLY SUCCEEDED just declared.
+   * Called from all three success paths and nowhere else — a missing entry
+   * becomes a hard throw on updateText in plan 13-03, the hottest path here.
+   */
+  private recordPage(config: PageConfigLike): void {
+    const add = (kind: "image" | "text" | "list", cs: ContainerLike[] | undefined): void => {
+      for (const c of cs ?? []) {
+        if (c.containerID === undefined) continue;
+        this.declaredContainers.set(c.containerID, {
+          kind,
+          name: c.containerName ?? "",
+          width: c.width ?? 0,
+          height: c.height ?? 0,
+        });
+      }
+    };
+    add("image", config.imageObject);
+    add("text", config.textObject);
+    add("list", config.listObject);
   }
 
   async connect(): Promise<void> {
@@ -100,6 +177,8 @@ export class GlassAdapterImpl implements GlassAdapter {
       ],
     };
 
+    this.assertPage(config);
+
     console.log('[GlassAdapter] bootstrapStartup config:', JSON.stringify(config));
     const result = await this.call((b) =>
       b.createStartUpPageContainer(new CreateStartUpPageContainer(config)),
@@ -108,6 +187,7 @@ export class GlassAdapterImpl implements GlassAdapter {
 
     if (result === StartUpPageCreateResult.success) {
       this.startupDone = true;
+      this.recordPage(config);   // population point 1: container 1 now exists
     } else {
       console.error('[GlassAdapter] bootstrapStartup failed with code:', result);
       // Force startupDone so subsequent renders use rebuildPageContainer
@@ -546,6 +626,8 @@ export class GlassAdapterImpl implements GlassAdapter {
       ...(payload.imageObject ? { imageObject: payload.imageObject } : {}),
     };
 
+    this.assertPage(config);
+
     if (!this.startupDone) {
       // Try createStartUpPageContainer once — if it fails, fall through to rebuildPageContainer
       try {
@@ -555,12 +637,18 @@ export class GlassAdapterImpl implements GlassAdapter {
         console.log('[GlassAdapter] createStartUpPageContainer result:', result);
         if (result === StartUpPageCreateResult.success) {
           this.startupDone = true;
+          // Population point 2. This branch RETURNS, so it never reaches the
+          // rebuild below — instrumenting only the rebuild silently skips the
+          // entire first page of every cold boot.
+          this.recordPage(config);
           return;
         }
       } catch (e) {
         console.warn('[GlassAdapter] createStartUpPageContainer threw:', e);
       }
-      // Failed — mark as done and fall through to rebuildPageContainer
+      // Failed — mark as done and fall through to rebuildPageContainer.
+      // NOT a population point: startupDone is set for control flow only,
+      // nothing was declared. The rebuild below records on its own success.
       console.warn('[GlassAdapter] startup failed, falling through to rebuild');
       this.startupDone = true;
     }
@@ -572,7 +660,10 @@ export class GlassAdapterImpl implements GlassAdapter {
       ok = await this.call((b) => b.rebuildPageContainer(new RebuildPageContainer(config)));
     }
 
-    if (!ok) {
+    if (ok) {
+      // Population point 3, recorded once after the retry has settled `ok`.
+      this.recordPage(config);
+    } else {
       console.warn("[glass] rebuildPageContainer failed after retry");
     }
   }
