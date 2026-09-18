@@ -447,12 +447,12 @@ Every v2.0 requirement maps to exactly one phase.
 
 | Requirement | Phase | Status |
 |---|---|---|
-| HARN-01 | Phase 12 | Pending |
-| HARN-02 | Phase 12 | Pending |
-| HARN-03 | Phase 12 | Pending |
-| HARN-04 | Phase 12 | Pending |
-| HARN-05 | Phase 12 | Pending |
-| HARN-06 | Phase 12 | Pending |
+| HARN-01 | Phase 12 | Complete |
+| HARN-02 | Phase 12 | Complete |
+| HARN-03 | Phase 12 | Complete |
+| HARN-04 | Phase 12 | Delivered, blocked by research-14 (Phase 13 REND-05) |
+| HARN-05 | Phase 12 | Complete |
+| HARN-06 | Phase 12 | Complete |
 | REND-03 | Phase 13 | Pending |
 | REND-04 | Phase 13 | Pending |
 | REND-05 | Phase 13 | Pending |
