@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Enhancement & Polish
 status: completed
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-09-18T19:48:08.604Z"
+stopped_at: Completed 13-02-PLAN.md
+last_updated: "2026-09-18T20:38:12.745Z"
 progress:
   total_phases: 22
   completed_phases: 12
   total_plans: 46
-  completed_plans: 43
+  completed_plans: 44
 ---
 
 # Project State
@@ -19,26 +19,26 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Milestone v2.0 — Showdown Parity (Phase 13 Container Safety Layer, plan 13-02 next)
+**Current focus:** Milestone v2.0 — Showdown Parity (Phase 13 Container Safety Layer, plan 13-03 next)
 
 ## Current Position
 
-Phase: 13 — Container Safety Layer — IN PROGRESS (1/3 plans)
-Plan: 13-01 complete; 13-02 next
-Status: Phase 12 complete (HARN-01..06). 13-01 landed the serialising SendQueue: every SDK call in glassAdapter.ts goes through one `call()` helper, so two sends are never in flight at once. `npm run harness` now runs a full battle to END_SCREEN. REND-05 complete; REND-03/04/06 are 13-02 and 13-03.
+Phase: 13 — Container Safety Layer — IN PROGRESS (2/3 plans)
+Plan: 13-01 and 13-02 complete; 13-03 next
+Status: Phase 12 complete (HARN-01..06). 13-01 landed the serialising SendQueue: every SDK call in glassAdapter.ts goes through one `call()` helper, so two sends are never in flight at once. 13-02 landed the geometry guard: `assertPageContainers()` plus the SDK's own `validateEvenHubPageContainer()` run before every create/rebuild and REFUSE (never clamp), and `declaredContainers` now records every container a successful create/rebuild declared — cumulative, because `rebuildPageContainer` never removes absent containers. selfCheck is 46/46. REND-05 and REND-03 complete; REND-04/06 are 13-03.
 Previous activity: 2026-09-17 — 12-03 shipped: assert.ts vocabulary, run.ts runner, `[screen]` oracle, selfCheck/boot/negativeProof scenarios. 36 primitive checks + 10 suite steps green three runs running; three real app defects allow-listed by name and printed every run (research rows 10, 11, and the newly found 13).
 
 ```
 Milestone v2.0 Progress:
 [==========] Phase 12 Automation Test Harness          <- complete (4/4), gates everything
-[===       ] Phase 13 Container Safety Layer          <- in progress (1/3)
+[======    ] Phase 13 Container Safety Layer          <- in progress (2/3)
 [          ] Phase 14 Battle Text & HUD Persistence
 [          ] Phase 15 4-bit Greyscale Sprite Pipeline
 [          ] Phase 16 Modern Input Model
 [          ] Phase 17 Context Menu & Inspect Navigation
 [          ] Phase 18 Move/Field/Team/Opponent Inspect
 [          ] Phase 19 Call-Count Performance Restructure
-13% complete (1/8 phases, 1/3 plans in Phase 13)
+13% complete (1/8 phases, 2/3 plans in Phase 13)
 ```
 
 ### Milestone v1.1 closed out
@@ -76,6 +76,10 @@ left orphaned in the roadmap:
 
 - Total plans completed: 24 (23 through v1.1, + 12-01)
 - 12-01: 2 tasks, 5 commits, 9 files, ~50 min
+- 13-02: 3 tasks, 3 commits, 4 files, ~2 h (over half of it diagnosing a stale
+  simulator WebKit cache that had nothing to do with the plan — see
+  phases/13-container-safety-layer/deferred-items.md D13-A)
+
 - Average duration: ~2.3 min
 
 ## Accumulated Context
@@ -213,6 +217,8 @@ Recent decisions affecting current work:
 - [Phase 12]: Phase 12 allow-lists three app defects by exact anchored line (research rows 10, 11, 13) instead of failing every run; each names its owning phase and is printed in every run's output
 - [Phase 13]: D-06 enforced as a SendQueue choke point in glassAdapter, not an edit to AnimationEngine's Promise.all — one guard fixes every present and future caller
 - [Phase 13]: Serialising all SDK sends measured 2x FASTER per send, not slower — overlapping sends were contending on the bridge, so the plan's +2-5s/turn cost prediction was wrong in our favour
+- [Phase 13]: Refuse, never clamp: assertPageContainers throws before any bridge call; the SDK validator runs alongside it because neither covers the other (verified valid:true for 9999x9999 and containerTotalNum:13)
+- [Phase 13]: declaredContainers is cumulative, not per-page, because rebuildPageContainer never removes absent containers
 
 ### v1.1 Research Context
 
@@ -262,10 +268,15 @@ Key findings from research (2026-03-01):
 - [Phase 4 note]: Pass BattlePokemon.calcSpecies (not species) to @smogon/calc — cosmetic forme crash avoided
 - [Bundle note]: @pkmn/sim + @pkmn/randoms produce ~1.25 MB bundle (247 KB gzip) — chunk warning is cosmetic, not blocking
 - [Phase 10 flag]: 4-container SDK limit may require fallback if overlay layout exceeds hardware constraint — research noted this as hardware-gated with a fallback option
+- 13-02: both full harness runs lost one mid-battle turn to the simulator process being starved (sim uptime clock advanced 0.196s across a 123s wall-clock gap), not an app hang. Will produce false failures in any multi-battle verification — see 13-container-safety-layer/deferred-items.md D13-B
 
 ## Session Continuity
 
-Last session: 2026-09-18T19:47:35.125Z
-Stopped at: Completed 13-01-PLAN.md
-Next: execute 13-02-PLAN.md (container geometry + count guards).
+Last session: 2026-09-18T20:33:35.700Z
+Stopped at: Completed 13-02-PLAN.md
+Next: execute 13-03-PLAN.md (REND-04/06 — container lifecycle, research-10/11).
+
+Read before starting 13-03: `declaredContainers` in glassAdapter.ts is populated
+but nothing reads it yet, so nothing would notice a population point being
+dropped. 13-03 is its first consumer and should bring its own checks.
 Resume file: None

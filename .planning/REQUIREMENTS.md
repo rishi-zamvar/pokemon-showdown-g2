@@ -272,7 +272,7 @@ Phases 17-18 as shown rather than being left orphaned.
 
 - [ ] **REND-01**: Turn-result text is verified complete, not mid-typewriter. (CORRECTED 2026-09-17: the `[Mudsdale'` fragment first reported as malformed is exactly `"[Mudsdale's Stamina]".slice(0,10)` — AnimationEngine renders progressive prefixes, so the capture landed mid-animation. No rendering defect. The real requirement is that the harness must not mistake a mid-typewriter frame for a settled one, and that every log kind produces correct final text.)
 - [ ] **REND-02**: Nameplates and HP bars remain visible for the duration of every animation
-- [ ] **REND-03**: No page declares a container outside the 20–288 x 20–144 image bounds; a guard rejects violations before the SDK call
+- [x] **REND-03**: No page declares a container outside the 20–288 x 20–144 image bounds; a guard rejects violations before the SDK call
 - [ ] **REND-04**: Image data dimensions always match container dimensions (hardware tiles mismatched data)
 - [x] **REND-05**: `updateImageRawData` calls are queued strictly sequentially — concurrent sends are not permitted
 - [ ] **REND-06**: No image data is sent during `createStartUpPageContainer`; placeholders are created then updated
@@ -328,7 +328,7 @@ Phases 17-18 as shown rather than being left orphaned.
 | HARN-04 | Phase 12 | Pending |
 | HARN-05 | Phase 12 | Complete |
 | HARN-06 | Phase 12 | Complete |
-| REND-03 | Phase 13 | Pending |
+| REND-03 | Phase 13 | Complete |
 | REND-04 | Phase 13 | Pending |
 | REND-05 | Phase 13 | Complete |
 | REND-06 | Phase 13 | Pending |
