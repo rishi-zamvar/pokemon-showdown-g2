@@ -177,8 +177,45 @@ Verified by instrumentation, not inspection.
 | 11 | `TextContainerUpgrade failed: container 2 not found` — the "blank out container 2" workaround in `showOverlayHud` fires against a container that isn't there | simulator stdout, Phase 12 wave 2 | open (Phase 13/14) |
 | 12 | `POST /api/input` returns `{"ok":true}` for inputs the simulator then DROPS (`inject_input: no active event container`). The HTTP result is not evidence the input was handled | simulator stdout, Phase 12 wave 2 | open (harness + Phase 16) |
 | 13 | HP bars pad with `U+2591` (light shade), which the panel font has no glyph for — `lv_draw_letter: glyph dsc. not found for U+2591` on every HP-bar text render, so the empty part of every bar draws as nothing. `U+2588` (full block) does render | simulator stdout, Phase 12 wave 3 | open (Phase 13/14; `battleHudRenderer.ts:26`) |
+| 14 | **The game intermittently hangs forever mid-battle.** `AnimationEngine.ts:282` does `await Promise.all(tasks)` where tasks include `spriteFlash` and `hpDrain`, both of which issue `updateImageRawData`. Concurrent image sends are explicitly **not allowed**; the bridge deadlocks and the turn never completes | harness turn-16 and turn-21 timeouts, ~1 turn in 20 | open (REND-05, Phase 13) |
 
-### Why 10-13 were invisible before
+
+### Item 14 in detail — the most serious defect found so far
+
+Two harness runs hung at different turns (16, then 21 on a re-run), each timing
+out after 120 s with no screen transition. The captured frame shows the sprite
+frozen **inverted** — `spriteFlash` stuck between its invert and restore steps —
+with the typewriter text truncated mid-stream.
+
+The decisive evidence is the per-step host-call count the harness records:
+
+| | `updateImageRawData` calls |
+|---|---|
+| turns that passed | 10 - 21 |
+| the turn that hung | **5** |
+
+The hung turn issued *fewer* calls than a healthy one, so it did not stall after
+finishing its work — it died partway through its send sequence.
+
+Root cause is a documented platform rule the app violates:
+
+> Concurrent sends: **Not allowed** - queue image updates sequentially.
+
+`Promise.all` runs the typewriter, the sprite flash and the HP drain at the same
+time. On any turn that both deals damage and flashes a sprite — most of them —
+two image senders race. It usually survives; roughly one turn in twenty it does
+not.
+
+The fix belongs to **REND-05**, already written as "`updateImageRawData` calls
+are queued strictly sequentially — concurrent sends are not permitted". That
+requirement was derived from the docs before anyone knew the app violated it.
+
+`showOverlayHud` already awaits its three sends one at a time
+(`glassAdapter.ts:453-455`), so the adapter path is correct and only the
+animation path races. Phase 13 must enforce the invariant centrally so neither
+can regress.
+
+### Why 10-14 were invisible before
 
 All four are written to simulator **stdout** and appear nowhere in
 `/api/console`. During one boot the console held 119 entries and not one of

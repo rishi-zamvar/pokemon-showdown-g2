@@ -43,9 +43,19 @@ No layout redesign, no new screens, no sprite work.
   complementary; neither is sufficient alone.
 
 ### Ordering and lifecycle
-- **D-06:** Image sends stay strictly sequential. `showOverlayHud` already
-  awaits `sendBmpData` one at a time (glassAdapter.ts:453-455) — this phase
-  *preserves and enforces* that, it does not introduce it.
+- **D-06:** Image sends stay strictly sequential, and this is now the phase's
+  single highest-value fix. `showOverlayHud` already awaits `sendBmpData` one at
+  a time (glassAdapter.ts:453-455), but **`AnimationEngine.ts:282` does not**:
+  `await Promise.all(tasks)` runs `typewriterText`, `spriteFlash` and `hpDrain`
+  concurrently, and the latter two both call `updateImageRawData`. Concurrent
+  sends are not allowed on this platform, and the result is research-14 — the
+  game hangs forever, roughly one turn in twenty.
+  Enforce the invariant **centrally in the adapter** (a serialising queue), not
+  by rewriting `Promise.all` at one call site. A guard at the choke point fixes
+  every current and future caller; editing the animation engine fixes one and
+  leaves the next one free to reintroduce it.
+  This is the fix that makes Phase 12's `battleScenario` able to pass, so it
+  should land before anything else in this phase.
 - **D-07:** No image data during `createStartUpPageContainer`. Create empty
   placeholders, then `updateImageRawData`. This is the direct fix for
   research-10 (`update_image_raw_data: container 8 not found` on every boot).
