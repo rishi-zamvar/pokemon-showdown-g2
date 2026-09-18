@@ -27,6 +27,7 @@ import type { LogLine } from "./logs.ts";
 import type { ConsoleEntry, Driver } from "./driver.ts";
 import { spawnSync } from "node:child_process";
 import { firstSelectable, parseListItems } from "./scenarios/battle.ts";
+import { SendQueue } from "../src/adapters/containerGuards.ts";
 import {
   AssertionError,
   KNOWN_DEFECTS,
@@ -910,6 +911,105 @@ export async function runChecks(): Promise<CheckResult[]> {
     assert.equal(firstSelectable(["Golurk 100%", "Gogoat 0% (fainted)"]), 0);
     assert.equal(firstSelectable(["A 0% (fainted)", "B 0% (fainted)"]), -1);
     assert.equal(firstSelectable([]), -1);
+  });
+
+  // -- 39-41: the serialising send queue (REND-05, D-06) ---------------------
+  //
+  // The platform forbids concurrent sends and the app violated it from
+  // AnimationEngine.ts:282 (research-14: the game hangs ~1 turn in 20). These
+  // three checks are the deterministic regression guard for the fix; the
+  // battle runs are only corroboration.
+  //
+  // Every task here settles MANUALLY. A sleep-based test of a concurrency bug
+  // is a coin flip, and the bug it is guarding against is already intermittent.
+
+  /**
+   * Three tasks that record when they START and settle only when told to.
+   * `settled` is what makes check 41 meaningful: "started" alone cannot
+   * distinguish a serialising queue from one that never runs anything.
+   */
+  function deferredTasks(n: number) {
+    const started: number[] = [];
+    const settled: number[] = [];
+    const resolve: Array<(v: string) => void> = [];
+    const reject: Array<(e: unknown) => void> = [];
+    const tasks = Array.from({ length: n }, (_, i) => () => {
+      started.push(i);
+      const p = new Promise<string>((res, rej) => {
+        resolve[i] = res;
+        reject[i] = rej;
+      });
+      void p.then(
+        () => settled.push(i),
+        () => settled.push(i),
+      );
+      return p;
+    });
+    return { started, settled, resolve, reject, tasks };
+  }
+
+  /**
+   * Drain pending microtasks. `run()` is not async and `tail` starts as
+   * `Promise.resolve()`, so even task 1 begins one microtask turn AFTER
+   * submission rather than synchronously — and handing a thenable back to a
+   * `.then` handler costs a few more turns on top (promise adoption). A single
+   * `await Promise.resolve()` would therefore fail against a CORRECT queue.
+   * Ten turns is deterministic and, unlike a sleep, cannot flake.
+   */
+  const flush = async (): Promise<void> => {
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+  };
+
+  await check("39 SendQueue.run does not start task N+1 until task N settles", async () => {
+    const q = new SendQueue();
+    const d = deferredTasks(3);
+    const results = d.tasks.map((t) => q.run(t));
+
+    await flush();
+    assert.deepEqual(d.started, [0], "queue started more than one task at once");
+
+    d.resolve[0]!("a");
+    await flush();
+    assert.deepEqual(d.started, [0, 1], "task 2 did not start, or task 3 started early");
+
+    d.resolve[1]!("b");
+    await flush();
+    assert.deepEqual(d.started, [0, 1, 2]);
+
+    d.resolve[2]!("c");
+    // 39b: submission order preserved, and each caller gets its OWN value.
+    assert.deepEqual(await Promise.all(results), ["a", "b", "c"]);
+    assert.deepEqual(d.settled, [0, 1, 2], "tasks settled out of submission order");
+  });
+
+  await check("40 a rejected send does not poison the queue", async () => {
+    const q = new SendQueue();
+    const boom = new Error("send failed");
+    const bad = q.run(() => Promise.reject(boom));
+    const good = q.run(async () => "still running");
+
+    // the caller of the FAILED send still sees the failure...
+    await assert.rejects(bad, (e: unknown) => e === boom);
+    // ...and the send queued behind it runs anyway. A plain
+    // `tail = tail.then(fn)` wedges here, which is the whole point.
+    assert.equal(await good, "still running");
+  });
+
+  await check("41 the concurrency detector used by check 39 can still detect concurrency", async () => {
+    // The SAME tasks, run the way AnimationEngine.ts:282 runs them. If this
+    // does not report three concurrent starts, checks 39/40 prove nothing —
+    // they would pass just as happily against a queue that never runs anything.
+    const d = deferredTasks(3);
+    const all = Promise.all(d.tasks.map((t) => t()));
+
+    await flush();
+    assert.deepEqual(d.started, [0, 1, 2], "detector is dead: bare Promise.all did not run concurrently");
+    assert.deepEqual(d.settled, [], "a task settled on its own; the checks are not measuring what they claim");
+
+    d.resolve[0]!("a");
+    d.resolve[1]!("b");
+    d.resolve[2]!("c");
+    assert.deepEqual(await all, ["a", "b", "c"]);
   });
 
   return results;
