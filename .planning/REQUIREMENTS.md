@@ -274,7 +274,7 @@ Phases 17-18 as shown rather than being left orphaned.
 - [ ] **REND-02**: Nameplates and HP bars remain visible for the duration of every animation
 - [ ] **REND-03**: No page declares a container outside the 20–288 x 20–144 image bounds; a guard rejects violations before the SDK call
 - [ ] **REND-04**: Image data dimensions always match container dimensions (hardware tiles mismatched data)
-- [ ] **REND-05**: `updateImageRawData` calls are queued strictly sequentially — concurrent sends are not permitted
+- [x] **REND-05**: `updateImageRawData` calls are queued strictly sequentially — concurrent sends are not permitted
 - [ ] **REND-06**: No image data is sent during `createStartUpPageContainer`; placeholders are created then updated
 - [ ] **REND-07**: Remove "You" / "Foe" labels from the display entirely; identify Pokemon by name and screen position
 
@@ -330,7 +330,7 @@ Phases 17-18 as shown rather than being left orphaned.
 | HARN-06 | Phase 12 | Complete |
 | REND-03 | Phase 13 | Pending |
 | REND-04 | Phase 13 | Pending |
-| REND-05 | Phase 13 | Pending |
+| REND-05 | Phase 13 | Complete |
 | REND-06 | Phase 13 | Pending |
 | REND-01 | Phase 14 | Pending |
 | REND-02 | Phase 14 | Pending |

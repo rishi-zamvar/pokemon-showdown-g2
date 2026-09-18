@@ -351,7 +351,7 @@ Plans:
 **Plans**: 3 plans (strictly sequential — all three touch glassAdapter.ts)
 
 Plans:
-- [ ] 13-01-PLAN.md — Serialising send queue in the adapter; fixes the 1-in-20 mid-battle hang (REND-05)
+- [x] 13-01-PLAN.md — Serialising send queue in the adapter; fixes the 1-in-20 mid-battle hang (REND-05)
 - [ ] 13-02-PLAN.md — Geometry/count/event-capture guard + SDK validator + cumulative container registry (REND-03)
 - [ ] 13-03-PLAN.md — Image data/container dimension match, no updates to undeclared containers, KNOWN_DEFECTS waivers deleted (REND-04, REND-06)
 
@@ -545,7 +545,7 @@ Phases 6 and 11 are retired and skipped. Within v2.0, Phase 12 must complete bef
 | 10. Overlay HUD Layouts | 4/4 | Complete | 2026-03-03 |
 | 11. Stats Screen | - | Retired -> Phases 17-18 | - |
 | 12. Automation Test Harness | 3/4 | In Progress|  |
-| 13. Container Safety Layer | 0/TBD | Not started | - |
+| 13. Container Safety Layer | 1/3 | In Progress|  |
 | 14. Battle Text & HUD Persistence | 0/TBD | Not started | - |
 | 15. 4-bit Greyscale Sprite Pipeline | 0/TBD | Not started | - |
 | 16. Modern Input Model | 0/TBD | Not started | - |

@@ -3,14 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Enhancement & Polish
 status: completed
-stopped_at: Completed 12-03-PLAN.md
-last_updated: "2026-09-17T23:45:03.905Z"
-last_activity: "2026-09-17 — 12-03 shipped: assert.ts vocabulary, run.ts runner, `[screen]` oracle, selfCheck/boot/negativeProof scenarios. 36 primitive checks + 10 suite steps green three runs running; three real app defects allow-listed by name and printed every run (research rows 10, 11, and the newly found 13)."
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-09-18T19:48:08.604Z"
 progress:
   total_phases: 22
-  completed_phases: 11
-  total_plans: 43
-  completed_plans: 41
+  completed_phases: 12
+  total_plans: 46
+  completed_plans: 43
 ---
 
 # Project State
@@ -20,26 +19,26 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Milestone v2.0 — Showdown Parity (Phase 12 Automation Test Harness, plan 12-04 next)
+**Current focus:** Milestone v2.0 — Showdown Parity (Phase 13 Container Safety Layer, plan 13-02 next)
 
 ## Current Position
 
-Phase: 12 — Automation Test Harness — IN PROGRESS (3/4 plans)
-Plan: 12-01, 12-02, 12-03 complete; 12-04 next
-Status: `npm run harness` runs the suite unattended from nothing and exits non-zero on any failure. HARN-01, HARN-02, HARN-03, HARN-05, HARN-06 complete; HARN-04 (scripted battle) is 12-04.
-Last activity: 2026-09-17 — 12-03 shipped: assert.ts vocabulary, run.ts runner, `[screen]` oracle, selfCheck/boot/negativeProof scenarios. 36 primitive checks + 10 suite steps green three runs running; three real app defects allow-listed by name and printed every run (research rows 10, 11, and the newly found 13).
+Phase: 13 — Container Safety Layer — IN PROGRESS (1/3 plans)
+Plan: 13-01 complete; 13-02 next
+Status: Phase 12 complete (HARN-01..06). 13-01 landed the serialising SendQueue: every SDK call in glassAdapter.ts goes through one `call()` helper, so two sends are never in flight at once. `npm run harness` now runs a full battle to END_SCREEN. REND-05 complete; REND-03/04/06 are 13-02 and 13-03.
+Previous activity: 2026-09-17 — 12-03 shipped: assert.ts vocabulary, run.ts runner, `[screen]` oracle, selfCheck/boot/negativeProof scenarios. 36 primitive checks + 10 suite steps green three runs running; three real app defects allow-listed by name and printed every run (research rows 10, 11, and the newly found 13).
 
 ```
 Milestone v2.0 Progress:
-[=====     ] Phase 12 Automation Test Harness          <- in progress (3/4), gates everything
-[          ] Phase 13 Container Safety Layer
+[==========] Phase 12 Automation Test Harness          <- complete (4/4), gates everything
+[===       ] Phase 13 Container Safety Layer          <- in progress (1/3)
 [          ] Phase 14 Battle Text & HUD Persistence
 [          ] Phase 15 4-bit Greyscale Sprite Pipeline
 [          ] Phase 16 Modern Input Model
 [          ] Phase 17 Context Menu & Inspect Navigation
 [          ] Phase 18 Move/Field/Team/Opponent Inspect
 [          ] Phase 19 Call-Count Performance Restructure
-9% complete (0/8 phases, 3/4 plans in Phase 12)
+13% complete (1/8 phases, 1/3 plans in Phase 13)
 ```
 
 ### Milestone v1.1 closed out
@@ -212,6 +211,8 @@ Recent decisions affecting current work:
 - [Phase 12]: Framebuffer luminance is premultiplied by ALPHA - simulator carries brightness in alpha, RGB is constant green
 - [Phase 12]: Real simulator captures committed as harness fixtures; synthetic PNGs cannot validate the metrics
 - [Phase 12]: Phase 12 allow-lists three app defects by exact anchored line (research rows 10, 11, 13) instead of failing every run; each names its owning phase and is printed in every run's output
+- [Phase 13]: D-06 enforced as a SendQueue choke point in glassAdapter, not an edit to AnimationEngine's Promise.all — one guard fixes every present and future caller
+- [Phase 13]: Serialising all SDK sends measured 2x FASTER per send, not slower — overlapping sends were contending on the bridge, so the plan's +2-5s/turn cost prediction was wrong in our favour
 
 ### v1.1 Research Context
 
@@ -264,7 +265,7 @@ Key findings from research (2026-03-01):
 
 ## Session Continuity
 
-Last session: 2026-09-17T23:44:42.436Z
-Stopped at: Completed 12-03-PLAN.md
-Next: execute 12-02-PLAN.md (simulator lifecycle + HTTP client + merged log capture).
+Last session: 2026-09-18T19:47:35.125Z
+Stopped at: Completed 13-01-PLAN.md
+Next: execute 13-02-PLAN.md (container geometry + count guards).
 Resume file: None
