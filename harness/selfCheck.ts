@@ -26,6 +26,7 @@ import { LogStream, isFailureLine } from "./logs.ts";
 import type { LogLine } from "./logs.ts";
 import type { ConsoleEntry, Driver } from "./driver.ts";
 import { spawnSync } from "node:child_process";
+import { firstSelectable, parseListItems } from "./scenarios/battle.ts";
 import {
   AssertionError,
   KNOWN_DEFECTS,
@@ -876,6 +877,39 @@ export async function runChecks(): Promise<CheckResult[]> {
     const f = synthFrame(DISPLAY.WIDTH, DISPLAY.HEIGHT, () => 0);
     assert.throws(() => expectFrameDiff(f, REGIONS.FULL, "golden.png"), /D-10/);
     assert.throws(() => expectFrameDiff(f, REGIONS.FULL, "golden.png"), AssertionError);
+  });
+
+  // -- 37: the switch-list parser reads a REAL simulator stdout line ---------
+  // Verbatim from a live run (.harness-runs/2026-09-18T15-18-04-069Z). This is
+  // the line the battle script depends on to avoid clicking a fainted entry,
+  // which deadlocks the app on SWITCH_SELECT with no log line of any kind.
+  await check("37 parseListItems reads item_name off a real stdout line", () => {
+    const real =
+      '[2026-09-18T15:12:24Z INFO  evenhub_simulator_lib::flutter] RebuildPageContainer ' +
+      'CreateStartUpPageContainer { container_total_num: Some(4), list_object: Some([ListContainerProperty ' +
+      '{ x_position: Some(288), item_container: ListItemContainerProperty { item_count: Some(5), ' +
+      'item_width: None, is_item_select_border_en: Some(1), item_name: Some(["Gogoat 0% (fainted)", ' +
+      '"Golurk 100%", "Vaporeon 100%", "Venomoth 100%", "Gardevoir 100%"]) }, is_event_capture: Some(1) }])';
+    assert.deepEqual(parseListItems(real), [
+      "Gogoat 0% (fainted)",
+      "Golurk 100%",
+      "Vaporeon 100%",
+      "Venomoth 100%",
+      "Gardevoir 100%",
+    ]);
+    // a line that carries no list must be null, not an empty array: an empty
+    // array would read as "a list with nothing selectable" and throw the wrong
+    // diagnosis at whoever is debugging a stalled switch.
+    assert.equal(parseListItems("[INFO] UpdateImageRawData container_id=Some(4)"), null);
+    assert.deepEqual(parseListItems('item_name: Some(["Attack", "Switch"])'), ["Attack", "Switch"]);
+  });
+
+  // -- 38: fainted entries are skipped, and all-fainted is -1 ----------------
+  await check("38 firstSelectable skips the entries handleSwitchSelect drops", () => {
+    assert.equal(firstSelectable(["Gogoat 0% (fainted)", "Golurk 100%"]), 1);
+    assert.equal(firstSelectable(["Golurk 100%", "Gogoat 0% (fainted)"]), 0);
+    assert.equal(firstSelectable(["A 0% (fainted)", "B 0% (fainted)"]), -1);
+    assert.equal(firstSelectable([]), -1);
   });
 
   return results;

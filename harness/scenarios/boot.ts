@@ -30,7 +30,7 @@ const SCREEN_TIMEOUT_MS = 60_000;
  * turning HARN-05 into a coin flip. This polls a condition (two consecutive
  * polls with no new lines), it is not a fixed sleep: D-15 is satisfied.
  */
-async function quiesce(ctx: Ctx, settleMs = 4000): Promise<void> {
+export async function quiesce(ctx: Ctx, settleMs = 4000): Promise<void> {
   let last = -1;
   await waitFor(
     async () => {

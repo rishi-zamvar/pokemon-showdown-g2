@@ -7,6 +7,9 @@
  *   2. boot       — cold boot to MAIN_MENU, enter battle, all seven inputs.
  *   3. negativeProof — must run AFTER boot (it needs a screen up, and it needs
  *      the stdout tee to have seen real traffic).
+ *   4. battle     — LAST. It is by far the longest (a full Normal-speed battle
+ *      runs minutes), so everything cheap that could fail has already failed by
+ *      the time it starts, and it leaves the app back on MAIN_MENU.
  *
  * `harness/probe.ts` is deliberately NOT here: it is a standalone connectivity
  * probe, so nothing it does counts toward a suite requirement.
@@ -15,5 +18,6 @@ import type { Scenario } from "../run.ts";
 import { selfCheckScenario } from "./selfCheck.ts";
 import { bootScenario } from "./boot.ts";
 import { negativeProofScenario } from "./negativeProof.ts";
+import { battleScenario } from "./battle.ts";
 
-export const SCENARIOS: Scenario[] = [selfCheckScenario, bootScenario, negativeProofScenario];
+export const SCENARIOS: Scenario[] = [selfCheckScenario, bootScenario, negativeProofScenario, battleScenario];
