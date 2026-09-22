@@ -62,7 +62,15 @@ export const bootScenario: Scenario = {
         const frame = await ctx.waitScreen("MAIN_MENU", SCREEN_TIMEOUT_MS, 0);
         // wide on purpose: a smoke detector, not a golden diff (D-10). The
         // lower bound fails a blank screen, the upper a saturated one.
-        expectFrameInk(frame, REGIONS.CONTENT, 0.01, 0.6);
+        //
+        // RECALIBRATED by 13.1-02. The floor was 0.01, measured against a
+        // THREE-row main menu. The list is one row now ("Enter Battle"; Battle
+        // Speed and About moved into the root context menu, D-05), and one row
+        // of text inks CONTENT at 0.0046 -- measured, not guessed, off
+        // .harness-runs/.../boot-001-screen-MAIN_MENU.png. 0.002 keeps the only
+        // property the floor ever had: a blank CONTENT region is 0.000 and
+        // still fails, with 2.3x headroom below the real screen.
+        expectFrameInk(frame, REGIONS.CONTENT, 0.002, 0.6);
         await quiesce(ctx);
         expectConsoleClean(ctx.logs);
       },

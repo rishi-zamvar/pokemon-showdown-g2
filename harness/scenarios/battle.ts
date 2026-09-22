@@ -18,16 +18,23 @@
  * The plan says to cycle the main menu to Instant first. Measured on the real
  * app this session, that is not reachable and would not be observable:
  *
- *   harness-01  Zero list indices are undeliverable. The simulator omits
+ *   harness-01  FIXED by 13.1-02 -- kept because the quirk behind it is still
+ *               live and still the reason select(0, true) exists. Zero list
+ *               indices are undeliverable: the simulator omits
  *               `currentSelectItemIndex` from listEvent when the selection is 0
  *               (the same zero-dropping quirk the app already documents for
- *               CLICK_EVENT=0), so glassAdapter.mapEventToGesture:632 hands
+ *               CLICK_EVENT=0), so glassAdapter.mapEventToGesture hands
  *               ScreenController `listIndex: undefined` and onTap falls back to
- *               `state.cursorIndex`. handleMainMenu:183 sets cursorIndex=1 when
- *               it cycles the speed -- so after ONE speed change, every further
- *               click on the main menu cycles the speed again and "Enter Battle"
- *               becomes unreachable. Verified live: Normal->Fast->Instant->Slow
- *               ->Normal from four clicks with `up` pressed in between.
+ *               `state.cursorIndex`. handleMainMenu used to set cursorIndex=1
+ *               when it cycled the speed -- so after ONE speed change, every
+ *               further click cycled the speed again and "Enter Battle" became
+ *               unreachable. Verified live: Normal->Fast->Instant->Slow->Normal
+ *               from four clicks with `up` pressed in between. 13.1-02 removed
+ *               the state rather than guarding it: Battle Speed and About moved
+ *               into the root context menu, the list is one row, cursorIndex
+ *               never leaves 0 and the fallback is always right. Which is also
+ *               why `speed` other than Normal now THROWS here -- there is no
+ *               list row left to click.
  *   harness-02  In Instant mode resolveTurn():530 and resolveSwitch():611 call
  *               glass.showText() and `return` WITHOUT going through render(),
  *               and render() is where the `[screen] <NAME>` oracle is logged.
@@ -96,9 +103,6 @@ const ENTER_BATTLE_MS = 120_000;
 /** a Normal-speed turn measured at 8-40s; a stall must still fail, not hang forever */
 const TURN_MS = 120_000;
 const MENU_MS = 30_000;
-
-/** clicks on main-menu item 1 needed to reach each preset from Normal */
-const SPEED_CLICKS: Record<"Normal" | "Fast" | "Instant", number> = { Normal: 0, Fast: 1, Instant: 2 };
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -199,8 +203,9 @@ function makeSelector(ctx: Ctx): (index: number, force?: boolean) => Promise<voi
  *
  * Needed because two screens this script has to see are rendered WITHOUT going
  * through ScreenController.render(), so they log no `[screen]` oracle line at
- * all: the About/Credits text (handleMainMenu:190) and, in Instant mode, the
- * TURN_RESULT text (resolveTurn:531 / resolveSwitch:612). The simulator echoes
+ * all: the About text (ScreenController.onMenuItem, reached from the root
+ * context menu since 13.1-02) and, in Instant mode, the TURN_RESULT text
+ * (resolveTurn / resolveSwitch). The simulator echoes
  * the container payload it was handed, so the app's own UI strings are still
  * observable -- on the HARN-02 tee, not on /api/console.
  */
@@ -348,42 +353,26 @@ export async function runBattleScript(ctx: Ctx, opts: BattleScriptOpts = {}): Pr
     // Normal is SpeedConfig's value on every app open, so there is nothing to
     // do -- and nothing to undo, which is why it is the default here.
     if (speed !== "Normal") {
-      // Main-menu item 1 cycles the preset IN PLACE: Normal -> Fast -> Instant
-      // -> Slow, re-rendering with cursor=1 each time.
-      await select(1);
-      for (let i = 0; i < SPEED_CLICKS[speed]; i++) {
-        // Watermark before EVERY click: without it the second click's wait
-        // matches the first click's `[screen] MAIN_MENU cursor=1` line and
-        // returns instantly, so the cycle silently stops one short (B4).
-        const w = ctx.logs.nextSeq();
-        await ctx.press("click");
-        await ctx.waitScreen("MAIN_MENU", MENU_MS, w);
-      }
-      // ...and now "Enter Battle" is unreachable: handleMainMenu:183 left
-      // cursorIndex at 1, and a click on list index 0 arrives with
-      // currentSelectItemIndex ABSENT (the simulator omits the zero), so
-      // mapEventToGesture:632 yields listIndex: undefined and onTap falls back
-      // to cursorIndex=1 -- another speed cycle. See harness-01 in the header.
-      //
-      // handleMainMenu:195 (About/Credits) is the only handler that puts
-      // cursorIndex back to 0, so that is the way out. It renders via
-      // glass.showText WITHOUT render(), hence the stdout oracle.
-      const w = ctx.logs.nextSeq();
-      await select(2);
-      await ctx.press("click");
-      await waitStdout(ctx, /Gen 9 Random Battles/, w, MENU_MS);
+      // 13.1-02 moved Battle Speed off the main-menu LIST and into the root
+      // context menu, so there is no list row to click any more: the menu is
+      // an OS affordance driven by POST /api/input {"action":"context_menu"}.
+      // The old body clicked list item 1; on today's one-row menu that click
+      // resolves to item 0 and ENTERS A BATTLE, then waits 30s for a MAIN_MENU
+      // that is never coming. Throw instead of failing 30s later with a
+      // misleading message. The menu vocabulary this needs is plan 13.1-03's.
+      throw new AssertionError(
+        `speed "${speed}" is not reachable from this script. 13.1-02 moved Battle Speed into the root context menu; driving it needs the context_menu vocabulary from 13.1-03. Also see harness-02 in the file header: Instant renders TURN_RESULT without render(), so it logs no [screen] oracle at all.`,
+      );
     }
     expectConsoleClean(ctx.logs);
   });
 
   // -- 3. enter battle ------------------------------------------------------
   await ctx.step("enter-battle", async () => {
-    // FORCED home. The tracker starts at 0, but the simulator's selection may
-    // not be: boot's seven-input storm includes an `up` and a `down`, so the
-    // main-menu list can be sitting on item 1 ("Battle Speed") and a click
-    // would cycle the speed instead of entering the battle.
-    // On the About/Credits text screen there is no list to move, so this is a
-    // no-op there; the click still resolves to item 0 via cursorIndex.
+    // FORCED home. Since 13.1-02 the main menu is a single row, so boot's
+    // seven-input storm can no longer park the selection on a row that cycles
+    // the speed -- but re-homing still costs nothing and keeps the tracker
+    // honest across a screen it did not draw.
     await select(0, true);
     const w = ctx.logs.nextSeq();
     await ctx.press("click");
