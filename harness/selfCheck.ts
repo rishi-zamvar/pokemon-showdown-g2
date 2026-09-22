@@ -27,7 +27,14 @@ import type { LogLine } from "./logs.ts";
 import type { ConsoleEntry, Driver } from "./driver.ts";
 import { spawnSync } from "node:child_process";
 import { firstSelectable, parseListItems } from "./scenarios/battle.ts";
-import { LIMITS, SendQueue, assertPageContainers } from "../src/adapters/containerGuards.ts";
+import {
+  LIMITS,
+  SendQueue,
+  assertContainerDeclared,
+  assertImageUpdate,
+  assertPageContainers,
+  imageDataDimensions,
+} from "../src/adapters/containerGuards.ts";
 import type { ContainerLike, PageConfigLike } from "../src/adapters/containerGuards.ts";
 import {
   AssertionError,
@@ -1232,6 +1239,244 @@ export async function runChecks(): Promise<CheckResult[]> {
     );
     accepts({ containerTotalNum: 1, textObject: [capture({ containerName: "sixteenCharsXXXX" })] }, "a 16-character containerName");
   });
+
+  // -------------------------------------------------------------------------
+  // 47-52: the image-data dimension guard (REND-04 / REND-06, plan 13-03)
+  // -------------------------------------------------------------------------
+  //
+  // The firmware TILES image data smaller than its container instead of
+  // erroring: the screen renders something plausible and wrong and NO log
+  // stream mentions it. That is strictly worse than the 576x24 team bar of
+  // defect #2, which at least failed loudly. The adapter knows every
+  // container's declared size (plan 13-02's registry), so it can read the
+  // dimensions out of the payload's own header and refuse a mismatch before
+  // the ~104 ms host call goes out.
+  //
+  // Numbered from 47, not 46 as the plan said: 46 was taken by plan 13-02's
+  // containerName check, which landed after 13-03 was written.
+
+  /**
+   * A hand-built 62-byte BITMAPINFOHEADER.
+   *
+   * NOT `encodeBmp` from src/sprites/SpriteBmpEncoder.ts, which cannot be
+   * imported here at all: its line 15 is
+   * `import { SPRITE_CONFIG } from '../config/constants.js'`, and Node 22's
+   * strip-only mode does NOT remap `.js` -> `.ts`, so `node harness/selfCheck.ts`
+   * would die at import with ERR_MODULE_NOT_FOUND before running a single
+   * check. That is also the empirical proof that containerGuards.ts's
+   * zero-import rule is load-bearing rather than defensive.
+   *
+   * The reader only ever looks at offsets 0, 18 and 22, so a header-only
+   * fixture pins exactly the bytes it depends on — and fails if it ever starts
+   * guessing dimensions from file length. Offsets are the app's real writer's:
+   * SpriteBmpEncoder.ts:77-78, `setInt32(18, width, true)` / `setInt32(22, height, true)`.
+   */
+  function bmpHeader(width: number, height: number): Uint8Array {
+    const data = new Uint8Array(62);
+    const view = new DataView(data.buffer);
+    data[0] = 0x42; // "B"
+    data[1] = 0x4d; // "M"
+    view.setUint32(2, 62, true); // fileSize
+    view.setUint32(10, 62, true); // pixel data offset
+    view.setUint32(14, 40, true); // BITMAPINFOHEADER size
+    view.setInt32(18, width, true);
+    view.setInt32(22, height, true);
+    return data;
+  }
+
+  /** 8-byte PNG signature + IHDR length/type + big-endian width/height. */
+  function pngHeader(width: number, height: number): Uint8Array {
+    const data = new Uint8Array(33);
+    const view = new DataView(data.buffer);
+    data.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+    view.setUint32(8, 13, false); // IHDR chunk length
+    data.set([0x49, 0x48, 0x44, 0x52], 12); // "IHDR"
+    view.setUint32(16, width, false);
+    view.setUint32(20, height, false);
+    return data;
+  }
+
+  function decl(kind: string, name: string, width: number, height: number): {
+    kind: string; name: string; width: number; height: number;
+  } {
+    return { kind, name, width, height };
+  }
+
+  /** Refused, carrying `adapter: rejected container` plus every needle. */
+  function refusesUpdate(fn: () => void, needles: string[], what: string): void {
+    let msg: string | null = null;
+    try {
+      fn();
+    } catch (e) {
+      msg = e instanceof Error ? e.message : String(e);
+    }
+    assert.ok(msg !== null, `${what}: expected a refusal, the guard accepted it`);
+    assert.match(
+      msg,
+      /adapter: rejected container/,
+      `${what}: refusal must carry the family literal; got: ${msg}`,
+    );
+    for (const n of needles) {
+      assert.ok(msg.includes(n), `${what}: refusal should name ${JSON.stringify(n)}; got: ${msg}`);
+    }
+  }
+
+  await check("47 imageDataDimensions reads a BITMAPINFOHEADER", () => {
+    assert.deepEqual(
+      imageDataDimensions(bmpHeader(OVERLAY_LAYOUT.TEAM_BAR_W, OVERLAY_LAYOUT.TEAM_BAR_H)),
+      { width: 288, height: 24 },
+    );
+    assert.deepEqual(
+      imageDataDimensions(bmpHeader(OVERLAY_LAYOUT.COMPOSITE_W, OVERLAY_LAYOUT.COMPOSITE_H)),
+      { width: 144, height: 132 },
+    );
+    assert.deepEqual(
+      imageDataDimensions(bmpHeader(SPRITE_CONFIG.SIZE, SPRITE_CONFIG.SIZE)),
+      { width: 96, height: 96 },
+    );
+
+    // A negative height is a legal top-down BMP: it describes row ORDER, not
+    // size. Returning -132 would make every comparison below fail open.
+    assert.deepEqual(imageDataDimensions(bmpHeader(144, -132)), { width: 144, height: 132 });
+
+    // byteOffset. A Uint8Array view into a larger buffer is exactly where a
+    // DataView-based reader silently reads the wrong bytes.
+    const padded = new Uint8Array(80);
+    padded.set(bmpHeader(96, 96), 8);
+    assert.deepEqual(imageDataDimensions(padded.subarray(8)), { width: 96, height: 96 });
+  });
+
+  await check("48 imageDataDimensions refuses anything it does not recognise", () => {
+    refusesUpdate(() => imageDataDimensions(new Uint8Array(0)), ["0 bytes"], "an empty payload");
+    refusesUpdate(
+      () => imageDataDimensions(new Uint8Array([0x00, 0x01, 0x02])),
+      ["00 01 02", "3 bytes"],
+      "a 3-byte payload",
+    );
+    refusesUpdate(
+      () => imageDataDimensions(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10])),
+      ["ff d8 ff e0"],
+      "a JPEG",
+    );
+    // The real trap: the signature is right and the header is truncated, so a
+    // reader that checks only "BM" reads two ints past the end of the buffer.
+    refusesUpdate(
+      () => imageDataDimensions(new Uint8Array([0x42, 0x4d, 0x00, 0x00])),
+      ["42 4d"],
+      "a truncated BMP that still starts BM",
+    );
+  });
+
+  await check("49 imageDataDimensions reads a PNG IHDR", () => {
+    // Phase 15 ships a greyscale PNG pipeline; REND-04's guard must not be the
+    // thing that blocks it.
+    assert.deepEqual(imageDataDimensions(pngHeader(96, 96)), { width: 96, height: 96 });
+    assert.deepEqual(imageDataDimensions(pngHeader(288, 144)), { width: 288, height: 144 });
+    // Big-endian, not little: 288 read the wrong way round is 0x20010000.
+    assert.notDeepEqual(imageDataDimensions(pngHeader(288, 144)), { width: 537067520, height: 0 });
+  });
+
+  await check("50 assertImageUpdate refuses the tiling case", () => {
+    // The exact shape: showOverlayHud declared 144x132, an animation frame is
+    // 96x96. The hardware repeats the 96x96 image across the 144x132 slot
+    // rather than erroring.
+    refusesUpdate(
+      () => assertImageUpdate(
+        CONTAINER_IDS.oppSprite,
+        decl("image", CONTAINER_NAMES.oppSprite, OVERLAY_LAYOUT.COMPOSITE_W, OVERLAY_LAYOUT.COMPOSITE_H),
+        bmpHeader(SPRITE_CONFIG.SIZE, SPRITE_CONFIG.SIZE),
+      ),
+      ["4", "144x132", "96x96"],
+      "a 96x96 frame into a 144x132 container",
+    );
+
+    // The reverse is equally wrong and must not be waved through as "it fits".
+    refusesUpdate(
+      () => assertImageUpdate(
+        CONTAINER_IDS.playerSprite,
+        decl("image", CONTAINER_NAMES.playerSprite, SPRITE_CONFIG.SIZE, SPRITE_CONFIG.SIZE),
+        bmpHeader(OVERLAY_LAYOUT.COMPOSITE_W, OVERLAY_LAYOUT.COMPOSITE_H),
+      ),
+      ["5", "96x96", "144x132"],
+      "a 144x132 composite into a 96x96 container",
+    );
+
+    // One dimension off by one is the same defect, just harder to see.
+    refusesUpdate(
+      () => assertImageUpdate(4, decl("image", "oppSpr", 144, 132), bmpHeader(144, 131)),
+      ["144x132", "144x131"],
+      "a one-pixel-short payload",
+    );
+  });
+
+  await check("51 assertImageUpdate accepts the app's real sends", () => {
+    // 50 and 52 alone would pass against a guard that refuses everything; this
+    // is the half that stops one shipping. Every payload here is a size the
+    // app really sends today.
+    const accepts = (id: number, d: ReturnType<typeof decl>, data: Uint8Array, what: string): void => {
+      try {
+        assertImageUpdate(id, d, data);
+      } catch (e) {
+        assert.fail(`${what}: guard refused a correct send — ${e instanceof Error ? e.message : String(e)}`);
+      }
+    };
+
+    accepts(
+      CONTAINER_IDS.teamBar,
+      decl("image", CONTAINER_NAMES.teamBar, OVERLAY_LAYOUT.TEAM_BAR_W, OVERLAY_LAYOUT.TEAM_BAR_H),
+      bmpHeader(OVERLAY_LAYOUT.TEAM_BAR_W, OVERLAY_LAYOUT.TEAM_BAR_H),
+      "emptyTeamBarBmp()'s 288x24 into the team-bar container",
+    );
+    accepts(
+      CONTAINER_IDS.oppSprite,
+      decl("image", CONTAINER_NAMES.oppSprite, OVERLAY_LAYOUT.COMPOSITE_W, OVERLAY_LAYOUT.COMPOSITE_H),
+      bmpHeader(OVERLAY_LAYOUT.COMPOSITE_W, OVERLAY_LAYOUT.COMPOSITE_H),
+      "showOverlayHud's 144x132 composite",
+    );
+    accepts(
+      CONTAINER_IDS.playerSprite,
+      decl("image", CONTAINER_NAMES.playerSprite, SPRITE_CONFIG.SIZE, SPRITE_CONFIG.SIZE),
+      bmpHeader(SPRITE_CONFIG.SIZE, SPRITE_CONFIG.SIZE),
+      "showBattleHud's 96x96 sprite and every animation frame",
+    );
+    accepts(
+      CONTAINER_IDS.playerSprite,
+      decl("image", CONTAINER_NAMES.playerSprite, SPRITE_CONFIG.SIZE, SPRITE_CONFIG.SIZE),
+      pngHeader(SPRITE_CONFIG.SIZE, SPRITE_CONFIG.SIZE),
+      "Phase 15's PNG of the same size",
+    );
+  });
+
+  await check("52 assertImageUpdate refuses an undeclared container", () => {
+    // research-10's failure mode, moved from a simulator warning nobody reads
+    // to an exception at the call site (D-08).
+    refusesUpdate(
+      () => assertImageUpdate(CONTAINER_IDS.teamBar, undefined, bmpHeader(288, 24)),
+      ["8", "declared"],
+      "a send to a container no page ever declared",
+    );
+    refusesUpdate(
+      () => assertContainerDeclared(CONTAINER_IDS.status, undefined),
+      ["2", "declared"],
+      "research-11's textContainerUpgrade against an undeclared container 2",
+    );
+
+    // Declared, but as the wrong KIND. updateImageRawData against a text
+    // container fails on the hardware the same way a missing one does.
+    refusesUpdate(
+      () => assertImageUpdate(
+        CONTAINER_IDS.status,
+        decl("text", CONTAINER_NAMES.status, 576, 32),
+        bmpHeader(576, 32),
+      ),
+      ["2", "text", "image"],
+      "an image send to a text container",
+    );
+
+    // A declared container passes the existence check and returns nothing.
+    assert.equal(assertContainerDeclared(CONTAINER_IDS.content, decl("text", CONTAINER_NAMES.content, 576, 288)), undefined);
+  });
+
 
   return results;
 }

@@ -9,8 +9,9 @@
  * would break `node harness/selfCheck.ts` outright. Structural local types
  * only; no SDK, no ../config/constants.
  *
- * Plans 13-02 and 13-03 add the geometry and dimension guards here. Today it
- * holds the queue.
+ * Three guards live here: the serialising send queue (13-01, REND-05), the
+ * page geometry/count guard (13-02, REND-03) and the image-data dimension /
+ * container-existence guard (13-03, REND-04 and REND-06).
  */
 
 /**
@@ -184,5 +185,130 @@ export function assertPageContainers(config: PageConfigLike): void {
   // 5. The config lying about itself.
   if (config.containerTotalNum !== undefined && config.containerTotalNum !== all.length) {
     refuse(`config declares containerTotalNum ${config.containerTotalNum} but carries ${all.length} containers`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// REND-04 / REND-06: the image-data dimension guard
+// ---------------------------------------------------------------------------
+
+/**
+ * What the adapter recorded when a create/rebuild ACTUALLY SUCCEEDED
+ * (glassAdapter's `declaredContainers`). Structural, like ContainerLike, so
+ * this file keeps importing nothing.
+ */
+export interface DeclaredContainer {
+  kind: string;
+  name: string;
+  width: number;
+  height: number;
+}
+
+/** through the BITMAPINFOHEADER height field at offset 22 */
+const BMP_MIN_BYTES = 26;
+/** through the IHDR height field at offset 20 */
+const PNG_MIN_BYTES = 24;
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+function refuseUpdate(containerID: number, reason: string): never {
+  throw new Error(`adapter: rejected container ${containerID} — ${reason}`);
+}
+
+/** The leading bytes, so an unrecognised payload names itself in the refusal. */
+function leadingBytes(data: Uint8Array): string {
+  const head = Array.from(data.subarray(0, 4), (b) => b.toString(16).padStart(2, "0")).join(" ");
+  return `${data.length} bytes starting ${head || "(nothing)"}`;
+}
+
+/**
+ * null when the payload is neither BMP nor PNG. Separate from the two throwing
+ * wrappers so the "unrecognised" refusal can name the container when there is
+ * one and stay honest when there is not.
+ */
+function readDimensions(data: Uint8Array): { width: number; height: number } | null {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+  // BITMAPINFOHEADER, little-endian. Offsets pinned against the app's own
+  // writer, SpriteBmpEncoder.ts:77-78.
+  if (data.length >= BMP_MIN_BYTES && data[0] === 0x42 && data[1] === 0x4d) {
+    // Math.abs: a negative height is a legal top-down BMP. It describes row
+    // ORDER, not size, and returning -132 would fail every comparison below.
+    return {
+      width: Math.abs(view.getInt32(18, true)),
+      height: Math.abs(view.getInt32(22, true)),
+    };
+  }
+
+  // PNG IHDR, big-endian. Phase 15's greyscale pipeline writes these, and this
+  // guard must not be the thing that blocks it.
+  if (data.length >= PNG_MIN_BYTES && PNG_SIGNATURE.every((b, i) => data[i] === b)) {
+    return { width: view.getUint32(16, false), height: view.getUint32(20, false) };
+  }
+
+  return null;
+}
+
+/**
+ * Pixel dimensions of an image payload, read from its own header.
+ *
+ * Exists because the hardware TILES data smaller than its container rather
+ * than erroring: the screen renders something plausible and wrong and no log
+ * stream mentions it. Supports the BMP the app writes today and the PNG Phase
+ * 15 will write; anything else is REFUSED rather than guessed, because
+ * silently accepting an unrecognised payload defeats the whole point.
+ */
+export function imageDataDimensions(data: Uint8Array): { width: number; height: number } {
+  const dims = readDimensions(data);
+  if (dims === null) {
+    throw new Error(
+      `adapter: rejected container image payload — neither BMP nor PNG: ${leadingBytes(data)}`,
+    );
+  }
+  return dims;
+}
+
+/**
+ * D-08: an update aimed at a container no page has ever declared is a bug, not
+ * a no-op. The firmware answers it with `container N not found` on a stream
+ * nobody reads (research-10, research-11); this answers it at the call site.
+ *
+ * `declared` is CUMULATIVE — rebuildPageContainer never removes containers
+ * absent from the new config, so "declared once" means "still on the hardware".
+ */
+export function assertContainerDeclared(
+  containerID: number,
+  declared: DeclaredContainer | undefined,
+): asserts declared is DeclaredContainer {
+  if (declared === undefined) {
+    refuseUpdate(
+      containerID,
+      "no page has ever declared it, so the hardware has no such container to update",
+    );
+  }
+}
+
+/** Throws unless `data`'s dimensions equal the container's declared ones. */
+export function assertImageUpdate(
+  containerID: number,
+  declared: DeclaredContainer | undefined,
+  data: Uint8Array,
+): void {
+  assertContainerDeclared(containerID, declared);
+
+  if (declared.kind !== "image") {
+    refuseUpdate(containerID, `"${declared.name}" is declared as a ${declared.kind} container, not an image container`);
+  }
+
+  const dims = readDimensions(data);
+  if (dims === null) {
+    refuseUpdate(containerID, `"${declared.name}" was sent a payload that is neither BMP nor PNG: ${leadingBytes(data)}`);
+  }
+
+  if (dims.width !== declared.width || dims.height !== declared.height) {
+    refuseUpdate(
+      containerID,
+      `"${declared.name}" is declared ${declared.width}x${declared.height} but the payload is ${dims.width}x${dims.height}; ` +
+      "the firmware TILES a mismatch instead of erroring, so this would render something plausible and wrong with nothing in any log",
+    );
   }
 }
