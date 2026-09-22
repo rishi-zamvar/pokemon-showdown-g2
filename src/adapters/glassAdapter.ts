@@ -24,9 +24,9 @@ import {
   SPRITE_CONFIG,
   TIMING,
 } from "../config/constants";
-import { SendQueue, assertPageContainers } from "./containerGuards";
+import { SendQueue, assertContainerDeclared, assertImageUpdate, assertPageContainers } from "./containerGuards";
 import type { ContainerLike, PageConfigLike } from "./containerGuards";
-import { emptyTeamBarBmp } from "../sprites/CompositeBuilder";
+import { blankSprite } from "../animation/SpriteEffects";
 import type { GestureEvent, GlassAdapter, StatusBar, Unsubscribe } from "../types/contracts";
 
 /**
@@ -50,18 +50,27 @@ export class GlassAdapterImpl implements GlassAdapter {
   private readonly queue = new SendQueue();
 
   /**
-   * Every container ever successfully declared, with its latest kind and size.
+   * The containers the CURRENT page declares, with their kind and size.
    *
-   * CUMULATIVE ON PURPOSE. rebuildPageContainer does NOT remove containers that
-   * are absent from the new config — they persist on screen with their last
-   * rendered content (see the comment in showBattleHud; both blanking
-   * workarounds in this file exist because of it). So "does this container
-   * exist on the hardware" means "was it ever declared by a create/rebuild that
-   * SUCCEEDED", not "is it in the config we just sent". A per-page map would
-   * report container 8 as absent while it is visibly on screen, and plan 13-03
-   * would then skip a blank that is genuinely needed.
+   * PER PAGE, not cumulative. Plan 13-02 built this cumulative on the belief
+   * that "rebuildPageContainer does NOT remove containers absent from the new
+   * config". That belief is wrong, and the boot log says so directly: the
+   * FIRST showOverlayHud blanks container 2 successfully (the preceding page
+   * declared it), the rebuild that follows omits container 2, and the very
+   * next showOverlayHud's blank comes back
+   * `TextContainerUpgrade failed: container 2 not found` — research-11, on
+   * every boot, from a container a cumulative map still claims exists.
    *
-   * Nothing reads it yet; plan 13-03 does.
+   * What actually persists across a rebuild is the PIXELS, not the container:
+   * lvgl does not clear the canvas, so stale status text stays visible while
+   * the container object behind it is gone. That is why the blank in
+   * showOverlayHud still has to happen on the first overlay (while the
+   * container is alive) and must be skipped on every one after it, and it is
+   * also why the leftover pixels are Phase 14's problem, not something a
+   * textContainerUpgrade can reach.
+   *
+   * Read by sendBmpData (REND-04, dimensions) and by updateText /
+   * showOverlayHud (REND-06, existence).
    */
   private readonly declaredContainers = new Map<number, {
     kind: "image" | "text" | "list";
@@ -118,11 +127,16 @@ export class GlassAdapterImpl implements GlassAdapter {
   }
 
   /**
-   * Record what a create/rebuild that ACTUALLY SUCCEEDED just declared.
-   * Called from all three success paths and nowhere else — a missing entry
-   * becomes a hard throw on updateText in plan 13-03, the hottest path here.
+   * Record what a create/rebuild that ACTUALLY SUCCEEDED just declared, and
+   * forget the page it replaced. Called from all three success paths and
+   * nowhere else — a missing entry is a hard throw on updateText, the hottest
+   * path in this file, so recording a page that never rendered would be worse
+   * than recording none.
    */
   private recordPage(config: PageConfigLike): void {
+    // Replace, do not accumulate: the page that just went out is the page the
+    // hardware has. See the field comment for the boot log that proves it.
+    this.declaredContainers.clear();
     const add = (kind: "image" | "text" | "list", cs: ContainerLike[] | undefined): void => {
       for (const c of cs ?? []) {
         if (c.containerID === undefined) continue;
@@ -251,6 +265,12 @@ export class GlassAdapterImpl implements GlassAdapter {
    * Uses textContainerUpgrade. Max 2000 chars per Nick Ustinov notes.
    */
   async updateText(text: string, status: StatusBar): Promise<void> {
+    // D-08: a textContainerUpgrade aimed at a container no page has declared
+    // is answered by the firmware with `container N not found` on a stream
+    // nobody reads. Containers 1 and 2 are declared by every page that can
+    // precede an updateText, so these refusals firing is a genuine regression
+    // and must be loud rather than skipped.
+    assertContainerDeclared(CONTAINER_IDS.content, this.declaredContainers.get(CONTAINER_IDS.content));
     await this.call((b) =>
       b.textContainerUpgrade(
         new TextContainerUpgrade({
@@ -263,6 +283,7 @@ export class GlassAdapterImpl implements GlassAdapter {
       ),
     );
 
+    assertContainerDeclared(CONTAINER_IDS.status, this.declaredContainers.get(CONTAINER_IDS.status));
     await this.call((b) =>
       b.textContainerUpgrade(
         new TextContainerUpgrade({
@@ -275,9 +296,12 @@ export class GlassAdapterImpl implements GlassAdapter {
       ),
     );
 
-    // Only update statusRight if it has content — container 3 doesn't exist
-    // during animation (showBattleHud only creates containers 1, 2, 4, 5).
-    if (status.right) {
+    // Container 3 only exists once showText's split status bar has been
+    // rendered; showBattleHud declares 1, 2, 4 and 5 only. "Has it got
+    // content" was a PROXY for "does it exist" — ask the registry the real
+    // question instead, and keep the content test because a blank right-hand
+    // status is not worth a ~104 ms host call.
+    if (status.right && this.declaredContainers.has(CONTAINER_IDS.statusRight)) {
       await this.call((b) =>
         b.textContainerUpgrade(
           new TextContainerUpgrade({
@@ -333,33 +357,53 @@ export class GlassAdapterImpl implements GlassAdapter {
     const s = SPRITE_CONFIG.SIZE;
     const halfH = Math.floor(GLASS_LAYOUT.height / 2);
 
-    const imageContainers: ImageContainerProperty[] = [];
+    // Containers 4 and 5 are declared UNCONDITIONALLY, blank when there is no
+    // sprite. They used to be omitted whenever the argument was undefined, and
+    // that omission is a landmine under the REND-04 guard:
+    //
+    //   - the two containers ALTERNATE declared sizes. showOverlayHud declares
+    //     them 144x132; this method declares them 96x96.
+    //   - the argument is regularly undefined — battleHudRenderer.ts:164-165
+    //     yields `oppSprite ?? undefined` whenever the bitmap is not yet
+    //     cached or getDexNum() returns 0.
+    //   - omitting the container leaves the CUMULATIVE registry holding
+    //     144x132 from the last overlay, while AnimationEngine.switchAnimation
+    //     sends three 96x96 frames unconditionally before its
+    //     `if (!finalSprite) return`. assertImageUpdate would then refuse
+    //     96x96-against-144x132 and the rejection would escape playTurn
+    //     uncaught — a NEW intermittent hang in the phase whose purpose is
+    //     removing one.
+    //
+    // Visible consequence, and it is an improvement: a missing sprite now
+    // reads as an empty slot instead of leaving whatever the previous page
+    // rendered there (often a 144x132 overlay composite), because
+    // rebuildPageContainer does not remove absent containers. An all-black
+    // 96x96 send is already what a fainted Pokemon gets
+    // (battleHudRenderer.ts:151-152), and ScreenController.ts:472-473 already
+    // passes blankSprite() here for this same reason.
+    const opp = oppSprite ?? blankSprite();
+    const ply = playerSprite ?? blankSprite();
 
     // Opponent sprite: top-right, vertically centered in top half
-    if (oppSprite) {
-      const oppY = GLASS_LAYOUT.y + Math.floor((halfH - s) / 2);
-      imageContainers.push(new ImageContainerProperty({
+    // Player sprite:   bottom-left, vertically centered in bottom half
+    const imageContainers: ImageContainerProperty[] = [
+      new ImageContainerProperty({
         xPosition: GLASS_LAYOUT.x + GLASS_LAYOUT.width - s,
-        yPosition: oppY,
+        yPosition: GLASS_LAYOUT.y + Math.floor((halfH - s) / 2),
         width: s,
         height: s,
         containerID: CONTAINER_IDS.oppSprite,
         containerName: CONTAINER_NAMES.oppSprite,
-      }));
-    }
-
-    // Player sprite: bottom-left, vertically centered in bottom half
-    if (playerSprite) {
-      const plyY = GLASS_LAYOUT.y + halfH + Math.floor((halfH - s) / 2);
-      imageContainers.push(new ImageContainerProperty({
+      }),
+      new ImageContainerProperty({
         xPosition: GLASS_LAYOUT.x,
-        yPosition: plyY,
+        yPosition: GLASS_LAYOUT.y + halfH + Math.floor((halfH - s) / 2),
         width: s,
         height: s,
         containerID: CONTAINER_IDS.playerSprite,
         containerName: CONTAINER_NAMES.playerSprite,
-      }));
-    }
+      }),
+    ];
 
     // Text: opponent info top half, player info bottom half
     const combinedText = `${oppText}\n\n${playerText}`;
@@ -379,19 +423,15 @@ export class GlassAdapterImpl implements GlassAdapter {
     const statusContainer = this.makeStatusContainer(statusText);
 
     await this.renderContainers({
-      imageObject: imageContainers.length > 0 ? imageContainers : undefined,
+      imageObject: imageContainers,
       textObject: [textContainer, statusContainer],
     });
 
     // Send BMP image data AFTER container creation. These were inline copies of
     // sendBmpData with the same arguments — the duplication predated it and was
     // the only reason one host call had two different log shapes.
-    if (oppSprite) {
-      await this.sendBmpData(CONTAINER_IDS.oppSprite, CONTAINER_NAMES.oppSprite, oppSprite);
-    }
-    if (playerSprite) {
-      await this.sendBmpData(CONTAINER_IDS.playerSprite, CONTAINER_NAMES.playerSprite, playerSprite);
-    }
+    await this.sendBmpData(CONTAINER_IDS.oppSprite, CONTAINER_NAMES.oppSprite, opp);
+    await this.sendBmpData(CONTAINER_IDS.playerSprite, CONTAINER_NAMES.playerSprite, ply);
   }
 
   /**
@@ -454,8 +494,14 @@ export class GlassAdapterImpl implements GlassAdapter {
     // When showOverlayHud runs next, rebuildPageContainer does NOT remove
     // container 2 — it persists as stale status text at the bottom of the
     // overlay. Clearing it with a zero-length textContainerUpgrade hides it.
-    // Try/catch: silently ignored if container 2 doesn't exist yet.
-    try {
+    //
+    // Container 2 only exists here if the page being replaced declared it —
+    // before the first showBattleHud it never has, and from the second overlay
+    // onward the previous rebuild already destroyed it. That is not an error
+    // to swallow in a try/catch, it is a question with an answer (D-08,
+    // research-11): the registry knows. The catch that used to be here hid a
+    // real `TextContainerUpgrade failed: container 2 not found` on every boot.
+    if (this.declaredContainers.has(CONTAINER_IDS.status)) {
       await this.call((b) =>
         b.textContainerUpgrade(
           new TextContainerUpgrade({
@@ -467,8 +513,6 @@ export class GlassAdapterImpl implements GlassAdapter {
           }),
         ),
       );
-    } catch {
-      // Container 2 doesn't exist yet — safe to ignore.
     }
 
     await this.renderContainers({
@@ -505,23 +549,18 @@ export class GlassAdapterImpl implements GlassAdapter {
   /**
    * Update a sprite image in-place without rebuilding the page.
    *
-   * Calls the SDK's updateImageRawData directly on the existing container.
-   * The container must already exist (created via showBattleHud or similar).
+   * The animation path. It used to issue its own updateImageRawData, which
+   * meant every animation frame bypassed both the dimension guard and the only
+   * log line the host-call counter can see. One guarded path is the whole
+   * point of a choke point, so this now delegates — the arguments were already
+   * identical.
    *
    * @param containerID - Numeric ID of the image container (from CONTAINER_IDS).
    * @param containerName - Name of the image container (from CONTAINER_NAMES).
-   * @param base64 - Raw base64 PNG string without the `data:` prefix.
+   * @param bmpData - BMP (or, from Phase 15, PNG) bytes sized exactly to the container.
    */
   async updateImage(containerID: number, containerName: string, bmpData: Uint8Array): Promise<void> {
-    await this.call((b) =>
-      b.updateImageRawData(
-        new ImageRawDataUpdate({
-          containerID,
-          containerName,
-          imageData: bmpData,
-        }),
-      ),
-    );
+    await this.sendBmpData(containerID, containerName, bmpData);
   }
 
   // --- Private ---
@@ -709,6 +748,12 @@ export class GlassAdapterImpl implements GlassAdapter {
     // bridge, so a null one here is a programming error. Returning silently
     // turned it into a sprite that never appeared with nothing in any log;
     // call() throws instead.
+    //
+    // REND-04, before the log line so a refused send is never counted as a
+    // host call: the firmware TILES data smaller than its container instead of
+    // erroring, so a mismatch renders something plausible and wrong and says
+    // so nowhere. 8 bytes of header arithmetic, no host round-trip.
+    assertImageUpdate(containerID, this.declaredContainers.get(containerID), bmpData);
     console.log(`[GlassAdapter] sendBmpData container=${containerName} size=${bmpData.length}B`);
     await this.call((b) =>
       b.updateImageRawData(

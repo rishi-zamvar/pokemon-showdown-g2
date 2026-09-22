@@ -74,23 +74,29 @@ export function isFailureLine(l: LogLine): boolean {
  * / PERF-04 owns turning this into an enforced ceiling and must add the
  * adapter-side log lines first.
  *
- * `sendBmpData container=` is now the SINGLE marker for `updateImageRawData`.
- * It used to be one of two: `showBattleHud` carried inline copies of
- * sendBmpData's call that logged `sending (opp|player)Sprite BMP` instead.
- * Plan 13-01 collapsed those two sites onto sendBmpData, which moves two calls
- * from one log pattern to the other — one line each way, so the per-turn count
- * is unchanged. That count is the evidence that diagnosed research-14 (5 sends
- * on the hung turn against 10-21 on healthy ones), so it must keep counting.
+ * `sendBmpData container=` is the SINGLE marker for `updateImageRawData`, and
+ * as of plan 13-03 it is a COMPLETE one: every send in the app now goes
+ * through sendBmpData, including `updateImage`, the animation path, which
+ * previously issued its own bridge call with no log line of any kind.
  *
- * KNOWN INACCURACY 1 — `rebuildPageContainer` is a known-zero placeholder. The
- * ONLY console line in the app mentioning it is the failure warning at
- * glassAdapter.ts:577, so any "count non-failure mentions" rule yields 0
- * forever. Phase 19 MUST add a success-path log inside renderContainers before
- * PERF-02's "at most 2 host calls" can be asserted at all. Not faked here.
+ * THE BASELINE MOVED, AND THAT IS THE POINT. The familiar "10-21
+ * updateImageRawData per healthy turn, 5 on the hung turn" figure that
+ * diagnosed research-14 counted only SCREEN RENDERS — every sprite flash,
+ * slide frame and switch-in frame was invisible to it. Counting them makes
+ * per-turn totals jump to tens of calls, which is a bigger number describing
+ * the same app, not a regression. Phase 19 owns the ceiling (PERF-02,
+ * PERF-04) and must set it against the new, complete count; the old range no
+ * longer applies to anything.
  *
- * KNOWN INACCURACY 2 — showBattleHud's FIRST updateImageRawData
- * (glassAdapter.ts ~:295) has no log line at all, so that path undercounts by
- * one per call. Phase 19's single instrumentation point fixes both.
+ * KNOWN INACCURACY — `rebuildPageContainer` is a known-zero placeholder. The
+ * ONLY console line in the app mentioning it is the failure warning in
+ * renderContainers, so any "count non-failure mentions" rule yields 0 forever.
+ * Phase 19 MUST add a success-path log inside renderContainers before PERF-02's
+ * "at most 2 host calls" can be asserted at all. Not faked here.
+ *
+ * (The second inaccuracy recorded here — showBattleHud's first
+ * updateImageRawData having no log line — is closed: that call site is
+ * sendBmpData now.)
  */
 const HOST_CALL_PATTERNS: Array<[RegExp, string]> = [
   [/\[GlassAdapter\] sendBmpData container=/, "updateImageRawData"],

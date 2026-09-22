@@ -102,20 +102,6 @@ export interface KnownDefect {
 
 export const KNOWN_DEFECTS: readonly KnownDefect[] = [
   {
-    id: "research-10",
-    match: /\bupdate_image_raw_data: container 8 not found$/,
-    owner: "Phase 13/14 (REND-06)",
-    why:
-      "the team bar BMP is pushed before its container exists, on every boot. Fixing it means changing render order, which this phase is forbidden to do (it observes only).",
-  },
-  {
-    id: "research-11",
-    match: /\bTextContainerUpgrade failed: container 2 not found$/,
-    owner: "Phase 13/14",
-    why:
-      "showOverlayHud's 'blank out container 2' workaround fires against a container that is not there, on every boot. Same reason: the fix is a rendering change.",
-  },
-  {
     // FOUND BY THIS HARNESS on its first green run — not previously known,
     // now row 13 of .planning/G2-PLATFORM-RESEARCH.md.
     id: "research-13",

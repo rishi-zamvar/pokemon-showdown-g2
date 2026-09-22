@@ -847,10 +847,11 @@ export async function runChecks(): Promise<CheckResult[]> {
   // -- 35: HARN-05 + the known-defect allow-list -----------------------------
   // The allow-list is the one place D-05 ("warnings are not tolerated") is
   // bent, so it gets the most sceptical check in this file: it must waive the
-  // two named boot lines and NOTHING else -- in particular not the
-  // container-validation line this whole phase exists to catch, and not the
-  // dropped-input line that makes a no-op look like a handled input.
-  await check("35 expectConsoleClean fails on stdout validation lines; the allow-list waives only its two", () => {
+  // ONE line still on it and NOTHING else -- in particular not the
+  // container-validation line this whole phase exists to catch, not the
+  // dropped-input line that makes a no-op look like a handled input, and no
+  // longer the two container-not-found lines plan 13-03 stopped occurring.
+  await check("35 expectConsoleClean fails on stdout validation lines; the allow-list waives only research-13", () => {
     const logs = new LogStream(stubDriver([]).asDriver());
     expectConsoleClean(logs);
 
@@ -862,12 +863,10 @@ export async function runChecks(): Promise<CheckResult[]> {
 
     const waived = [
       "[2026-01-01T00:00:00Z WARN  lvgl] [Warn]\t(9.769, +0)\t lv_draw_unit_draw_letter: lv_draw_letter: glyph dsc. not found for U+2591 lv_draw_label.c:575",
-      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::vm] update_image_raw_data: container 8 not found",
-      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::flutter] TextContainerUpgrade failed: container 2 not found",
     ];
     const clean = new LogStream(stubDriver([]).asDriver());
     for (const w of waived) clean.pushStdout(w);
-    expectConsoleClean(clean); // the two known boot defects, waived by id
+    expectConsoleClean(clean); // research-13, Phase 14's, waived by id
 
     // nothing else is waived, including near-misses of the same families
     const notWaived = [
@@ -877,6 +876,13 @@ export async function runChecks(): Promise<CheckResult[]> {
       "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::flutter] TextContainerUpgrade failed: container 4 not found",
       // a DIFFERENT missing glyph is a different defect and must still fail
       "[2026-01-01T00:00:00Z WARN  lvgl] [Warn]\t(9.769, +0)\t lv_draw_unit_draw_letter: lv_draw_letter: glyph dsc. not found for U+2588 lv_draw_label.c:575",
+      // THE REGRESSION GUARD (D-10). These two were waived until plan 13-03
+      // stopped them occurring: research-10 died with the team bar, and
+      // research-11 died when the container registry became per-page. Their
+      // waivers are deleted, so from here on either one coming back fails the
+      // run instead of being printed in a footer nobody has to act on.
+      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::vm] update_image_raw_data: container 8 not found",
+      "[2026-01-01T00:00:00Z WARN evenhub_simulator_lib::flutter] TextContainerUpgrade failed: container 2 not found",
     ];
     for (const line of notWaived) {
       const l = new LogStream(stubDriver([]).asDriver());
