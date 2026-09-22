@@ -30,6 +30,36 @@ export const CONTAINER_IDS = {
   teamBar: 8,
 } as const;
 
+/**
+ * Root-page context menu (INFO-01, D-04).
+ *
+ * ORDER IS LOAD-BEARING: Exit is LAST. The whole reason this phase routes the
+ * exit dialogue through a menu instead of a bare double-tap is that the
+ * dialogue, once dismissed, leaves every updateImageRawData returning
+ * sendFailed until the app restarts (D-02). The first item of a menu is the
+ * one a pre-selected highlight lands on, so putting Exit there would recreate
+ * the accident the menu exists to prevent — and it would let the harness wedge
+ * its own simulator with one `click` after `context_menu`.
+ *
+ * Protocol rules the SDK validator enforces before any host call: at most 10
+ * items, every itemID non-zero and unique, every itemName at most 32 UTF-8
+ * BYTES. Phase 17 adds inspect entries here, inherits all four rules, and must
+ * keep Exit last.
+ *
+ * The IDs are independent of the order: never renumber an id to move an item.
+ */
+export const MENU_ITEM_IDS = {
+  exit: 1,
+  battleSpeed: 2,
+  about: 3,
+} as const;
+
+export const MAIN_MENU_CONTEXT_MENU = [
+  { id: MENU_ITEM_IDS.battleSpeed, name: 'Battle Speed' },
+  { id: MENU_ITEM_IDS.about, name: 'About' },
+  { id: MENU_ITEM_IDS.exit, name: 'Exit' },   // LAST. See the note above.
+] as const;
+
 export const CONTAINER_NAMES = {
   content: "content",
   status: "status",

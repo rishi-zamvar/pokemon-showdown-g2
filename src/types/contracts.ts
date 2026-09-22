@@ -1,10 +1,17 @@
 export type Unsubscribe = () => void;
 
+/** One entry of the native OS context menu. itemID non-zero and unique; itemName <= 32 UTF-8 BYTES. */
+export interface MenuItem {
+  id: number;
+  name: string;
+}
+
 export type GestureKind =
   | "SCROLL_FWD"
   | "SCROLL_BACK"
   | "TAP"
   | "DOUBLE_TAP"
+  | "MENU_ITEM"
   | "FOREGROUND_ENTER"
   | "FOREGROUND_EXIT";
 
@@ -12,6 +19,8 @@ export interface GestureEvent {
   kind: GestureKind;
   /** Firmware-reported list selection index (from listEvent on TAP). */
   listIndex?: number;
+  /** Set only on MENU_ITEM; the itemID the OS reported for the clicked entry. */
+  menuItemID?: number;
 }
 
 export interface StatusBar {
@@ -23,7 +32,13 @@ export interface GlassAdapter {
   connect(): Promise<void>;
   bootstrapStartup(): Promise<void>;
   onGesture(handler: (event: GestureEvent) => void): Unsubscribe;
-  showList(items: string[], statusText: string): Promise<void>;
+  /**
+   * Render a list page, optionally declaring the native OS context menu.
+   *
+   * Omitting `menu` rebuilds without `menuObject`, which CLEARS the custom menu
+   * and restores the OS default (D-09). Only the root page passes one.
+   */
+  showList(items: string[], statusText: string, menu?: readonly MenuItem[]): Promise<void>;
   showText(text: string, status: StatusBar): Promise<void>;
   updateText(text: string, status: StatusBar): Promise<void>;
   showMessage(text: string): Promise<void>;
@@ -50,4 +65,14 @@ export interface GlassAdapter {
     listItems: string[],
     listStatus: string,
   ): Promise<void>;
+  /**
+   * Raise the OS exit dialogue (shutDownPageContainer exitMode 1).
+   *
+   * D-02: once this dialogue has been shown and dismissed, EVERY
+   * updateImageRawData returns sendFailed in 1-3 ms and never recovers until
+   * the app restarts. Three in-app recoveries were tried upstream and all
+   * failed. There is no recovery path here on purpose — only one caller, and
+   * it is an explicit menu selection on the root page.
+   */
+  exitApp(): Promise<void>;
 }
