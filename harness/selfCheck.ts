@@ -44,6 +44,7 @@ import {
 import type { ContainerLike, PageConfigLike } from "../src/adapters/containerGuards.ts";
 import {
   AssertionError,
+  FatalError,
   KNOWN_DEFECTS,
   expectConsoleClean,
   expectFrameDiff,
@@ -51,6 +52,7 @@ import {
   expectGreyLevels,
   expectHostCalls,
   expectLoggedLine,
+  expectNoLoggedLine,
   expectRegionPersists,
   expectScreen,
 } from "./assert.ts";
@@ -1561,6 +1563,99 @@ export async function runChecks(): Promise<CheckResult[]> {
     refuses([{ id: 1, name: "\u{1F3AE}".repeat(9) }], "INVALID_MENU_ITEM_NAME", "a 9-character, 36-BYTE name");
   });
 
+
+  await check("54 the menu item ids themselves are pinned, not just their order", () => {
+    // Check 53 pins the ORDER. This pins the NUMBERS, and they are a different
+    // contract: every assertion in plans 03/04 and every saved run log says
+    // `itemID=2`, not `itemID=whatever battleSpeed is today`. A future reorder
+    // must move the ARRAY POSITION (which 53 re-checks) and must NOT renumber
+    // an id out from under a log line that has already been interpreted.
+    assert.equal(MENU_ITEM_IDS.exit, 1, "Exit is itemID 1 in every recorded run log");
+    assert.equal(MENU_ITEM_IDS.battleSpeed, 2, "Battle Speed is itemID 2 in every recorded run log");
+    assert.equal(MENU_ITEM_IDS.about, 3, "About is itemID 3 in every recorded run log");
+    // ...and the array is built from those ids rather than restating them.
+    assert.deepEqual(
+      MAIN_MENU_CONTEXT_MENU.map((m) => m.id),
+      [MENU_ITEM_IDS.battleSpeed, MENU_ITEM_IDS.about, MENU_ITEM_IDS.exit],
+    );
+  });
+
+  await check("55 containerTotalNum counts containers, NOT menu items", () => {
+    // assertPageContainers never reads menuObject, and that is the property
+    // being pinned: a menu is not a container. Counting the three menu items
+    // into the total makes the guard refuse every correct root page -- with a
+    // message about a config lying about itself, which points at the wrong
+    // thing entirely. This is the exact page the app builds for MAIN_MENU.
+    const root: PageConfigLike = {
+      containerTotalNum: 2,
+      listObject: [
+        { containerID: CONTAINER_IDS.content, containerName: CONTAINER_NAMES.content, width: 560, height: 248, isEventCapture: 1 },
+      ],
+      textObject: [
+        { containerID: CONTAINER_IDS.status, containerName: CONTAINER_NAMES.status, width: 560, height: 28, isEventCapture: 0 },
+      ],
+    };
+    // Not a fresh object literal: the excess-property check would reject the
+    // extra key, and menuObject travelling alongside the containers is exactly
+    // what is being modelled.
+    const withMenu = {
+      ...root,
+      menuObject: { menuItems: MAIN_MENU_CONTEXT_MENU.map((m) => ({ itemID: m.id, itemName: m.name })) },
+    };
+    assert.equal(assertPageContainers(withMenu), undefined, "the real root page config was refused");
+
+    // 2 containers + 3 menu items = 5, the mistake this check exists to stop.
+    const miscounted = { ...withMenu, containerTotalNum: 2 + MAIN_MENU_CONTEXT_MENU.length };
+    assert.throws(
+      () => assertPageContainers(miscounted),
+      /containerTotalNum 5 but carries 2 containers/,
+      "the guard accepted a page that counted its menu items as containers",
+    );
+  });
+
+  await check("56 expectNoLoggedLine / expectLoggedLine(since) / FatalError", async () => {
+    const logs = new LogStream(
+      stubDriver([[
+        entry(1, "log", "[screen] MAIN_MENU cursor=0"),
+        entry(2, "log", "[GlassAdapter] menu: itemID=2"),
+        entry(3, "log", "[screen] menu: Battle Speed"),
+      ]]).asDriver(),
+    );
+    await logs.poll();
+
+    // absence passes, presence throws AND names the offending line
+    expectNoLoggedLine(logs, /menu: itemID=9/, "nothing selected item 9");
+    assert.throws(() => expectNoLoggedLine(logs, /menu: itemID=2/, "a menu item was selected"), AssertionError);
+    assert.throws(
+      () => expectNoLoggedLine(logs, /menu: itemID=2/, "a menu item was selected"),
+      /a menu item was selected: .*\[console\/log\] \[GlassAdapter\] menu: itemID=2/,
+    );
+
+    // THE VACUOUSNESS THE DOCSTRING WARNS ABOUT, MADE RUNNABLE. reset() is what
+    // ctx.step() does at the start of every step without keepLogs: the same
+    // assertion over the same history now passes while proving nothing. This is
+    // why the exit checks live INSIDE the step whose inputs they judge.
+    await logs.reset();
+    expectNoLoggedLine(logs, /menu: itemID=2/, "vacuous after reset()");
+
+    // the `since` watermark: a step that repeats an action must not match the
+    // previous iteration's line (the regression step in boot.ts selects the
+    // same menu item three times inside ONE step).
+    const repeated = new LogStream(
+      stubDriver([[entry(1, "log", "[screen] menu: Battle Speed"), entry(2, "log", "[screen] MAIN_MENU cursor=0")]]).asDriver(),
+    );
+    await repeated.poll();
+    const seqOfSecondLine = repeated.all()[1]!.seq;
+    assert.equal(expectLoggedLine(repeated, /menu: Battle Speed/).message, "[screen] menu: Battle Speed");
+    assert.throws(() => expectLoggedLine(repeated, /menu: Battle Speed/, seqOfSecondLine), AssertionError);
+    assert.throws(() => expectLoggedLine(repeated, /menu: Battle Speed/, seqOfSecondLine), /at or after seq/);
+
+    // FatalError is a distinct type, because run.ts routes on `instanceof`.
+    const f = new FatalError("boom");
+    assert.equal(f.name, "FatalError");
+    assert.ok(f instanceof Error);
+    assert.ok(!(f instanceof AssertionError));
+  });
 
   return results;
 }
