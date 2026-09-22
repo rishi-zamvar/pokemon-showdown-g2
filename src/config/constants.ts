@@ -15,6 +15,12 @@ export const GLASS_LAYOUT = {
 export const TIMING = {
   /** Scroll cooldown to prevent duplicate events (ms). Per Nick Ustinov notes. */
   SCROLL_COOLDOWN_MS: 300,
+  /**
+   * Menu-click dedupe window (ms). The firmware emits DUPLICATE events
+   * ~50-100 ms apart for one physical transition; wider than the scroll
+   * cooldown because a doubled Exit is unrecoverable (D-02).
+   */
+  MENU_DEDUPE_MS: 600,
   /** Timeout waiting for EvenAppBridge connection (ms). */
   BRIDGE_TIMEOUT_MS: 15_000,
 } as const;

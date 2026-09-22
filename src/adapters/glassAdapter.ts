@@ -49,6 +49,12 @@ export class GlassAdapterImpl implements GlassAdapter {
   private startupDone = false;
   private readonly gestureHandlers = new Set<(e: GestureEvent) => void>();
   private lastScrollTime = 0;
+  /**
+   * Menu dedupe state, its OWN pair. Sharing lastScrollTime would make a menu
+   * click eat the next scroll — different windows, different reasons.
+   */
+  private lastMenuItemID: number | null = null;
+  private lastMenuItemTime = 0;
   private readonly queue = new SendQueue();
 
   /**
@@ -742,6 +748,49 @@ export class GlassAdapterImpl implements GlassAdapter {
 
     this.unsubscribeHub?.();
     this.unsubscribeHub = this.bridge.onEvenHubEvent((event) => {
+      // INPUT-02, and it MUST be tested before mapEventToGesture (D6 / Phase
+      // 16): that function maps EVERY unrecognised eventType — including
+      // `undefined`, which is how the SDK deserialises CLICK_EVENT=0 — to TAP.
+      // A menu click carries no eventType at all, so falling through would
+      // turn "the wearer opened the menu and chose About" into a stray TAP
+      // that commits a move. Presence of the OBJECT is the test, NOT
+      // `itemID !== undefined`: an event that arrives with the id missing must
+      // still be swallowed here, never handed to the gesture mapper.
+      if (event.menuItemClickEvent) {
+        const itemID = event.menuItemClickEvent.itemID;
+        if (itemID === undefined) {
+          console.log('[GlassAdapter] menuItemClickEvent with no itemID — ignored');
+          return;
+        }
+
+        // The firmware emits DUPLICATE events ~50-100 ms apart for one
+        // physical transition. Undeduped, one selection of "Exit" fires the
+        // dialogue twice and one selection of "Battle Speed" skips a preset.
+        const now = Date.now();
+        if (
+          itemID === this.lastMenuItemID &&
+          now - this.lastMenuItemTime < TIMING.MENU_DEDUPE_MS
+        ) {
+          console.log(
+            `[GlassAdapter] menu: duplicate itemID=${itemID} within ${TIMING.MENU_DEDUPE_MS}ms — dropped`,
+          );
+          return;
+        }
+        // Refreshed on ACCEPT only, never on a drop: the window measures time
+        // since the last DELIVERED click, so a burst cannot extend itself
+        // indefinitely. Irrelevant at the observed 50-100 ms duplicate
+        // spacing; stated because the alternative is a silently different
+        // policy.
+        this.lastMenuItemID = itemID;
+        this.lastMenuItemTime = now;
+
+        console.log(`[GlassAdapter] menu: itemID=${itemID}`);
+        for (const handler of this.gestureHandlers) {
+          handler({ kind: 'MENU_ITEM', menuItemID: itemID });
+        }
+        return;
+      }
+
       const gesture = this.mapEventToGesture(event);
       if (!gesture) return;
 

@@ -21,7 +21,13 @@ import { decodePng } from "./png.ts";
 import { INK_THRESHOLD, greyLevels, inkRatio, saveFrame, toFrame } from "./frame.ts";
 import type { Frame } from "./frame.ts";
 import { REGIONS } from "./regions.ts";
-import { CONTAINER_IDS, CONTAINER_NAMES, DISPLAY, GLASS_LAYOUT, OVERLAY_LAYOUT, SPRITE_CONFIG } from "../src/config/constants.ts";
+import { CONTAINER_IDS, CONTAINER_NAMES, DISPLAY, GLASS_LAYOUT, MAIN_MENU_CONTEXT_MENU, MENU_ITEM_IDS, OVERLAY_LAYOUT, SPRITE_CONFIG } from "../src/config/constants.ts";
+import {
+  MenuContainerProperty,
+  MenuItemProperty,
+  utf8ByteLength,
+  validateEvenHubPageContainer,
+} from "@evenrealities/even_hub_sdk";
 import { LogStream, isFailureLine } from "./logs.ts";
 import type { LogLine } from "./logs.ts";
 import type { ConsoleEntry, Driver } from "./driver.ts";
@@ -1481,6 +1487,58 @@ export async function runChecks(): Promise<CheckResult[]> {
 
     // A declared container passes the existence check and returns nothing.
     assert.equal(assertContainerDeclared(CONTAINER_IDS.content, decl("text", CONTAINER_NAMES.content, 576, 288)), undefined);
+  });
+
+  await check("53 the root context menu is SDK-valid and keeps Exit last", () => {
+    // MAIN_MENU_CONTEXT_MENU is the ONE place the root menu is spelled out and
+    // Phase 17 edits it to add inspect entries. Two different failures are
+    // covered here because neither implies the other:
+    //
+    //  * the SDK validator refuses a malformed menu, and a refused menu builds
+    //    NOTHING — no list, no status, no page (D-07). Caught at boot today,
+    //    but only if someone boots.
+    //  * the validator has no opinion whatsoever about ORDER, and order is the
+    //    safety property. Exit LAST is what stops a pre-selected highlight
+    //    landing on the one action that wedges every updateImageRawData until
+    //    restart (D-02). Nothing else in the codebase checks it.
+    const wrap = (items: readonly { id: number; name: string }[]) => ({
+      // Exactly how renderContainers wraps it, so this validates the real
+      // payload shape and not a convenient plain-object stand-in.
+      containerTotalNum: 1,
+      textObject: [{ xPosition: 0, yPosition: 0, width: 576, height: 288, containerID: 1, containerName: "content", content: "x" }],
+      menuObject: new MenuContainerProperty({
+        menuItems: items.map((m) => new MenuItemProperty({ itemID: m.id, itemName: m.name })),
+      }),
+    });
+
+    const r = validateEvenHubPageContainer(wrap(MAIN_MENU_CONTEXT_MENU));
+    assert.equal(r.valid, true, `the real root menu is rejected by the SDK: ${JSON.stringify(r)}`);
+
+    const last = MAIN_MENU_CONTEXT_MENU[MAIN_MENU_CONTEXT_MENU.length - 1];
+    assert.equal(last?.id, MENU_ITEM_IDS.exit, "Exit must be the LAST menu item (D-02) — the default highlight lands on the first");
+    assert.ok(MAIN_MENU_CONTEXT_MENU.length <= 10, "the firmware renders at most 10 menu items");
+    for (const m of MAIN_MENU_CONTEXT_MENU) {
+      // No `m.id !== 0` assert: `as const` narrows the ids to a literal union
+      // and tsc calls the comparison unintentional (TS2367). The rule is still
+      // enforced — by the SDK, on the real menu, three lines up, and by the
+      // INVALID_MENU_ITEM_ID case below.
+      assert.ok(utf8ByteLength(m.name) <= 32, `"${m.name}" exceeds 32 UTF-8 BYTES — bytes, not characters`);
+    }
+    assert.equal(new Set(MAIN_MENU_CONTEXT_MENU.map((m) => m.id)).size, MAIN_MENU_CONTEXT_MENU.length, "itemIDs must be unique");
+
+    // The other half: a validator that said {valid:true} to everything would
+    // pass all of the above. Each of these is a real 0.0.15 rejection code.
+    const refuses = (items: { id: number; name: string }[], code: string, what: string): void => {
+      const got = validateEvenHubPageContainer(wrap(items));
+      assert.equal(got.valid, false, `${what}: the SDK accepted a menu it must refuse`);
+      assert.equal((got as { code: string }).code, code, what);
+    };
+    refuses([{ id: 0, name: "Exit" }], "INVALID_MENU_ITEM_ID", "itemID 0");
+    refuses([{ id: 1, name: "A" }, { id: 1, name: "B" }], "DUPLICATE_MENU_ITEM_ID", "a reused itemID");
+    refuses(Array.from({ length: 11 }, (_, i) => ({ id: i + 1, name: `m${i}` })), "TOO_MANY_MENU_ITEMS", "11 items");
+    refuses([{ id: 1, name: "x".repeat(33) }], "INVALID_MENU_ITEM_NAME", "a 33-character name");
+    // BYTES, not characters: 9 emoji is 9 characters and 36 bytes.
+    refuses([{ id: 1, name: "\u{1F3AE}".repeat(9) }], "INVALID_MENU_ITEM_NAME", "a 9-character, 36-BYTE name");
   });
 
 
