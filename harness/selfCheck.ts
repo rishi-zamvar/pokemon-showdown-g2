@@ -786,8 +786,28 @@ export async function runChecks(): Promise<CheckResult[]> {
       .split("\n")
       .filter((l) => !l.trim().startsWith("//"))
       .join("\n");
-    const emits = src.match(/console\.log\(`\[screen\] /g) ?? [];
-    assert.equal(emits.length, 1, `expected exactly one [screen] emit in src/, found ${emits.length}`);
+    // The ORACLE is the emit that interpolates the screen name. It must be
+    // unique: waitScreen latches onto the first line it can parse as a screen
+    // announcement, and a second one would let it succeed on the wrong screen.
+    const emits = src.match(/console\.log\(`\[screen\] \$\{this\.state\.screen\} cursor=/g) ?? [];
+    assert.equal(emits.length, 1, `expected exactly one [screen] oracle emit in src/, found ${emits.length}`);
+
+    // Everything ELSE on the [screen] channel must be unparseable AS a screen
+    // announcement -- otherwise "exactly one oracle" buys nothing. expectScreen
+    // matches /\[screen\] NAME\b/ and battle.ts's lastScreen matches
+    // /\[screen\] ([A-Z_]+)/, so a non-oracle line is safe iff it continues in
+    // lower case with a literal, never an interpolation that could widen to an
+    // uppercase screen name. 13.1-02's menu lines ("[screen] menu: Exit",
+    // "[screen] menu itemID=2 ignored on BATTLE_HUD") are why this is written
+    // down rather than left to whoever adds the next log line.
+    for (const m of src.matchAll(/console\.log\([`'"]\[screen\] ([^`'"]*)/g)) {
+      const rest = m[1]!;
+      if (rest.startsWith("${this.state.screen} cursor=")) continue; // the oracle itself
+      assert.ok(
+        /^[a-z]/.test(rest),
+        `[screen] line continues with "${rest.slice(0, 24)}" — only the oracle may start with an interpolation or a capital, or waitScreen cannot tell them apart`,
+      );
+    }
 
     const render = src.indexOf("private async render()");
     assert.ok(render > 0, "render() funnel not found");
