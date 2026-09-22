@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Enhancement & Polish
-status: 13.1-01 landed the ADAPTER HALF of the store blocker. `shutDownPageContainer` went from ZERO call sites in `src/` to exactly one — `exitApp()`, exitMode 1, through the SendQueue, bracketed by two load-bearing log lines plan 04 asserts on. `menuObject` is built INTO `config` before `assertPage`, so the SDK's own `validateEvenHubPageContainer` enforces the 10-item / non-zero / unique / 32-UTF-8-BYTE rules for free — no new guard, `containerGuards.ts` byte-identical and still importing nothing. `bindEvents` tests `event.menuItemClickEvent` on OBJECT PRESENCE and returns before `mapEventToGesture` runs, closing the D6 trap (that mapper turns every unknown eventType, `undefined` included, into a TAP). 600 ms dedupe in its own field pair, never sharing `lastScrollTime`. selfCheck 52 -> 53.
-stopped_at: Completed 13.1-01-PLAN.md
-last_updated: "2026-09-22T17:23:07.276Z"
+status: "13.1-02 WIRED THE MENU and deleted the soft-brick. `render()`'s MAIN_MENU case is the only `showList` of three passing a third argument, and the simulator log proves the declaration reaches the firmware: `menu_object: Some(MenuContainerProperty { menu_items: [Battle Speed id2, About id3, Exit id1] })` on the MAIN_MENU rebuild, Exit LAST. `MENU_ITEM` routes to `onMenuItem` behind `screen !== 'MAIN_MENU'`, and `glass.exitApp()` has exactly one caller. `handleMainMenu` is one `if` with no `cursorIndex` write anywhere in the file — harness-01 is structurally gone, not guarded, because the list is one row (`item_count: 1, ["Enter Battle"]`) and the speed preset moved to the status line. selfCheck still 53/53; full suite green through battle turn-11."
+stopped_at: Completed 13.1-02-PLAN.md
+last_updated: "2026-09-22T17:46:53.689Z"
 progress:
   total_phases: 23
   completed_phases: 13
   total_plans: 50
-  completed_plans: 46
+  completed_plans: 47
 ---
 
 # Project State
@@ -23,13 +23,41 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 ## Current Position
 
-Phase: 13.1 — Store Blocker: Exit Dialogue via Context Menu — IN PROGRESS (1/4 plans)
-Plan: 13.1-01 complete. 13.1-02 next.
-Status: 13.1-01 landed the ADAPTER HALF of the store blocker. `shutDownPageContainer` went from ZERO call sites in `src/` to exactly one — `exitApp()`, exitMode 1, through the SendQueue, bracketed by two load-bearing log lines plan 04 asserts on. `menuObject` is built INTO `config` before `assertPage`, so the SDK's own `validateEvenHubPageContainer` enforces the 10-item / non-zero / unique / 32-UTF-8-BYTE rules for free — no new guard, `containerGuards.ts` byte-identical and still importing nothing. `bindEvents` tests `event.menuItemClickEvent` on OBJECT PRESENCE and returns before `mapEventToGesture` runs, closing the D6 trap (that mapper turns every unknown eventType, `undefined` included, into a TAP). 600 ms dedupe in its own field pair, never sharing `lastScrollTime`. selfCheck 52 -> 53.
+Phase: 13.1 — Store Blocker: Exit Dialogue via Context Menu — IN PROGRESS (2/4 plans)
+Plan: 13.1-02 complete. 13.1-03 next.
+Status: 13.1-02 WIRED THE MENU and deleted the soft-brick. `render()`'s MAIN_MENU case is the only `showList` of three passing a third argument, and the simulator log proves the declaration reaches the firmware: `menu_object: Some(MenuContainerProperty { menu_items: [Battle Speed id2, About id3, Exit id1] })` on the MAIN_MENU rebuild, Exit LAST. `MENU_ITEM` routes to `onMenuItem` behind `screen !== 'MAIN_MENU'`, and `glass.exitApp()` has exactly one caller. `handleMainMenu` is one `if` with no `cursorIndex` write anywhere in the file — harness-01 is structurally gone, not guarded, because the list is one row (`item_count: 1, ["Enter Battle"]`) and the speed preset moved to the status line. selfCheck still 53/53; full suite green through battle turn-11.
 
-NOTHING IS WIRED YET AND THAT IS THE PLAN'S BOUNDARY. `MAIN_MENU_CONTEXT_MENU` has no caller in `src/`, `MENU_ITEM` has no `case` in `ScreenController` (its switch has no `default`, so an unhandled one is inert), and `exitApp()` has no caller. 13.1-02 wires all three.
+THE MENU IS LIVE; NOBODY HAS USED ONE YET. That is the whole of 13.1-03's job.
+`onMenuItem` is reachable in source and gated by seven falsifiability proofs,
+but no `menuItemClickEvent` has been delivered in a running simulator, so
+nothing yet proves the adapter hears a click rather than swallowing it. 13.1-03
+drives `POST /api/input {"action":"context_menu"}` and asserts on
+`[GlassAdapter] menu: itemID=` and `[screen] menu: Battle Speed`.
 
-REQUIREMENTS NOT TICKED: INFO-01 and INPUT-02 are listed on 13.1-01's frontmatter but are only half-delivered by it — the menu does not exist at runtime until 13.1-02 declares it, so both stay Pending and 13.1-02 should mark them. Ticking them now would put a false entry in the traceability table.
+REQUIREMENTS STILL NOT TICKED, AND THIS IS A DELIBERATE DEVIATION from the note
+13.1-01 left here. INFO-01, INPUT-02 and INPUT-05 all stay Pending. INPUT-02's
+live proof (a click heard and routed) is 13.1-03's stated must-have; INPUT-05's
+(`[screen] menu: Exit` -> `[GlassAdapter] shutDownPageContainer(1)`) is
+13.1-04's terminal scenario and that plan's frontmatter already claims it; and
+INFO-01 reads "the universal 'more' affordance DURING BATTLE", which D-09
+deliberately does not deliver — the menu is root-only and battle entries are
+Phase 17. A menu that exists is not a menu that has been used. See
+13.1-02-SUMMARY.md "Requirements: none marked complete, deliberately".
+
+HARNESS INK FLOORS WERE RECALIBRATED, twice, and this will bite anyone who
+diffs against an old artifact. The one-row main menu inks CONTENT at 0.0046,
+so `boot / boot` and `battle / menu` moved from a 0.01 floor to 0.002 (blank is
+still exactly 0.000 and still fails). The main menu is now the SPARSEST screen
+in the app, sparser than END_SCREEN. Static gates could not see any of this —
+only the live run did.
+
+selfCheck 32 NOW GATES THE ORACLE, NOT THE PREFIX. It used to count every
+``console.log(`[screen] ``, which 13.1-02's `[screen] menu itemID=...` guard
+line broke. It now requires exactly one emit interpolating
+`${this.state.screen} cursor=` AND that every other `[screen] ` line continues
+with a lowercase literal, so neither `expectScreen` nor `lastScreen` can
+mistake one for a screen announcement. Plans 03/04 may add `[screen] menu: X`
+lines freely; they must stay lowercase after the prefix.
 
 Previous activity: 2026-09-22 — 13-03 landed the image-data guard and cashed the waivers. `assertImageUpdate()` reads the payload's own BMP/PNG header and refuses any dimension mismatch before the ~104 ms call — the firmware TILES a mismatch instead of erroring. `updateImage` (the animation path) now routes through `sendBmpData`, so every frame is guarded and, for the first time, COUNTED. Both blanking try/catch blocks are deleted; `showOverlayHud` and `updateText` ask the registry instead. KNOWN_DEFECTS is down to research-13 (Phase 14's); research-10 and research-11 no longer occur and check 35 now FAILS on both lines. selfCheck 46 -> 52.
 
@@ -96,6 +124,10 @@ left orphaned in the roadmap:
   run — the one behaviour that needs one is the exit dialogue itself, and
   firing it wedges every later updateImageRawData in the process, so 13.1-04
   owns it as a terminal scenario)
+
+- 13.1-02: 2 tasks, 5 commits, 6 files, ~38 min (2 planned src files + 3
+  harness files the plan did not list — collapsing the main menu to one row
+  changes the pixels two scenarios assert on; 4 live simulator runs)
 
 - Average duration: ~2.3 min
 
@@ -240,6 +272,9 @@ Recent decisions affecting current work:
 - [Phase 13]: Host-call baseline moved to 8-76 updateImageRawData per turn (was 10-21): updateImage now routes through sendBmpData, so the animation path is counted for the first time
 - [Phase 13.1]: Exit is the LAST context-menu item, enforced permanently by selfCheck 53 — the SDK validator has no opinion about order and order is the whole D-02 safety property
 - [Phase 13.1]: menuItemClickEvent is dispatched on OBJECT PRESENCE before mapEventToGesture, because that mapper turns every unknown eventType (undefined included) into a TAP
+- [Phase 13.1]: Menu scope is expressed by OMISSION: only render()'s MAIN_MENU case passes showList's third argument, and the rebuild-without-menuObject on every other screen is what clears it (D-09)
+- [Phase 13.1]: harness-01 fixed by DELETING the state, not guarding the index: the main menu is one row so cursorIndex can never leave 0 (D-05)
+- [Phase 13.1]: INFO-01/INPUT-02/INPUT-05 left Pending by 13.1-02 — the menu is live but no menu click has been delivered; live proof belongs to plans 03 and 04
 
 ### v1.1 Research Context
 
@@ -293,21 +328,23 @@ Key findings from research (2026-03-01):
 
 ## Session Continuity
 
-Last session: 2026-09-22T17:22:47.686Z
-Stopped at: Completed 13.1-01-PLAN.md
-Next: execute 13.1-02-PLAN.md (wire Exit/Battle Speed/About behind a
-MAIN_MENU-only guard; collapse the main menu to one row to delete harness-01).
+Last session: 2026-09-22T17:46:09.520Z
+Stopped at: Completed 13.1-02-PLAN.md
+Next: execute 13.1-03-PLAN.md (prove the menu is live: declared at boot, opens
+under `context_menu`, and a click is heard by the adapter and routed by the
+controller rather than swallowed as a TAP).
 
-Read before starting 13.1-02: the adapter is ready and DELIBERATELY unwired.
-Pass `MAIN_MENU_CONTEXT_MENU` as `showList`'s third argument on the root page
-and NOWHERE else — every other `renderContainers` caller already omits it and
-therefore clears the custom menu, which is D-09 and is the mechanism that keeps
-Exit off non-root screens (D-03). Add the `MENU_ITEM` case to
-`ScreenController.handleGesture` and switch on `MENU_ITEM_IDS`. Do not call
-`exitApp()` from anywhere but the `MENU_ITEM_IDS.exit` case. Also mark INFO-01
-and INPUT-02 complete there — 13.1-01 left them Pending on purpose.
+Read before starting 13.1-03: the wiring is done and verified STATICALLY plus
+one live boot. `MAIN_MENU_CONTEXT_MENU` reaches the firmware — the payload is
+in `.harness-runs/2026-09-22T17-34-00-833Z`. What is NOT proved is anything
+involving an actual menu click. Navigate by id, never by an unmeasured
+highlight. The controller's guard logs `[screen] menu itemID=<n> ignored on
+<SCREEN>` on a non-root screen and `[screen] menu: <Name>` on the root one;
+keep any new `[screen] ` line lowercase after the prefix or selfCheck 32 will
+(correctly) fail it.
 
-Do NOT select Exit in any harness scenario before 13.1-04's terminal step: one
-selection wedges every subsequent updateImageRawData for the rest of the
-process, with no in-app recovery (D-02).
+Note that `runBattleScript({ speed })` now THROWS for anything but "Normal" —
+Battle Speed left the list and driving it needs 13.1-03's `context_menu`
+vocabulary. Wiring that up is the natural home for un-deferring it.
+
 Resume file: None
