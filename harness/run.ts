@@ -31,7 +31,7 @@ import type { SimHandle } from "./sim.ts";
 import { inkRatio, saveFrame, toFrame } from "./frame.ts";
 import { REGIONS } from "./regions.ts";
 import type { Frame } from "./frame.ts";
-import { expectConsoleClean, knownDefect } from "./assert.ts";
+import { FatalError, expectConsoleClean, knownDefect } from "./assert.ts";
 import type { KnownDefect } from "./assert.ts";
 import { SCENARIOS } from "./scenarios/index.ts";
 import type { ScreenName } from "../src/screens/ScreenState.ts";
@@ -254,6 +254,11 @@ async function runScenario(s: Scenario, driver: Driver, logs: LogStream, runDir:
   try {
     await s.run(ctx);
   } catch (e) {
+    // The ONE error that must not be recorded-and-continued. Everything after a
+    // wedged simulator fails for a reason unrelated to what it tests (D-02), so
+    // a cascade of misattributed failures is worse than no result at all. This
+    // propagates to main()'s catch, which sets `fatal` and calls finish().
+    if (e instanceof FatalError) throw e;
     if (!(e instanceof Error) || !(e as Error & { [RECORDED]?: true })[RECORDED]) {
       record({
         scenario: s.name,
