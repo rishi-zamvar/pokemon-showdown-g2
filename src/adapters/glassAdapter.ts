@@ -5,6 +5,8 @@ import {
   ImageRawDataUpdate,
   ListContainerProperty,
   ListItemContainerProperty,
+  MenuContainerProperty,
+  MenuItemProperty,
   OsEventTypeList,
   RebuildPageContainer,
   StartUpPageCreateResult,
@@ -27,7 +29,7 @@ import {
 import { SendQueue, assertContainerDeclared, assertImageUpdate, assertPageContainers } from "./containerGuards";
 import type { ContainerLike, PageConfigLike } from "./containerGuards";
 import { blankSprite } from "../animation/SpriteEffects";
-import type { GestureEvent, GlassAdapter, StatusBar, Unsubscribe } from "../types/contracts";
+import type { GestureEvent, GlassAdapter, MenuItem, StatusBar, Unsubscribe } from "../types/contracts";
 
 /**
  * GlassAdapter implementation built from official SDK docs and
@@ -212,8 +214,12 @@ export class GlassAdapterImpl implements GlassAdapter {
   /**
    * Show a scrollable list on glasses.
    * Always rebuilds because list items can't be updated in-place.
+   *
+   * `menu` is the native OS context menu. OMISSION IS THE SIGNIFICANT STATE
+   * (D-09): a rebuild without menuObject clears the custom menu and restores
+   * the OS default, which is why only the root page passes one.
    */
-  async showList(items: string[], statusText: string): Promise<void> {
+  async showList(items: string[], statusText: string, menu?: readonly MenuItem[]): Promise<void> {
     const listContainer = new ListContainerProperty({
       xPosition: GLASS_LAYOUT.x,
       yPosition: GLASS_LAYOUT.y,
@@ -234,6 +240,10 @@ export class GlassAdapterImpl implements GlassAdapter {
     await this.renderContainers({
       listObject: [listContainer],
       textObject: [statusContainer],
+      // Spread, not `menu: menu`. An explicit `undefined` key and an absent
+      // key are not the same thing once this reaches RebuildPageContainer,
+      // and absence is the state that clears the menu (D-09).
+      ...(menu ? { menu } : {}),
     });
   }
 
@@ -563,6 +573,34 @@ export class GlassAdapterImpl implements GlassAdapter {
     await this.sendBmpData(containerID, containerName, bmpData);
   }
 
+  /**
+   * INPUT-05. exitMode 1, not 0: 0 closes the app directly, 1 raises the
+   * foreground interaction layer and lets the wearer decide — that layer IS
+   * the dialogue Even Hub requires the root page to invoke.
+   *
+   * D-02: after this dialogue is dismissed, every updateImageRawData returns
+   * sendFailed in 1-3 ms and never recovers until restart. There is
+   * deliberately no recovery attempt here; three were tried upstream and all
+   * failed (rebuild-on-appearance wipes the images, rebuild-after-cancel does
+   * not clear the wedge, and re-calling createStartUpPageContainer is rejected
+   * `invalid` after blocking ~2.1 s). The mitigation is that this method has
+   * exactly one caller and it is an explicit menu selection.
+   *
+   * BOTH LOG LINES ARE LOAD-BEARING — DO NOT DELETE THEM TO SATISFY A GREP.
+   * The pre-call line is the ONLY positive evidence that the call happened: if
+   * the dialogue wedges the bridge the promise may never settle and the
+   * "after" line never arrives. console.log, never warn/error — the harness
+   * treats a console error as a run failure.
+   */
+  async exitApp(): Promise<void> {
+    console.log('[GlassAdapter] shutDownPageContainer(1)');
+    // Through this.call like every other bridge call: the SendQueue is the
+    // adapter's single choke point, and an exit racing an in-flight image send
+    // is exactly the class of bug 13-01 removed.
+    const ok = await this.call((b) => b.shutDownPageContainer(1));
+    console.log(`[GlassAdapter] shutDownPageContainer(1) -> ${ok}`);
+  }
+
   // --- Private ---
 
   private makeStatusContainer(text: string): TextContainerProperty {
@@ -613,7 +651,17 @@ export class GlassAdapterImpl implements GlassAdapter {
     listObject?: ListContainerProperty[];
     textObject?: TextContainerProperty[];
     imageObject?: ImageContainerProperty[];
+    /**
+     * Native OS context menu for THIS page. Every other caller of this method
+     * (showText, showMessage, showBattleHud, showOverlayHud) passes nothing
+     * and therefore CLEARS the custom menu on every rebuild. That is D-09 and
+     * it is deliberate: the menu is a root-page affordance, not a global one,
+     * and D-03 says no non-root screen may reach the exit dialogue.
+     */
+    menu?: readonly MenuItem[];
   }): Promise<void> {
+    // Menu items are NOT containers — assertPageContainers counts
+    // list+text+image only, and the firmware budget is per container.
     const containerTotalNum =
       (payload.listObject?.length ?? 0) +
       (payload.textObject?.length ?? 0) +
@@ -624,9 +672,30 @@ export class GlassAdapterImpl implements GlassAdapter {
       ...(payload.listObject ? { listObject: payload.listObject } : {}),
       ...(payload.textObject ? { textObject: payload.textObject } : {}),
       ...(payload.imageObject ? { imageObject: payload.imageObject } : {}),
+      ...(payload.menu
+        ? {
+            menuObject: new MenuContainerProperty({
+              menuItems: payload.menu.map(
+                (m) => new MenuItemProperty({ itemID: m.id, itemName: m.name }),
+              ),
+            }),
+          }
+        : {}),
     };
 
+    // ORDERING IS LOAD-BEARING: assertPage runs validateEvenHubPageContainer,
+    // which is what enforces the menu's 10-item / non-zero / unique /
+    // 32-UTF-8-BYTE rules (D-07). A menu built after this line is an
+    // unvalidated menu, and a menu the SDK rejects builds NOTHING — no list,
+    // no status, no page at all.
     this.assertPage(config);
+
+    // After, never before: the line has to mean "validated and about to be
+    // sent", not "attempted". Console only — the page was being rebuilt
+    // regardless, so this adds no host call.
+    if (payload.menu) {
+      console.log(`[GlassAdapter] menu declared: ${payload.menu.length} item(s)`);
+    }
 
     if (!this.startupDone) {
       // Try createStartUpPageContainer once — if it fails, fall through to rebuildPageContainer
