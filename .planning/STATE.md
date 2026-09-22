@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Enhancement & Polish
-status: "13.1-02 WIRED THE MENU and deleted the soft-brick. `render()`'s MAIN_MENU case is the only `showList` of three passing a third argument, and the simulator log proves the declaration reaches the firmware: `menu_object: Some(MenuContainerProperty { menu_items: [Battle Speed id2, About id3, Exit id1] })` on the MAIN_MENU rebuild, Exit LAST. `MENU_ITEM` routes to `onMenuItem` behind `screen !== 'MAIN_MENU'`, and `glass.exitApp()` has exactly one caller. `handleMainMenu` is one `if` with no `cursorIndex` write anywhere in the file — harness-01 is structurally gone, not guarded, because the list is one row (`item_count: 1, ["Enter Battle"]`) and the speed preset moved to the status line. selfCheck still 53/53; full suite green through battle turn-11."
-stopped_at: Completed 13.1-02-PLAN.md
-last_updated: "2026-09-22T17:46:53.689Z"
+status: "13.1-03 PROVED THE MENU, LIVE. **The OS context-menu highlight defaults to index 0 ("Battle Speed", itemID 2)** — measured three ways (two throwaway simulators, then the suite itself every run) and visible in `boot-003-context-menu-open.png`, where Battle Speed is drawn brighter than About and Exit. **Plan 02's ordering needs no revision**: Exit is last AND the highlight starts on entry one, so both halves of the safety property are now measured rather than assumed. `down` moves the highlight by exactly one (probe: `itemID=3`); a bare `click` commits the default, so the navigation shape is just `context_menu` + `click`. New boot steps `context-menu` (frames differ byte-for-byte, FULL ink rises 0.0091 -> 0.0118, `[GlassAdapter] menu: itemID=` AND `[screen] menu: ` both asserted) and `menu-speed-does-not-soft-brick` (Battle Speed x3 by id, each watermarked). `enter-battle` owns the harness-01 proof. selfCheck 53 -> 56. Full suite green through battle turn-20, then the known-open D13-D."
+stopped_at: Completed 13.1-03-PLAN.md
+last_updated: "2026-09-22T18:09:42.803Z"
 progress:
   total_phases: 23
   completed_phases: 13
   total_plans: 50
-  completed_plans: 47
+  completed_plans: 48
 ---
 
 # Project State
@@ -23,63 +23,34 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 ## Current Position
 
-Phase: 13.1 — Store Blocker: Exit Dialogue via Context Menu — IN PROGRESS (2/4 plans)
-Plan: 13.1-02 complete. 13.1-03 next.
-Status: 13.1-02 WIRED THE MENU and deleted the soft-brick. `render()`'s MAIN_MENU case is the only `showList` of three passing a third argument, and the simulator log proves the declaration reaches the firmware: `menu_object: Some(MenuContainerProperty { menu_items: [Battle Speed id2, About id3, Exit id1] })` on the MAIN_MENU rebuild, Exit LAST. `MENU_ITEM` routes to `onMenuItem` behind `screen !== 'MAIN_MENU'`, and `glass.exitApp()` has exactly one caller. `handleMainMenu` is one `if` with no `cursorIndex` write anywhere in the file — harness-01 is structurally gone, not guarded, because the list is one row (`item_count: 1, ["Enter Battle"]`) and the speed preset moved to the status line. selfCheck still 53/53; full suite green through battle turn-11.
+Phase: 13.1 — Store Blocker: Exit Dialogue via Context Menu — IN PROGRESS (3/4 plans)
+Plan: 13.1-03 complete. 13.1-04 next.
+Status: 13.1-03 PROVED THE MENU, LIVE. **The OS context-menu highlight defaults to index 0 ("Battle Speed", itemID 2)** — measured three ways (two throwaway simulators, then the suite itself every run) and visible in `boot-003-context-menu-open.png`, where Battle Speed is drawn brighter than About and Exit. **Plan 02's ordering needs no revision**: Exit is last AND the highlight starts on entry one, so both halves of the safety property are now measured rather than assumed. `down` moves the highlight by exactly one (probe: `itemID=3`); a bare `click` commits the default, so the navigation shape is just `context_menu` + `click`. New boot steps `context-menu` (frames differ byte-for-byte, FULL ink rises 0.0091 -> 0.0118, `[GlassAdapter] menu: itemID=` AND `[screen] menu: ` both asserted) and `menu-speed-does-not-soft-brick` (Battle Speed x3 by id, each watermarked). `enter-battle` owns the harness-01 proof. selfCheck 53 -> 56. Full suite green through battle turn-20, then the known-open D13-D.
 
-THE MENU IS LIVE; NOBODY HAS USED ONE YET. That is the whole of 13.1-03's job.
-`onMenuItem` is reachable in source and gated by seven falsifiability proofs,
-but no `menuItemClickEvent` has been delivered in a running simulator, so
-nothing yet proves the adapter hears a click rather than swallowing it. 13.1-03
-drives `POST /api/input {"action":"context_menu"}` and asserts on
-`[GlassAdapter] menu: itemID=` and `[screen] menu: Battle Speed`.
+THE ONE NUMBER 13.1-04 NEEDS: the default highlight is index 0. Exit is index 2,
+so plan 04 must navigate DOWN TWICE before committing. `selectMenuItem` in
+harness/scenarios/boot.ts already does the arithmetic from the measured default
+and refuses a negative step count, because only `down` has been measured to move
+the highlight — `up` has not. It also REFUSES any target whose id is
+`MENU_ITEM_IDS.exit`, on purpose: plan 04 owns that selection and must lift the
+refusal deliberately, in the terminal scenario, ordered last.
 
-REQUIREMENTS STILL NOT TICKED, AND THIS IS A DELIBERATE DEVIATION from the note
-13.1-01 left here. INFO-01, INPUT-02 and INPUT-05 all stay Pending. INPUT-02's
-live proof (a click heard and routed) is 13.1-03's stated must-have; INPUT-05's
-(`[screen] menu: Exit` -> `[GlassAdapter] shutDownPageContainer(1)`) is
-13.1-04's terminal scenario and that plan's frontmatter already claims it; and
-INFO-01 reads "the universal 'more' affordance DURING BATTLE", which D-09
-deliberately does not deliver — the menu is root-only and battle entries are
-Phase 17. A menu that exists is not a menu that has been used. See
-13.1-02-SUMMARY.md "Requirements: none marked complete, deliberately".
+THE SUITE CAN NOW END ITSELF. `FatalError` (harness/assert.ts) re-thrown by
+`runScenario` (run.ts:261) aborts the RUN, not the step — proved by pointing the
+no-exit check at a line a menu click really emits: boot's remaining steps,
+negativeProof and battle all never ran. Reserved for conditions that invalidate
+every later scenario. An ordinary failed assertion stays an AssertionError.
 
-HARNESS INK FLOORS WERE RECALIBRATED, twice, and this will bite anyone who
-diffs against an old artifact. The one-row main menu inks CONTENT at 0.0046,
-so `boot / boot` and `battle / menu` moved from a 0.01 floor to 0.002 (blank is
-still exactly 0.000 and still fails). The main menu is now the SPARSEST screen
-in the app, sparser than END_SCREEN. Static gates could not see any of this —
-only the live run did.
+THE BATTLE LOOP NOW ASSERTS AN ABSENCE PER TURN (D-11). `expectNoLoggedLine` is
+inside each `turn-N` step beside its `expectConsoleClean`, not in a later
+coverage step, because `ctx.step()` calls `logs.reset()` and a later placement
+inspects an EMPTY buffer and passes silently. Proved live (turn-1 goes red when
+the pattern is pointed at a line a turn really emits). The trap is written on
+the helper's own docstring and demonstrated runnably by selfCheck 56.
 
-selfCheck 32 NOW GATES THE ORACLE, NOT THE PREFIX. It used to count every
-``console.log(`[screen] ``, which 13.1-02's `[screen] menu itemID=...` guard
-line broke. It now requires exactly one emit interpolating
-`${this.state.screen} cursor=` AND that every other `[screen] ` line continues
-with a lowercase literal, so neither `expectScreen` nor `lastScreen` can
-mistake one for a screen announcement. Plans 03/04 may add `[screen] menu: X`
-lines freely; they must stay lowercase after the prefix.
-
-Previous activity: 2026-09-22 — 13-03 landed the image-data guard and cashed the waivers. `assertImageUpdate()` reads the payload's own BMP/PNG header and refuses any dimension mismatch before the ~104 ms call — the firmware TILES a mismatch instead of erroring. `updateImage` (the animation path) now routes through `sendBmpData`, so every frame is guarded and, for the first time, COUNTED. Both blanking try/catch blocks are deleted; `showOverlayHud` and `updateText` ask the registry instead. KNOWN_DEFECTS is down to research-13 (Phase 14's); research-10 and research-11 no longer occur and check 35 now FAILS on both lines. selfCheck 46 -> 52.
-
-CORRECTION TO 13-02: `declaredContainers` is now PER PAGE, not cumulative. `rebuildPageContainer` DOES remove containers absent from the new config — the boot log shows the first overlay blank container 2 successfully and the next one come back `container 2 not found`. The cumulative map was itself the cause of research-11. What survives a rebuild is the PIXELS, not the container, so the stale overlay text is Phase 14's canvas problem.
-
-HOST-CALL BASELINE MOVED: 8-76 `updateImageRawData` per turn (typically 16-50), NOT the familiar 10-21. The old figure counted screen renders only. Phase 14 must not read a 60-call turn as a regression; Phase 19 must set PERF-02/PERF-04 against the new count.
-
-Previous activity: 2026-09-18 — 13-02 shipped the geometry guard (`assertPageContainers()` + the SDK's own validator before every create/rebuild, REFUSE never clamp).
-
-```
-Milestone v2.0 Progress:
-[==========] Phase 12 Automation Test Harness          <- complete (4/4), gates everything
-[==========] Phase 13 Container Safety Layer          <- complete (3/3), REND-03..06 done
-[==        ] Phase 13.1 Store Blocker — Exit Menu     <- 1/4, adapter half landed, nothing wired
-[          ] Phase 14 Battle Text & HUD Persistence
-[          ] Phase 15 4-bit Greyscale Sprite Pipeline
-[          ] Phase 16 Modern Input Model
-[          ] Phase 17 Context Menu & Inspect Navigation
-[          ] Phase 18 Move/Field/Team/Opponent Inspect
-[          ] Phase 19 Call-Count Performance Restructure
-25% complete (2/8 phases; Phase 13 closed 3/3)
-```
+REQUIREMENTS: INPUT-02 and INFO-01 are now ticked — a click WAS delivered in a
+running simulator, heard by the adapter and routed by the controller. INPUT-05
+stays Pending: it is 13.1-04's terminal scenario and nothing has selected Exit.
 
 ### Milestone v1.1 closed out
 
@@ -128,6 +99,10 @@ left orphaned in the roadmap:
 - 13.1-02: 2 tasks, 5 commits, 6 files, ~38 min (2 planned src files + 3
   harness files the plan did not list — collapsing the main menu to one row
   changes the pixels two scenarios assert on; 4 live simulator runs)
+
+- 13.1-03: 3 tasks, 4 commits, 5 files, ~52 min (2 throwaway simulator probes
+  to measure the default highlight BEFORE writing anything that depends on it,
+  then 7 falsifiability breaks, 7 reds, all restored)
 
 - Average duration: ~2.3 min
 
@@ -328,23 +303,20 @@ Key findings from research (2026-03-01):
 
 ## Session Continuity
 
-Last session: 2026-09-22T17:46:09.520Z
-Stopped at: Completed 13.1-02-PLAN.md
-Next: execute 13.1-03-PLAN.md (prove the menu is live: declared at boot, opens
-under `context_menu`, and a click is heard by the adapter and routed by the
-controller rather than swallowed as a TAP).
+Last session: 2026-09-22T18:20:00.000Z
+Stopped at: Completed 13.1-03-PLAN.md
+Next: execute 13.1-04-PLAN.md (the terminal Exit scenario — `[screen] menu: Exit`
+-> `[GlassAdapter] shutDownPageContainer(1)`, ordered LAST because selecting it
+wedges every image send until restart, D-02).
 
-Read before starting 13.1-03: the wiring is done and verified STATICALLY plus
-one live boot. `MAIN_MENU_CONTEXT_MENU` reaches the firmware — the payload is
-in `.harness-runs/2026-09-22T17-34-00-833Z`. What is NOT proved is anything
-involving an actual menu click. Navigate by id, never by an unmeasured
-highlight. The controller's guard logs `[screen] menu itemID=<n> ignored on
-<SCREEN>` on a non-root screen and `[screen] menu: <Name>` on the root one;
-keep any new `[screen] ` line lowercase after the prefix or selfCheck 32 will
-(correctly) fail it.
-
-Note that `runBattleScript({ speed })` now THROWS for anything but "Normal" —
-Battle Speed left the list and driving it needs 13.1-03's `context_menu`
-vocabulary. Wiring that up is the natural home for un-deferring it.
-
-Resume file: None
+Read before starting 13.1-04: the vocabulary is all there. `expectNoLoggedLine`,
+`FatalError`, `expectLoggedLine(logs, pattern, since)`, `openMenu`,
+`commitMenuSelection`, `selectMenuItem` and `refuseExit` all live in
+harness/scenarios/boot.ts and harness/assert.ts. Exit is menu index 2 and the
+highlight starts at 0, so it takes two `down` presses. `commitMenuSelection`
+currently REFUSES the Exit id by design — lifting that refusal is plan 04's
+first deliberate act, and it must happen in a scenario registered AFTER battle
+in harness/scenarios/index.ts. `harness/logs.ts` has no HOST_CALL_PATTERNS row
+for the exit, so `expectHostCalls` cannot count it; `expectLoggedLine` needs
+none. Selecting Exit is the one thing in this phase that cannot be undone
+without restarting the simulator.
