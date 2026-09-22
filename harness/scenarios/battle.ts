@@ -62,10 +62,29 @@
  */
 import { waitFor } from "../driver.ts";
 import { REGIONS } from "../regions.ts";
-import { AssertionError, expectConsoleClean, expectFrameInk, expectScreen } from "../assert.ts";
+import {
+  AssertionError,
+  expectConsoleClean,
+  expectFrameInk,
+  expectNoLoggedLine,
+  expectScreen,
+} from "../assert.ts";
 import { quiesce } from "./boot.ts";
 import type { Ctx, Scenario } from "../run.ts";
 import type { ScreenName } from "../../src/screens/ScreenState.ts";
+
+/**
+ * D-11, and it has to live INSIDE the steps that drive the battle.
+ *
+ * The failure this phase exists to prevent is an exit nobody asked for, so the
+ * real assertion is an absence. ctx.step() calls logs.reset() at the start of
+ * every step without keepLogs, so an "did anything exit during the battle"
+ * check placed in a LATER step inspects an empty buffer and passes even if the
+ * app exited on every single turn. One call per turn, beside that turn's
+ * expectConsoleClean, judging that turn's own inputs.
+ */
+const EXIT_CALL = /shutDownPageContainer/;
+const NO_EXIT = "nothing in this step asked the app to exit";
 
 /** moves the SIMULATOR's list selection; `force` re-homes even if it looks right */
 type Select = (index: number, force?: boolean) => Promise<void>;
@@ -439,6 +458,9 @@ export async function runBattleScript(ctx: Ctx, opts: BattleScriptOpts = {}): Pr
       // HARN-05 for every turn of a real battle, not just at boot. This is the
       // assertion that catches a container-validation line appearing on turn 17.
       expectConsoleClean(ctx.logs);
+      // D-11: and no turn of a real battle may exit the app. Scoped to THIS
+      // turn's lines -- see the note on EXIT_CALL above.
+      expectNoLoggedLine(ctx.logs, EXIT_CALL, `turn ${turn}: ${NO_EXIT}`);
     });
 
     if (ended) break;
@@ -586,6 +608,7 @@ export const battleScenario: Scenario = {
       await ctx.press("click");
       await ctx.waitScreen("MAIN_MENU", MENU_MS, w);
       expectConsoleClean(ctx.logs);
+      expectNoLoggedLine(ctx.logs, EXIT_CALL, `back-to-menu: ${NO_EXIT}`);
     });
   },
 };
