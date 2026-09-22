@@ -32,7 +32,7 @@ import { renderEndScreen } from './renderers/endScreenRenderer.js';
 import { renderSpriteRefresh } from './renderers/spriteRefreshRenderer.js';
 import { SpriteService } from '../sprites/SpriteService.js';
 import { blankSprite } from '../animation/SpriteEffects.js';
-import { ANIM } from '../config/constants.js';
+import { ANIM, MAIN_MENU_CONTEXT_MENU, MENU_ITEM_IDS } from '../config/constants.js';
 import { SpeedConfig } from '../config/SpeedConfig.js';
 import { buildOppComposite, buildPlayerComposite, buildTeamBar, emptyComposite, emptyTeamBarBmp } from '../sprites/CompositeBuilder.js';
 
@@ -89,6 +89,13 @@ export class ScreenController {
       case 'DOUBLE_TAP':
         await this.onDoubleTap();
         break;
+      case 'MENU_ITEM':
+        // Note the animation guard above: it swallows everything except
+        // TAP/DOUBLE_TAP while an animation runs, so a menu click mid-animation
+        // is dropped. Correct and wanted -- the menu only exists on MAIN_MENU,
+        // where nothing animates.
+        await this.onMenuItem(event.menuItemID);
+        break;
       case 'FOREGROUND_ENTER':
         await this.render();
         break;
@@ -139,6 +146,62 @@ export class ScreenController {
     }
   }
 
+  /**
+   * Native context-menu selection (INPUT-02 / INFO-01).
+   *
+   * D-03: the root-page guard is the safety mechanism, not a formality. The
+   * exit dialogue leaves the firmware unable to send ANY image again until the
+   * app restarts (D-02), so the set of places that can raise it is kept to
+   * exactly one screen and exactly one explicit selection. Non-root pages
+   * rebuild without menuObject and should never deliver these ids at all --
+   * this guard is what makes "should" into "cannot".
+   *
+   * PRECISELY: the guard is STATE-scoped, not page-scoped. `screen` is still
+   * 'MAIN_MENU' while the About text page is displayed, so an id arriving
+   * there would pass. That is not a hole -- the showText rebuild that drew
+   * that page carried no menuObject, so the OS has no app menu to deliver
+   * from -- but the guard reads "the app believes it is on the root screen",
+   * not "the root page is on the glass". Say what it does, not more.
+   */
+  private async onMenuItem(itemID?: number): Promise<void> {
+    if (itemID === undefined) return;
+    if (this.state.screen !== 'MAIN_MENU') {
+      console.log(`[screen] menu itemID=${itemID} ignored on ${this.state.screen}`);
+      return;
+    }
+
+    switch (itemID) {
+      case MENU_ITEM_IDS.exit:
+        // INPUT-05: the Even Hub submission requirement. Explicit selection
+        // only -- never from a double-tap, and never from any other screen.
+        console.log('[screen] menu: Exit');
+        await this.glass.exitApp();
+        break;
+
+      case MENU_ITEM_IDS.battleSpeed:
+        console.log('[screen] menu: Battle Speed');
+        SpeedConfig.cycle();
+        // cursorIndex stays 0. The whole point of D-05 is that no menu action
+        // writes a non-zero cursor onto a one-row list.
+        await this.render();
+        break;
+
+      case MENU_ITEM_IDS.about:
+        console.log('[screen] menu: About');
+        await this.glass.showText(
+          'Pokemon Showdown G2\nGen 9 Random Battles\non Even Realities G2\n\nBuilt with @pkmn/sim\n\nTap to return',
+          { left: 'About', right: '' },
+        );
+        // Screen state stays MAIN_MENU with cursorIndex 0, so the next tap
+        // resolves to list item 0 and STARTS A BATTLE -- it does not return to
+        // the menu. That is pre-existing behaviour (harness/scenarios/battle.ts
+        // relies on it to escape the About page) and this phase does not change
+        // it. showText rebuilt without menuObject, so the custom menu is
+        // cleared while this text page is up -- D-09 working as intended.
+        break;
+    }
+  }
+
   private async onDoubleTap(): Promise<void> {
     switch (this.state.screen) {
       case 'ATTACK_SELECT':
@@ -167,6 +230,14 @@ export class ScreenController {
           setTimeout(() => { this.forfeitPending = false; }, 3000);
         }
         break;
+      case 'MAIN_MENU':
+        // D-01/D-02: root double-tap must NOT raise the exit dialogue. The
+        // OS owns the context menu and opens it itself -- there is no SDK call
+        // to open one, so there is nothing to do here. Firing the dialogue from
+        // every double-tap would maximise exposure to an unrecoverable state
+        // where every updateImageRawData returns sendFailed until restart.
+        // This case exists so that silence is a decision, not an oversight.
+        break;
       default:
         break;
     }
@@ -177,24 +248,13 @@ export class ScreenController {
   // ---------------------------------------------------------------------------
 
   private async handleMainMenu(idx: number): Promise<void> {
-    switch (idx) {
-      case 0: // "Enter Battle"
-        await this.startNewBattle();
-        break;
-      case 1: // "Battle Speed" — cycle preset inline, re-render with cursor at 1
-        SpeedConfig.cycle();
-        this.state = { ...this.state, screen: 'MAIN_MENU', cursorIndex: 1 };
-        await this.render();
-        break;
-      case 2: // "About/Credits" — show credits text, tap anywhere returns to menu
-        await this.glass.showText(
-          'Pokemon Showdown G2\nGen 9 Random Battles\non Even Realities G2\n\nBuilt with @pkmn/sim\n\nTap to return',
-          { left: 'About', right: '' },
-        );
-        // State stays MAIN_MENU — next tap re-renders the menu
-        this.state = { ...this.state, screen: 'MAIN_MENU', cursorIndex: 0 };
-        break;
-    }
+    // ONE row, so idx is always 0 (D-05). onTap falls back to cursorIndex when
+    // the firmware omits currentSelectItemIndex for selection 0; with a
+    // single-row list cursorIndex is always 0 and the fallback is harmless.
+    // Before this phase, case 1 left the cursor at index 1 and every later click
+    // re-cycled the speed instead of entering a battle — harness-01.
+    // Battle Speed and About live in the root context menu now (onMenuItem).
+    if (idx === 0) await this.startNewBattle();
   }
 
   private async handleSpriteRefresh(idx: number): Promise<void> {
@@ -727,7 +787,10 @@ export class ScreenController {
       case 'MAIN_MENU': {
         this.hideCompanion();
         const result = renderMainMenu();
-        await this.glass.showList(result.items, result.status);
+        // The ONLY showList call that passes a menu. D-09: the root page is
+        // the only page that declares one, and that is what makes the context
+        // menu -- Exit included -- a root-page affordance.
+        await this.glass.showList(result.items, result.status, MAIN_MENU_CONTEXT_MENU);
         break;
       }
       case 'BATTLE_HUD': {
@@ -773,11 +836,15 @@ export class ScreenController {
       }
       case 'END_SCREEN': {
         const result = renderEndScreen(this.state.battleState!.winner!);
+        // Two arguments DELIBERATELY (D-09). A rebuild without menuObject
+        // clears the custom menu and restores the firmware default, which is
+        // how Exit becomes unreachable off the root page. Do not "fix" this.
         await this.glass.showList(result.items, result.status);
         break;
       }
       case 'SPRITE_REFRESH': {
         const result = renderSpriteRefresh();
+        // Two arguments DELIBERATELY (D-09) -- see the END_SCREEN case above.
         await this.glass.showList(result.items, result.status);
         break;
       }
