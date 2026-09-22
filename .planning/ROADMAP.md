@@ -355,6 +355,38 @@ Plans:
 - [x] 13-02-PLAN.md — Geometry/count/event-capture guard + SDK validator + cumulative container registry (REND-03)
 - [ ] 13-03-PLAN.md — Image data/container dimension match, no updates to undeclared containers, KNOWN_DEFECTS waivers deleted (REND-04, REND-06)
 
+### Phase 13.1: Store Blocker — Exit Dialogue via Context Menu (INSERTED 2026-09-22)
+**Goal**: The app satisfies Even Hub's root-page exit requirement, and does so through a menu rather than a bare double-tap, so the firmware's post-dialogue image wedge cannot be tripped by accident
+**Depends on**: Phase 13 (the send queue and container registry must exist first)
+**Requirements**: INPUT-05, INPUT-02, INFO-01
+**Why inserted**: `evenhub pack` now succeeds, so packaging is no longer what blocks submission — this is. `shutDownPageContainer` is called ZERO times anywhere in `src/`; root double-tap currently does nothing, and Even Hub rejects apps whose root page does not invoke the exit dialogue.
+
+**Why it merges with the context menu rather than shipping alone**: there is a
+firmware defect (observed 2.2.7.14 / Even App 2.2.7 / SDK 0.0.13) where, once
+the exit dialogue has been shown and dismissed, EVERY `updateImageRawData`
+returns `sendFailed` in 1-3 ms — an immediate rejection with no transfer — and
+it never recovers until the app restarts. Three in-app recoveries were tried
+and all failed: rebuilding on appearance wipes the images, rebuilding after
+cancel does not clear the wedge, and re-calling `createStartUpPageContainer` is
+rejected with `invalid` after blocking ~2.1 s.
+
+So the dialogue must be hard to reach by accident. Firing
+`shutDownPageContainer(1)` from every root double-tap — the obvious reading of
+the requirement — maximises exposure to an unrecoverable wedge. EvenChess's
+pattern is the safe one and still satisfies the requirement: root double-tap
+opens the context menu, and an explicit "Exit" item fires the dialogue.
+
+**Success Criteria** (what must be TRUE):
+  1. A native context menu is declared via `menuObject` on the root page, with at most 10 items and each `itemID` non-zero and unique
+  2. `menuItemClickEvent` is parsed and routed through `onEvenHubEvent`
+  3. Double-tap on the root (MAIN_MENU) page opens that menu; it does NOT call `shutDownPageContainer` directly
+  4. An explicit "Exit" menu item calls `shutDownPageContainer(1)`
+  5. No non-root screen calls `shutDownPageContainer` at all
+  6. Menu item names are within 32 UTF-8 bytes and validate before the SDK call
+**Harness assertions that prove it**: `expectLoggedLine` on the menu declaration at boot; `POST /api/input {"action":"context_menu"}` followed by `expectFrameInk` on the menu region; `expectConsoleClean()` across `runBattleScript()` to prove no accidental shutdown mid-battle.
+**Plans**: TBD
+**UI hint**: yes
+
 ### Phase 14: Battle Text & HUD Persistence
 **Goal**: Turn results read like the Showdown battle log, nameplates and HP bars survive every animation, and the display never says "You" or "Foe"
 **Depends on**: Phase 13 (needs the sequential image queue before touching animation sends)
@@ -408,7 +440,8 @@ Plans:
 ### Phase 16: Modern Input Model
 **Goal**: Every gesture the G2 and the R1 ring can produce reaches the app, the double-tap-twice forfeit hack is gone, and the root page satisfies Even Hub's shutdown requirement
 **Depends on**: Phase 12 (independent of the render phases — may run alongside 13–15)
-**Requirements**: INPUT-01, INPUT-02, INPUT-03, INPUT-04, INPUT-05, INPUT-06
+**Requirements**: INPUT-01, INPUT-03, INPUT-04, INPUT-06  
+> INPUT-02 (menuItemClickEvent) and INPUT-05 (root-page exit) moved to **Phase 13.1** — they are the Even Hub submission blocker and were pulled forward.
 **Success Criteria** (what must be TRUE):
   1. `LONG_PRESS_EVENT` (9) and `LONG_PRESS_RELEASE_EVENT` (10) arrive at the screen controller as distinct gesture kinds
   2. `menuItemClickEvent` from the native context menu arrives carrying the clicked item's id
@@ -422,7 +455,8 @@ Plans:
 ### Phase 17: Context Menu & Inspect Navigation
 **Goal**: The native context menu becomes the universal "more" affordance, and the Pokemon inspect screen establishes the inspect pattern — this is where the retired Phase 11 Stats Screen lands
 **Depends on**: Phase 16 (needs `menuItemClickEvent` plumbed), Phase 14 (inspect screens render over a correct HUD)
-**Requirements**: INFO-01, INFO-02, INFO-07
+**Requirements**: INFO-02, INFO-07  
+> INFO-01 (native context menu) moved to **Phase 13.1** — the safe exit pattern requires the menu to exist, so it ships there. Phase 17 extends that menu with inspect entries rather than creating it.
 **Success Criteria** (what must be TRUE):
   1. A `context_menu` input from any battle screen opens a native menu of at most 10 items, each name ≤32 UTF-8 bytes, and selecting an item navigates to that inspect screen
   2. The Pokemon inspect screen shows species, level, types, current/max HP, status, ability, held item, every non-zero stat stage, and Tera type for the selected Pokemon
@@ -482,12 +516,12 @@ Every v2.0 requirement maps to exactly one phase.
 | SPR-03 | Phase 15 | Pending |
 | SPR-04 | Phase 15 | Pending |
 | INPUT-01 | Phase 16 | Pending |
-| INPUT-02 | Phase 16 | Pending |
+| INPUT-02 | Phase 13.1 (moved from 16) | Pending |
 | INPUT-03 | Phase 16 | Pending |
 | INPUT-04 | Phase 16 | Pending |
-| INPUT-05 | Phase 16 | Pending |
+| INPUT-05 | Phase 13.1 (moved from 16) | Pending |
 | INPUT-06 | Phase 16 | Pending |
-| INFO-01 | Phase 17 | Pending |
+| INFO-01 | Phase 13.1 (moved from 17) | Pending |
 | INFO-02 | Phase 17 | Pending |
 | INFO-07 | Phase 17 | Pending |
 | INFO-03 | Phase 18 | Pending |
