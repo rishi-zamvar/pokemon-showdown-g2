@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Enhancement & Polish
-status: completed
-stopped_at: Completed 13-03-PLAN.md
-last_updated: "2026-09-22T15:32:44.078Z"
+status: 13.1-01 landed the ADAPTER HALF of the store blocker. `shutDownPageContainer` went from ZERO call sites in `src/` to exactly one — `exitApp()`, exitMode 1, through the SendQueue, bracketed by two load-bearing log lines plan 04 asserts on. `menuObject` is built INTO `config` before `assertPage`, so the SDK's own `validateEvenHubPageContainer` enforces the 10-item / non-zero / unique / 32-UTF-8-BYTE rules for free — no new guard, `containerGuards.ts` byte-identical and still importing nothing. `bindEvents` tests `event.menuItemClickEvent` on OBJECT PRESENCE and returns before `mapEventToGesture` runs, closing the D6 trap (that mapper turns every unknown eventType, `undefined` included, into a TAP). 600 ms dedupe in its own field pair, never sharing `lastScrollTime`. selfCheck 52 -> 53.
+stopped_at: Completed 13.1-01-PLAN.md
+last_updated: "2026-09-22T17:23:07.276Z"
 progress:
   total_phases: 23
   completed_phases: 13
-  total_plans: 46
-  completed_plans: 45
+  total_plans: 50
+  completed_plans: 46
 ---
 
 # Project State
@@ -23,9 +23,15 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 ## Current Position
 
-Phase: 13 — Container Safety Layer — COMPLETE (3/3 plans)
-Plan: 13-01, 13-02 and 13-03 all complete. REND-03..REND-06 all ticked.
-Status: 13-03 landed the image-data guard and cashed the waivers. `assertImageUpdate()` reads the payload's own BMP/PNG header and refuses any dimension mismatch before the ~104 ms call — the firmware TILES a mismatch instead of erroring. `updateImage` (the animation path) now routes through `sendBmpData`, so every frame is guarded and, for the first time, COUNTED. Both blanking try/catch blocks are deleted; `showOverlayHud` and `updateText` ask the registry instead. KNOWN_DEFECTS is down to research-13 (Phase 14's); research-10 and research-11 no longer occur and check 35 now FAILS on both lines. selfCheck 46 -> 52.
+Phase: 13.1 — Store Blocker: Exit Dialogue via Context Menu — IN PROGRESS (1/4 plans)
+Plan: 13.1-01 complete. 13.1-02 next.
+Status: 13.1-01 landed the ADAPTER HALF of the store blocker. `shutDownPageContainer` went from ZERO call sites in `src/` to exactly one — `exitApp()`, exitMode 1, through the SendQueue, bracketed by two load-bearing log lines plan 04 asserts on. `menuObject` is built INTO `config` before `assertPage`, so the SDK's own `validateEvenHubPageContainer` enforces the 10-item / non-zero / unique / 32-UTF-8-BYTE rules for free — no new guard, `containerGuards.ts` byte-identical and still importing nothing. `bindEvents` tests `event.menuItemClickEvent` on OBJECT PRESENCE and returns before `mapEventToGesture` runs, closing the D6 trap (that mapper turns every unknown eventType, `undefined` included, into a TAP). 600 ms dedupe in its own field pair, never sharing `lastScrollTime`. selfCheck 52 -> 53.
+
+NOTHING IS WIRED YET AND THAT IS THE PLAN'S BOUNDARY. `MAIN_MENU_CONTEXT_MENU` has no caller in `src/`, `MENU_ITEM` has no `case` in `ScreenController` (its switch has no `default`, so an unhandled one is inert), and `exitApp()` has no caller. 13.1-02 wires all three.
+
+REQUIREMENTS NOT TICKED: INFO-01 and INPUT-02 are listed on 13.1-01's frontmatter but are only half-delivered by it — the menu does not exist at runtime until 13.1-02 declares it, so both stay Pending and 13.1-02 should mark them. Ticking them now would put a false entry in the traceability table.
+
+Previous activity: 2026-09-22 — 13-03 landed the image-data guard and cashed the waivers. `assertImageUpdate()` reads the payload's own BMP/PNG header and refuses any dimension mismatch before the ~104 ms call — the firmware TILES a mismatch instead of erroring. `updateImage` (the animation path) now routes through `sendBmpData`, so every frame is guarded and, for the first time, COUNTED. Both blanking try/catch blocks are deleted; `showOverlayHud` and `updateText` ask the registry instead. KNOWN_DEFECTS is down to research-13 (Phase 14's); research-10 and research-11 no longer occur and check 35 now FAILS on both lines. selfCheck 46 -> 52.
 
 CORRECTION TO 13-02: `declaredContainers` is now PER PAGE, not cumulative. `rebuildPageContainer` DOES remove containers absent from the new config — the boot log shows the first overlay blank container 2 successfully and the next one come back `container 2 not found`. The cumulative map was itself the cause of research-11. What survives a rebuild is the PIXELS, not the container, so the stale overlay text is Phase 14's canvas problem.
 
@@ -37,6 +43,7 @@ Previous activity: 2026-09-18 — 13-02 shipped the geometry guard (`assertPageC
 Milestone v2.0 Progress:
 [==========] Phase 12 Automation Test Harness          <- complete (4/4), gates everything
 [==========] Phase 13 Container Safety Layer          <- complete (3/3), REND-03..06 done
+[==        ] Phase 13.1 Store Blocker — Exit Menu     <- 1/4, adapter half landed, nothing wired
 [          ] Phase 14 Battle Text & HUD Persistence
 [          ] Phase 15 4-bit Greyscale Sprite Pipeline
 [          ] Phase 16 Modern Input Model
@@ -84,6 +91,11 @@ left orphaned in the roadmap:
 - 13-02: 3 tasks, 3 commits, 4 files, ~2 h (over half of it diagnosing a stale
   simulator WebKit cache that had nothing to do with the plan — see
   phases/13-container-safety-layer/deferred-items.md D13-A)
+
+- 13.1-01: 3 tasks, 3 commits, 4 files, ~41 min (adapter-only; no simulator
+  run — the one behaviour that needs one is the exit dialogue itself, and
+  firing it wedges every later updateImageRawData in the process, so 13.1-04
+  owns it as a terminal scenario)
 
 - Average duration: ~2.3 min
 
@@ -226,6 +238,8 @@ Recent decisions affecting current work:
 - [Phase 13]: declaredContainers is cumulative, not per-page, because rebuildPageContainer never removes absent containers
 - [Phase 13]: declaredContainers is PER PAGE: rebuildPageContainer DOES remove containers absent from the new config (boot log proves it); 13-02's cumulative map was itself the cause of research-11
 - [Phase 13]: Host-call baseline moved to 8-76 updateImageRawData per turn (was 10-21): updateImage now routes through sendBmpData, so the animation path is counted for the first time
+- [Phase 13.1]: Exit is the LAST context-menu item, enforced permanently by selfCheck 53 — the SDK validator has no opinion about order and order is the whole D-02 safety property
+- [Phase 13.1]: menuItemClickEvent is dispatched on OBJECT PRESENCE before mapEventToGesture, because that mapper turns every unknown eventType (undefined included) into a TAP
 
 ### v1.1 Research Context
 
@@ -279,11 +293,21 @@ Key findings from research (2026-03-01):
 
 ## Session Continuity
 
-Last session: 2026-09-22T15:32:38.483Z
-Stopped at: Completed 13-03-PLAN.md
-Next: execute 13-03-PLAN.md (REND-04/06 — container lifecycle, research-10/11).
+Last session: 2026-09-22T17:22:47.686Z
+Stopped at: Completed 13.1-01-PLAN.md
+Next: execute 13.1-02-PLAN.md (wire Exit/Battle Speed/About behind a
+MAIN_MENU-only guard; collapse the main menu to one row to delete harness-01).
 
-Read before starting 13-03: `declaredContainers` in glassAdapter.ts is populated
-but nothing reads it yet, so nothing would notice a population point being
-dropped. 13-03 is its first consumer and should bring its own checks.
+Read before starting 13.1-02: the adapter is ready and DELIBERATELY unwired.
+Pass `MAIN_MENU_CONTEXT_MENU` as `showList`'s third argument on the root page
+and NOWHERE else — every other `renderContainers` caller already omits it and
+therefore clears the custom menu, which is D-09 and is the mechanism that keeps
+Exit off non-root screens (D-03). Add the `MENU_ITEM` case to
+`ScreenController.handleGesture` and switch on `MENU_ITEM_IDS`. Do not call
+`exitApp()` from anywhere but the `MENU_ITEM_IDS.exit` case. Also mark INFO-01
+and INPUT-02 complete there — 13.1-01 left them Pending on purpose.
+
+Do NOT select Exit in any harness scenario before 13.1-04's terminal step: one
+selection wedges every subsequent updateImageRawData for the rest of the
+process, with no in-app recovery (D-02).
 Resume file: None
