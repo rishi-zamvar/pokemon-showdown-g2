@@ -342,7 +342,13 @@ export async function runBattleScript(ctx: Ctx, opts: BattleScriptOpts = {}): Pr
       // No-op on a cold run, where MAIN_MENU is already the first thing logged.
       await ensureMainMenu(ctx, select);
       const f = await ctx.waitScreen("MAIN_MENU", ENTER_BATTLE_MS, 0);
-      expectFrameInk(f, REGIONS.CONTENT, 0.01, 0.6);
+      // 0.002, not 0.01 -- the same recalibration as the end-screen step below
+      // and boot.ts's boot step. Since 13.1-02 the main menu is ONE list row
+      // ("Enter Battle") and is now the sparsest screen in the app, sparser
+      // than END_SCREEN: measured 0.0046 on CONTENT. The old 0.01 floor was
+      // set against the three-row list and fails with "ink 0.005 outside
+      // [0.01, 0.6]". A blank screen still scores exactly 0 and still fails.
+      expectFrameInk(f, REGIONS.CONTENT, 0.002, 0.6);
       expectConsoleClean(ctx.logs);
     },
     { keepLogs: true },
