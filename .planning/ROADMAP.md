@@ -384,7 +384,11 @@ opens the context menu, and an explicit "Exit" item fires the dialogue.
   5. No non-root screen calls `shutDownPageContainer` at all
   6. Menu item names are within 32 UTF-8 bytes and validate before the SDK call
 **Harness assertions that prove it**: `expectLoggedLine` on the menu declaration at boot; `POST /api/input {"action":"context_menu"}` followed by `expectFrameInk` on the menu region; `expectConsoleClean()` across `runBattleScript()` to prove no accidental shutdown mid-battle.
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 13.1-01-PLAN.md — declare menuObject on the root page, route menuItemClickEvent ahead of gesture mapping, add the single exitApp() call site
+- [ ] 13.1-02-PLAN.md — wire Exit/Battle Speed/About to the root menu behind a MAIN_MENU-only guard, and collapse the main menu to one row to delete the harness-01 soft-brick
+- [ ] 13.1-03-PLAN.md — harness proof: menu is live, a menu click routes, Enter Battle survives N speed changes, and nothing exits by accident
 **UI hint**: yes
 
 ### Phase 14: Battle Text & HUD Persistence
@@ -580,6 +584,7 @@ Phases 6 and 11 are retired and skipped. Within v2.0, Phase 12 must complete bef
 | 11. Stats Screen | - | Retired -> Phases 17-18 | - |
 | 12. Automation Test Harness | 3/4 | In Progress|  |
 | 13. Container Safety Layer | 3/3 | Complete   | 2026-09-22 |
+| 13.1 Store Blocker — Exit Menu | 0/3 | Not started | - |
 | 14. Battle Text & HUD Persistence | 0/TBD | Not started | - |
 | 15. 4-bit Greyscale Sprite Pipeline | 0/TBD | Not started | - |
 | 16. Modern Input Model | 0/TBD | Not started | - |
