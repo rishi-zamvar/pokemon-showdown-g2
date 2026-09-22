@@ -734,7 +734,6 @@ export class ScreenController {
         const bs = this.state.battleState!;
         const result = renderBattleHudActions(bs, this.isTrapped());
         await this.glass.showOverlayHud(
-          this.teamBarBmp ?? emptyTeamBarBmp(),
           this.oppCompositeBmp ?? emptyComposite(),
           this.playerCompositeBmp ?? emptyComposite(),
           result.items,
@@ -748,7 +747,6 @@ export class ScreenController {
           ? ['[TERA QUEUED]', ...result.items]
           : result.items;
         await this.glass.showOverlayHud(
-          this.teamBarBmp ?? emptyTeamBarBmp(),
           this.oppCompositeBmp ?? emptyComposite(),
           this.playerCompositeBmp ?? emptyComposite(),
           items,
@@ -761,7 +759,6 @@ export class ScreenController {
         this.switchIndexMap = result.indexMap;
         const listStatus = this.forcedSwitch ? 'MUST SWITCH' : result.status;
         await this.glass.showOverlayHud(
-          this.teamBarBmp ?? emptyTeamBarBmp(),
           this.oppCompositeBmp ?? emptyComposite(),
           this.playerCompositeBmp ?? emptyComposite(),
           result.items,

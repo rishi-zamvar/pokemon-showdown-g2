@@ -184,10 +184,12 @@ export async function buildSpriteComposite(
     ctx.fillText(text, x, y);
   };
 
-  // Line 1: Name + Level
-  const label = isFront ? 'Foe' : 'You';
-  const nameLine = `${label}: ${mon.name} Lv.${mon.level ?? 50}`;
-  alignText(nameLine.slice(0, 18), 2);
+  // Line 1: Name only.
+  // No "Foe:"/"You:" prefix and no level — screen position already says which
+  // side a Pokemon is on (opponent top-right, player bottom-left), and the
+  // prefix cost 5 of the 18 usable characters on a line that has to fit a
+  // species name. Level is not actionable during a random battle.
+  alignText(mon.name.slice(0, 18), 2);
 
   // Line 2: HP bar
   const hpPct = mon.fainted

@@ -378,32 +378,6 @@ export class GlassAdapterImpl implements GlassAdapter {
     const statusText = `${status.left}  ${status.right}`;
     const statusContainer = this.makeStatusContainer(statusText);
 
-    // Blank out container 8 (teamBar) before rebuilding.
-    //
-    // The SDK's rebuildPageContainer does NOT remove containers that are absent
-    // from the new config — they persist on screen with their last-rendered
-    // content. showOverlayHud always includes container 8 (a 576x24 team bar
-    // image at y=0). When showBattleHud is called next (for animation), that
-    // container 8 remains visible as a green horizontal strip across the top.
-    //
-    // Fix: overwrite container 8's image data with an all-black BMP before
-    // the rebuild, effectively hiding it. We use a try/catch because this call
-    // may fail if container 8 has never been created yet (first animation before
-    // any overlay was shown) — that failure is harmless and expected.
-    try {
-      await this.call((b) =>
-        b.updateImageRawData(
-          new ImageRawDataUpdate({
-            containerID: CONTAINER_IDS.teamBar,
-            containerName: CONTAINER_NAMES.teamBar,
-            imageData: emptyTeamBarBmp(),
-          }),
-        ),
-      );
-    } catch {
-      // Container 8 doesn't exist yet — nothing to blank, safe to ignore.
-    }
-
     await this.renderContainers({
       imageObject: imageContainers.length > 0 ? imageContainers : undefined,
       textObject: [textContainer, statusContainer],
@@ -433,22 +407,11 @@ export class GlassAdapterImpl implements GlassAdapter {
    * Total container count is exactly 4, within the SDK hardware limit.
    */
   async showOverlayHud(
-    teamBarBmp: Uint8Array,
     oppCompositeBmp: Uint8Array,
     playerCompositeBmp: Uint8Array,
     listItems: string[],
     listStatus: string,
   ): Promise<void> {
-    // C1: Team preview bar (full-width, top strip)
-    const teamBarContainer = new ImageContainerProperty({
-      xPosition: 0,
-      yPosition: 0,
-      width: OVERLAY_LAYOUT.TEAM_BAR_W,
-      height: OVERLAY_LAYOUT.TEAM_BAR_H,
-      containerID: CONTAINER_IDS.teamBar,
-      containerName: CONTAINER_NAMES.teamBar,
-    });
-
     // C2: Opponent composite (top-right quadrant)
     const oppContainer = new ImageContainerProperty({
       xPosition: OVERLAY_LAYOUT.OPP_X,
@@ -509,16 +472,15 @@ export class GlassAdapterImpl implements GlassAdapter {
     }
 
     await this.renderContainers({
-      imageObject: [teamBarContainer, oppContainer, playerContainer],
+      imageObject: [oppContainer, playerContainer],
       listObject: [listContainer],
     });
 
     // Diagnostic: log BMP sizes so we can verify correct data reaches each container.
-    // Expected: teamBar ~1790B (576x24 1-bit), opp/player ~2702B (144x132 1-bit).
-    // If playerBmp length equals teamBarBmp length, cache swapped them.
+    // Expected: opp/player ~2702B (144x132 1-bit).
     console.debug(
-      `[showOverlayHud] BMP sizes: teamBar=${teamBarBmp.length}B ` +
-      `opp=${oppCompositeBmp.length}B player=${playerCompositeBmp.length}B`,
+      `[showOverlayHud] BMP sizes: opp=${oppCompositeBmp.length}B ` +
+      `player=${playerCompositeBmp.length}B`,
     );
 
     // Wait 50ms after rebuildPageContainer before sending image data.
@@ -535,8 +497,7 @@ export class GlassAdapterImpl implements GlassAdapter {
     await this.delay(50);
 
     // Send BMP image data sequentially after container creation.
-    // Order must match the imageObject array order above (teamBar, opp, player).
-    await this.sendBmpData(CONTAINER_IDS.teamBar, CONTAINER_NAMES.teamBar, teamBarBmp);
+    // Order must match the imageObject array order above (opp, player).
     await this.sendBmpData(CONTAINER_IDS.oppSprite, CONTAINER_NAMES.oppSprite, oppCompositeBmp);
     await this.sendBmpData(CONTAINER_IDS.playerSprite, CONTAINER_NAMES.playerSprite, playerCompositeBmp);
   }

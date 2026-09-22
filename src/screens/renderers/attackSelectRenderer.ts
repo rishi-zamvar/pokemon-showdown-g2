@@ -14,6 +14,15 @@ export function renderAttackSelect(state: BattleState): ListScreen {
   const mon = state.playerSide.team[state.playerSide.activeIndex]!;
   const items: string[] = [];
 
+  // The engine already enforces Choice lock / Encore / Disable / Taunt and
+  // silently substitutes a legal move when asked for a locked-out one. Without
+  // this, selecting any of the four moves produced a different move on screen
+  // with no explanation. Mark what is refused and say why.
+  const locked = mon.lockedIntoMove;
+  const lockedName = locked
+    ? (DataLoader.getMove(locked)?.name ?? locked)
+    : '';
+
   for (const slug of mon.moves) {
     const moveData = DataLoader.getMove(slug);
     const moveName = moveData?.name ?? slug;
@@ -22,9 +31,14 @@ export function renderAttackSelect(state: BattleState): ListScreen {
     const used = mon.ppUsed[slug] ?? 0;
     const remaining = Math.max(0, maxPp - used);
 
+    const isDisabled = mon.disabledMoves[slug] !== undefined;
     let label = `${moveName} (${moveType}) ${remaining}/${maxPp}`;
     if (remaining === 0) {
       label += ' [--]';
+    } else if (isDisabled) {
+      // Locked out by the engine — still listed, because hiding it would make
+      // the move look lost rather than temporarily unavailable.
+      label += ' [X]';
     }
 
     // Enforce per-line width limit
@@ -41,6 +55,6 @@ export function renderAttackSelect(state: BattleState): ListScreen {
 
   return {
     items,
-    status: 'Choose move',
+    status: lockedName ? `Locked: ${lockedName}` : 'Choose move',
   };
 }

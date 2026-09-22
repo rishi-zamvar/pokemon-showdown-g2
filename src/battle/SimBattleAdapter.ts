@@ -290,6 +290,31 @@ function deriveSide(
   teamData: ActivePokemon[],
   prevSideState: BattleSide,
 ): BattleSide {
+  // Move restrictions the engine is ALREADY enforcing.
+  //
+  // @pkmn/sim reports these as `disabled` on the active request and silently
+  // substitutes a legal move if asked for a locked-out one — which is why a
+  // Choice-locked player could select any of four moves and watch a different
+  // one happen. We read them here purely so the UI can say so.
+  const activeReq = (simSide as unknown as {
+    activeRequest?: { active?: Array<{ moves: Array<{ id: string; disabled?: boolean }> }> };
+  }).activeRequest;
+  const reqMoves = activeReq?.active?.[0]?.moves;
+  const disabledMoves: Record<string, string> = {};
+  let lockedIntoMove = '';
+  if (reqMoves && reqMoves.length > 0) {
+    for (const m of reqMoves) {
+      if (m.disabled) disabledMoves[m.id] = 'disabled';
+    }
+    const usable = reqMoves.filter((m) => !m.disabled);
+    // Exactly one option out of several means the engine has locked the choice
+    // (Choice item, Encore, a recharge turn). One option out of one is just a
+    // single-move Pokemon and is not a lock.
+    if (usable.length === 1 && reqMoves.length > 1) {
+      lockedIntoMove = usable[0]!.id;
+    }
+  }
+
   // Map team in ORIGINAL order (matching teamData indices)
   const team = teamData.map((prev, _i) => {
     const simMon = findSimMon(simSide, prev.species, prev.name);
@@ -354,6 +379,9 @@ function deriveSide(
       revealedAbility,
       heldItem,
       heldItemConsumed,
+      // Restrictions apply to whichever mon is currently out, not the whole team.
+      disabledMoves: simMon === simSide.active[0] ? disabledMoves : {},
+      lockedIntoMove: simMon === simSide.active[0] ? lockedIntoMove : '',
     } satisfies ActivePokemon;
   });
 

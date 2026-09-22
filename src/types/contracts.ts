@@ -40,13 +40,11 @@ export interface GlassAdapter {
    * Show the 4-container overlay HUD layout used by all decision screens.
    *
    * Containers (in order):
-   *   C1 (ImageContainer 576x24):  Team preview bar at y=0
    *   C2 (ImageContainer 144x132): Opponent composite at x=432, y=24
    *   C3 (ImageContainer 144x132): Player composite at x=0, y=156
    *   C4 (ListContainer 288x132):  Selectable action list at x=288, y=156
    */
   showOverlayHud(
-    teamBarBmp: Uint8Array,
     oppCompositeBmp: Uint8Array,
     playerCompositeBmp: Uint8Array,
     listItems: string[],

@@ -68,6 +68,19 @@ export interface ActivePokemon extends BattlePokemon {
   heldItem: string;
   /** True if the held item has been consumed this battle. */
   heldItemConsumed: boolean;
+  /**
+   * Move slugs the engine currently refuses, with the reason.
+   *
+   * @pkmn/sim already ENFORCES these (Choice lock, Taunt, Disable, Encore,
+   * Torment, 0 PP) — it reports them as `disabled` on the active request and
+   * silently substitutes a legal move if you ask for one it has locked out.
+   * The app had no visibility into that, so a Choice-locked player could pick
+   * any of four moves and watch a different one happen with no explanation.
+   * Empty when nothing is restricted.
+   */
+  disabledMoves: Record<string, string>;
+  /** Move slug the player is locked into this turn, or '' if free to choose. */
+  lockedIntoMove: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +208,8 @@ export function initActivePokemon(pokemon: BattlePokemon): ActivePokemon {
     teraActive: false,
     ppUsed: {},
     fainted: false,
+    disabledMoves: {},
+    lockedIntoMove: "",
     volatiles: [],
     statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, accuracy: 0, evasion: 0 },
     revealedAbility: '',

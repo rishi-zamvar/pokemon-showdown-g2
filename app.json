@@ -4,13 +4,18 @@
   "name": "Pokemon Showdown",
   "version": "0.1.0",
   "min_app_version": "2.2.10",
+  "min_sdk_version": "0.0.15",
   "tagline": "Pokemon battles on your G2 glasses",
   "description": "Battle wild Pokemon with turn-based combat on Even Realities G2 glasses. Scroll to navigate moves, tap to select.",
   "author": "Rishi Zamvar",
   "entrypoint": "index.html",
-  "permissions": {
-    "network": [
-      "evenhub.evenrealities.com"
-    ]
-  }
+  "supported_languages": [
+    "en"
+  ],
+  "permissions": [
+    {
+      "name": "network",
+      "desc": "Downloads Pokemon sprite images and battle data used to render the battle on the glasses."
+    }
+  ]
 }
