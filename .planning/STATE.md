@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Enhancement & Polish
 status: completed
-stopped_at: Completed 13-02-PLAN.md
-last_updated: "2026-09-18T20:38:12.745Z"
+stopped_at: Completed 13-03-PLAN.md
+last_updated: "2026-09-22T15:32:44.078Z"
 progress:
-  total_phases: 22
-  completed_phases: 12
+  total_phases: 23
+  completed_phases: 13
   total_plans: 46
-  completed_plans: 44
+  completed_plans: 45
 ---
 
 # Project State
@@ -19,26 +19,31 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** Players can play a complete random battle on G2 glasses with attack, switch, and Terastallize
-**Current focus:** Milestone v2.0 — Showdown Parity (Phase 13 Container Safety Layer, plan 13-03 next)
+**Current focus:** Milestone v2.0 — Showdown Parity (Phase 13 Container Safety Layer COMPLETE; Phase 14 Battle Text & HUD Persistence next)
 
 ## Current Position
 
-Phase: 13 — Container Safety Layer — IN PROGRESS (2/3 plans)
-Plan: 13-01 and 13-02 complete; 13-03 next
-Status: Phase 12 complete (HARN-01..06). 13-01 landed the serialising SendQueue: every SDK call in glassAdapter.ts goes through one `call()` helper, so two sends are never in flight at once. 13-02 landed the geometry guard: `assertPageContainers()` plus the SDK's own `validateEvenHubPageContainer()` run before every create/rebuild and REFUSE (never clamp), and `declaredContainers` now records every container a successful create/rebuild declared — cumulative, because `rebuildPageContainer` never removes absent containers. selfCheck is 46/46. REND-05 and REND-03 complete; REND-04/06 are 13-03.
-Previous activity: 2026-09-17 — 12-03 shipped: assert.ts vocabulary, run.ts runner, `[screen]` oracle, selfCheck/boot/negativeProof scenarios. 36 primitive checks + 10 suite steps green three runs running; three real app defects allow-listed by name and printed every run (research rows 10, 11, and the newly found 13).
+Phase: 13 — Container Safety Layer — COMPLETE (3/3 plans)
+Plan: 13-01, 13-02 and 13-03 all complete. REND-03..REND-06 all ticked.
+Status: 13-03 landed the image-data guard and cashed the waivers. `assertImageUpdate()` reads the payload's own BMP/PNG header and refuses any dimension mismatch before the ~104 ms call — the firmware TILES a mismatch instead of erroring. `updateImage` (the animation path) now routes through `sendBmpData`, so every frame is guarded and, for the first time, COUNTED. Both blanking try/catch blocks are deleted; `showOverlayHud` and `updateText` ask the registry instead. KNOWN_DEFECTS is down to research-13 (Phase 14's); research-10 and research-11 no longer occur and check 35 now FAILS on both lines. selfCheck 46 -> 52.
+
+CORRECTION TO 13-02: `declaredContainers` is now PER PAGE, not cumulative. `rebuildPageContainer` DOES remove containers absent from the new config — the boot log shows the first overlay blank container 2 successfully and the next one come back `container 2 not found`. The cumulative map was itself the cause of research-11. What survives a rebuild is the PIXELS, not the container, so the stale overlay text is Phase 14's canvas problem.
+
+HOST-CALL BASELINE MOVED: 8-76 `updateImageRawData` per turn (typically 16-50), NOT the familiar 10-21. The old figure counted screen renders only. Phase 14 must not read a 60-call turn as a regression; Phase 19 must set PERF-02/PERF-04 against the new count.
+
+Previous activity: 2026-09-18 — 13-02 shipped the geometry guard (`assertPageContainers()` + the SDK's own validator before every create/rebuild, REFUSE never clamp).
 
 ```
 Milestone v2.0 Progress:
 [==========] Phase 12 Automation Test Harness          <- complete (4/4), gates everything
-[======    ] Phase 13 Container Safety Layer          <- in progress (2/3)
+[==========] Phase 13 Container Safety Layer          <- complete (3/3), REND-03..06 done
 [          ] Phase 14 Battle Text & HUD Persistence
 [          ] Phase 15 4-bit Greyscale Sprite Pipeline
 [          ] Phase 16 Modern Input Model
 [          ] Phase 17 Context Menu & Inspect Navigation
 [          ] Phase 18 Move/Field/Team/Opponent Inspect
 [          ] Phase 19 Call-Count Performance Restructure
-13% complete (1/8 phases, 2/3 plans in Phase 13)
+25% complete (2/8 phases; Phase 13 closed 3/3)
 ```
 
 ### Milestone v1.1 closed out
@@ -219,6 +224,8 @@ Recent decisions affecting current work:
 - [Phase 13]: Serialising all SDK sends measured 2x FASTER per send, not slower — overlapping sends were contending on the bridge, so the plan's +2-5s/turn cost prediction was wrong in our favour
 - [Phase 13]: Refuse, never clamp: assertPageContainers throws before any bridge call; the SDK validator runs alongside it because neither covers the other (verified valid:true for 9999x9999 and containerTotalNum:13)
 - [Phase 13]: declaredContainers is cumulative, not per-page, because rebuildPageContainer never removes absent containers
+- [Phase 13]: declaredContainers is PER PAGE: rebuildPageContainer DOES remove containers absent from the new config (boot log proves it); 13-02's cumulative map was itself the cause of research-11
+- [Phase 13]: Host-call baseline moved to 8-76 updateImageRawData per turn (was 10-21): updateImage now routes through sendBmpData, so the animation path is counted for the first time
 
 ### v1.1 Research Context
 
@@ -272,8 +279,8 @@ Key findings from research (2026-03-01):
 
 ## Session Continuity
 
-Last session: 2026-09-18T20:33:35.700Z
-Stopped at: Completed 13-02-PLAN.md
+Last session: 2026-09-22T15:32:38.483Z
+Stopped at: Completed 13-03-PLAN.md
 Next: execute 13-03-PLAN.md (REND-04/06 — container lifecycle, research-10/11).
 
 Read before starting 13-03: `declaredContainers` in glassAdapter.ts is populated

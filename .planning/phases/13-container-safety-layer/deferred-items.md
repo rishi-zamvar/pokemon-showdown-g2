@@ -72,3 +72,75 @@ Not investigated further: the plan explicitly defers multi-battle stability
 verification to after 13-03. Worth knowing before that verification is
 attempted, since a starved simulator will produce exactly this failure
 regardless of what 13-03 does.
+
+---
+
+## D13-C: `npm run harness -- --only battle` fails deterministically at the first step (found in 13-03)
+
+**Symptom.** Two consecutive `--only battle` runs failed at `battle / menu`
+after exactly 1297 ms with:
+
+```
+[stdout/warn] WARN evenhub_simulator_lib::vm] inject_input: no active event container
+```
+
+The same `battle` scenario passes inside a full `npm run harness`, where the
+`boot` scenario runs first. So the battle scenario injects its first input
+before the app has an event-capturing container, and only gets away with it
+because `boot` has already warmed the app up.
+
+**Why it matters.** `--only battle` is the obvious way to sample the mid-battle
+intermittent (D13-B) cheaply — a battle-only run is minutes shorter than a full
+one. Right now that shortcut is unusable, so every sample costs a full run.
+
+**Why deferred.** The fix belongs in `harness/scenarios/battle.ts` (wait for
+MAIN_MENU before the first inject, the way `boot` does), which is outside plan
+13-03's `files_modified`.
+
+---
+
+## D13-B follow-up (observed in 13-03)
+
+One mid-battle turn was lost to the 120 s budget in 1 of 3 full runs, same
+shape as D13-B. This time lvgl printed nothing across the gap, so there is no
+simulator uptime clock to read. The structural argument that it is not an app
+deadlock is recorded in `13-03-SUMMARY.md`: the turn's last activity was a
+FULLY RENDERED decision screen (rebuild + both composite sends, then silence),
+so the app was idle waiting for input, not mid-send — which is the opposite of
+research-14's "died partway through a send burst" signature.
+
+Still worth a real instrument rather than an argument. The cheapest one is a
+timestamped automation-side log of every inject the harness sends, so "the app
+never saw the input" and "the app saw it and did nothing" stop looking
+identical from the outside.
+
+---
+
+## D13-D: `[unhandledrejection] Not all choices done` (found in 13-03, run 6 of 5 full runs)
+
+**Symptom.** `battle / turn-6` failed after 90 847 ms with a single console
+error:
+
+```
+[console/error] [unhandledrejection] Not all choices done
+```
+
+That string is the battle simulator's, not the adapter's: it rejects a choice
+submitted while a side still owes one. So the app asked the sim to resolve a
+turn before both sides had chosen.
+
+**Not a container concern.** No adapter call is involved, no
+`adapter: rejected container` line, no container-not-found line, and the
+message reaches the console as an *unhandled rejection* — nothing awaits the
+promise that produced it. The suspects are ScreenController's turn sequencing
+around `submitSwitch` / `transitionAfterTurn` (which recurses) and
+SimAIOpponent's auto-switch path.
+
+**Why deferred.** Plan 13-03 owns REND-04 and REND-06 in the adapter; this is
+battle-loop sequencing in `src/screens/ScreenController.ts` and
+`src/battle/SimBattleAdapter.ts`, neither in `files_modified`.
+
+**Worth noting:** this is the first time the harness has caught it, and it was
+caught only because the run count went to five. It is a genuine
+lose-the-battle-state defect, not noise, and the unhandled rejection means the
+app has no chance to recover from it.

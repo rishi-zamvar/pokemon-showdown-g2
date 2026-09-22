@@ -32,7 +32,7 @@ v2.0 (Showdown Parity) adds Phases 12-19. It opens with an automation test harne
 **Milestone v2.0 — Showdown Parity**
 
 - [ ] **Phase 12: Automation Test Harness** - Scripted simulator driver reading framebuffer, console, and stdout; TDD foundation for every phase after it
-- [ ] **Phase 13: Container Safety Layer** - Adapter-level guards for image bounds, dimension match, sequential sends, and startup placeholders
+- [x] **Phase 13: Container Safety Layer** - Adapter-level guards for image bounds, dimension match, sequential sends, and startup placeholders (completed 2026-09-22)
 - [ ] **Phase 14: Battle Text & HUD Persistence** - Correct turn-result text, nameplates that survive animation, "You"/"Foe" labels removed
 - [ ] **Phase 15: 4-bit Greyscale Sprite Pipeline** - Greyscale PNG sprites replacing the 1-bit dithered BMP encoder
 - [ ] **Phase 16: Modern Input Model** - Long-press, context-menu clicks, eventSource, explicit forfeit, root-page shutdown
@@ -353,7 +353,7 @@ Plans:
 Plans:
 - [x] 13-01-PLAN.md — Serialising send queue in the adapter; fixes the 1-in-20 mid-battle hang (REND-05)
 - [x] 13-02-PLAN.md — Geometry/count/event-capture guard + SDK validator + cumulative container registry (REND-03)
-- [ ] 13-03-PLAN.md — Image data/container dimension match, no updates to undeclared containers, KNOWN_DEFECTS waivers deleted (REND-04, REND-06)
+- [x] 13-03-PLAN.md — Image data/container dimension match, no updates to undeclared containers, KNOWN_DEFECTS waivers deleted (REND-04, REND-06)
 
 ### Phase 13.1: Store Blocker — Exit Dialogue via Context Menu (INSERTED 2026-09-22)
 **Goal**: The app satisfies Even Hub's root-page exit requirement, and does so through a menu rather than a bare double-tap, so the firmware's post-dialogue image wedge cannot be tripped by accident
@@ -579,7 +579,7 @@ Phases 6 and 11 are retired and skipped. Within v2.0, Phase 12 must complete bef
 | 10. Overlay HUD Layouts | 4/4 | Complete | 2026-03-03 |
 | 11. Stats Screen | - | Retired -> Phases 17-18 | - |
 | 12. Automation Test Harness | 3/4 | In Progress|  |
-| 13. Container Safety Layer | 2/3 | In Progress|  |
+| 13. Container Safety Layer | 3/3 | Complete   | 2026-09-22 |
 | 14. Battle Text & HUD Persistence | 0/TBD | Not started | - |
 | 15. 4-bit Greyscale Sprite Pipeline | 0/TBD | Not started | - |
 | 16. Modern Input Model | 0/TBD | Not started | - |
