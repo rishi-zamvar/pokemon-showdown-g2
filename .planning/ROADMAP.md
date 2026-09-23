@@ -376,6 +376,20 @@ the requirement — maximises exposure to an unrecoverable wedge. EvenChess's
 pattern is the safe one and still satisfies the requirement: root double-tap
 opens the context menu, and an explicit "Exit" item fires the dialogue.
 
+> **MEASURED 2026-09-23 (13.1-04), and it is NOT what the paragraph above
+> describes.** On the simulator the call RESOLVES — `shutDownPageContainer(1)
+> -> true` — the simulator process stays alive and answers
+> `/api/screenshot/glasses` for at least 40 s afterwards, and the app logs
+> nothing further at all. There is no burst of `sendFailed`: zero
+> `updateImageRawData` are even ATTEMPTED, because `ShutDownPageContainer` tore
+> down the page containers, so the simulator drops every later input with
+> `WARN inject_input: no active event container` and the app's gesture handlers
+> are never called. Practical consequence is identical (unusable until
+> restart, no recovery) and the design decision stands, but the 1-3 ms
+> `sendFailed` figure is an inherited hardware/firmware observation that this
+> repo has never reproduced. Whoever re-tests on hardware should say which one
+> they saw.
+
 **Success Criteria** (what must be TRUE):
   1. A native context menu is declared via `menuObject` on the root page, with at most 10 items and each `itemID` non-zero and unique
   2. `menuItemClickEvent` is parsed and routed through `onEvenHubEvent`
@@ -390,7 +404,7 @@ Plans:
 - [x] 13.1-01-PLAN.md — declare menuObject on the root page, route menuItemClickEvent ahead of gesture mapping, add the single exitApp() call site
 - [x] 13.1-02-PLAN.md — wire Exit/Battle Speed/About to the root menu behind a MAIN_MENU-only guard, and collapse the main menu to one row to delete the harness-01 soft-brick
 - [x] 13.1-03-PLAN.md — harness proof: menu declared at boot, live under context_menu, click routes, and Enter Battle survives N speed changes
-- [ ] 13.1-04-PLAN.md — per-turn no-accidental-exit, set-speed rewritten for the menu, and a terminal scenario proving Exit actually reaches shutDownPageContainer(1)
+- [x] 13.1-04-PLAN.md — per-turn no-accidental-exit, set-speed rewritten for the menu, and a terminal scenario proving Exit actually reaches shutDownPageContainer(1)
 **UI hint**: yes
 
 ### Phase 14: Battle Text & HUD Persistence
@@ -522,10 +536,10 @@ Every v2.0 requirement maps to exactly one phase.
 | SPR-03 | Phase 15 | Pending |
 | SPR-04 | Phase 15 | Pending |
 | INPUT-01 | Phase 16 | Pending |
-| INPUT-02 | Phase 13.1 (moved from 16) | Pending |
+| INPUT-02 | Phase 13.1 (moved from 16) | Complete |
 | INPUT-03 | Phase 16 | Pending |
 | INPUT-04 | Phase 16 | Pending |
-| INPUT-05 | Phase 13.1 (moved from 16) | Pending |
+| INPUT-05 | Phase 13.1 (moved from 16) | Complete — proved live by the `exitLast` scenario |
 | INPUT-06 | Phase 16 | Pending |
 | INFO-01 | Phase 13.1 (moved from 17) | Pending |
 | INFO-02 | Phase 17 | Pending |

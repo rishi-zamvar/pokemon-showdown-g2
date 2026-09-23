@@ -301,7 +301,7 @@ Phases 17-18 as shown rather than being left orphaned.
 - [x] **INPUT-02**: Handle `menuItemClickEvent` from the native context menu
 - [ ] **INPUT-03**: Distinguish `eventSource` — `GLASSES_R`, `GLASSES_L`, `RING` — and keep R1 ring input working
 - [ ] **INPUT-04**: Replace the `forfeitPending` double-tap-twice-within-3s hack with an explicit menu action
-- [ ] **INPUT-05**: Root page double-tap calls `shutDownPageContainer(1)` — an Even Hub submission requirement the app currently fails
+- [x] **INPUT-05**: Root page double-tap calls `shutDownPageContainer(1)` — an Even Hub submission requirement the app currently fails
 - [ ] **INPUT-06**: Handle `sysEvent`, `listEvent` and `textEvent` for the same gesture (simulator and hardware differ)
 
 ### Performance (call count is the only lever)
@@ -343,7 +343,7 @@ Phases 17-18 as shown rather than being left orphaned.
 | INPUT-02 | Phase 16 | Complete |
 | INPUT-03 | Phase 16 | Pending |
 | INPUT-04 | Phase 16 | Pending |
-| INPUT-05 | Phase 16 | Pending |
+| INPUT-05 | Phase 13.1 | Complete — observed live in 13.1-04 `exitLast`: `[screen] menu: Exit` -> `[GlassAdapter] shutDownPageContainer(1)` -> `-> true`, with the simulator logging its own `ShutDownPageContainer`. Delivered by D-01's route (root context menu -> explicit "Exit"), NOT by a bare double-tap calling the bridge directly — ROADMAP criterion 3 already records that opening the menu on double-tap is firmware behaviour the SDK exposes no way to invoke. `double_click` on the root page is asserted to exit nothing. |
 | INPUT-06 | Phase 16 | Pending |
 | INFO-01 | Phase 17 | Pending — root-page menu shipped and proved live in 13.1-03; the requirement says "during battle", which D-09 deliberately does not deliver |
 | INFO-02 | Phase 17 | Pending |

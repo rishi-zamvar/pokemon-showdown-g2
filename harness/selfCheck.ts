@@ -1657,6 +1657,59 @@ export async function runChecks(): Promise<CheckResult[]> {
     assert.ok(!(f instanceof AssertionError));
   });
 
+  await check("57 the Exit selection is confined to the terminal scenario", () => {
+    // Two halves of ONE safety property, neither implied by the other:
+    //
+    //   * exitLast must be REGISTERED LAST. Raising the dialogue wedges every
+    //     updateImageRawData until the app restarts (D-02) and the whole suite
+    //     shares one simulator, so a scenario appended after it would fail for
+    //     a reason three scenarios back. Nothing else checks the order;
+    //     scenarios/index.ts's comment is a comment.
+    //   * exitLast must be the ONLY caller that lifts commitMenuSelection's
+    //     Exit refusal. Phase 17 edits this menu, and `allowExit` passed from a
+    //     scenario that runs earlier re-creates exactly the failure the
+    //     ordering exists to prevent.
+    //
+    // A source-text gate, not an import: harness/selfCheck.ts is imported BY
+    // scenarios/selfCheck.ts, which scenarios/index.ts imports, so importing
+    // SCENARIOS here would close a module cycle around this file's top-level
+    // CLI entry point.
+    const read = (f: string): string =>
+      fs
+        .readFileSync(path.join(import.meta.dirname, "scenarios", f), "utf8")
+        .split("\n")
+        // A comment quoting the forbidden string IS the forbidden string as far
+        // as a text gate is concerned, so strip line comments before matching.
+        .filter((l) => !l.trim().startsWith("//"))
+        .join("\n");
+
+    const index = read("index.ts");
+    const decl = /export const SCENARIOS: Scenario\[\] = \[([^\]]*)\]/.exec(index);
+    assert.ok(decl, "could not find the SCENARIOS array literal in harness/scenarios/index.ts");
+    const registered = decl[1]!.split(",").map((x) => x.trim()).filter(Boolean);
+    assert.ok(registered.length >= 2, `parsed ${registered.length} scenario(s) out of the registry, which cannot be right`);
+    assert.equal(
+      registered.at(-1),
+      "exitLastScenario",
+      `exitLast must be the LAST registered scenario; the registry ends with ${registered.at(-1)}. Anything after it runs against a simulator whose every image send fails (D-02).`,
+    );
+    assert.equal(
+      registered.filter((x) => x === "exitLastScenario").length,
+      1,
+      "exitLastScenario is registered more than once; the second run would drive a wedged app",
+    );
+
+    const callers = fs
+      .readdirSync(path.join(import.meta.dirname, "scenarios"))
+      .filter((f) => f.endsWith(".ts") && /\ballowExit\b/.test(read(f)))
+      .sort();
+    assert.deepEqual(
+      callers,
+      ["boot.ts", "exitLast.ts"],
+      `only boot.ts (which defines and honours the guard) and exitLast.ts (the one permitted caller) may name allowExit; found ${JSON.stringify(callers)}`,
+    );
+  });
+
   return results;
 }
 
