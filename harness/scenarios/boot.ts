@@ -66,7 +66,7 @@ const MENU_CLICK = /\[GlassAdapter\] menu: itemID=(\d+)/;
  * Evidence that the app raised the exit dialogue. Written as a pattern rather
  * than inline so there is ONE spelling of it in this file.
  */
-const EXIT_CALL = /shutDownPageContainer/;
+export const EXIT_CALL = /shutDownPageContainer/;
 
 /**
  * Where the OS highlight sits when the menu opens. MEASURED, not assumed:
@@ -78,6 +78,19 @@ const EXIT_CALL = /shutDownPageContainer/;
  * safety property.
  */
 let observedDefaultIndex: number | null = null;
+
+/**
+ * The measured default, or null when nothing has measured it yet in this
+ * process.
+ *
+ * Exported for exactly one caller: `--only exitLast` never runs `boot`, so the
+ * measurement has not happened and commitMenuSelection rightly refuses to
+ * navigate blind. That scenario makes the measurement itself rather than
+ * guessing. Nobody should read this to SKIP a measurement.
+ */
+export function defaultHighlightIndex(): number | null {
+  return observedDefaultIndex;
+}
 
 /**
  * Turn an unexpected exit into a RUN abort instead of a step failure.
@@ -121,14 +134,20 @@ async function openMenu(ctx: Ctx): Promise<void> {
  * "whatever happens to be highlighted" would be a coin flip whose losing side
  * is Exit.
  */
-async function commitMenuSelection(ctx: Ctx, targetIndex: number): Promise<number> {
+async function commitMenuSelection(
+  ctx: Ctx,
+  targetIndex: number,
+  opts: MenuSelectOpts = {},
+): Promise<number> {
   const target = MAIN_MENU_CONTEXT_MENU[targetIndex];
   if (!target) {
     throw new AssertionError(`menu index ${targetIndex} does not exist in MAIN_MENU_CONTEXT_MENU`);
   }
-  // A typo in a caller must not be the thing that wedges the simulator. Plan 04
-  // owns that selection and is ordered last for exactly this reason.
-  if (target.id === MENU_ITEM_IDS.exit) {
+  // A typo in a caller must not be the thing that wedges the simulator. The
+  // refusal is LIFTED, never deleted: scenarios/exitLast.ts is the one caller
+  // permitted to pass allowExit, and selfCheck 57 pins that it stays the only
+  // one. Everything else in the suite runs before it and would be poisoned.
+  if (target.id === MENU_ITEM_IDS.exit && !opts.allowExit) {
     throw new AssertionError(
       `refusing to select "${target.name}" (itemID ${target.id}): it raises the dialogue that wedges every later image send (D-02). That selection is plan 13.1-04's terminal scenario and belongs at the very end of the suite.`,
     );
@@ -151,8 +170,9 @@ async function commitMenuSelection(ctx: Ctx, targetIndex: number): Promise<numbe
   await ctx.press("click");
   await quiesce(ctx);
 
-  // FIRST, before anything else can mask it.
-  refuseExit(ctx, `selecting menu item "${target.name}"`);
+  // FIRST, before anything else can mask it — except for the one caller that
+  // asked for the exit on purpose, where the line is the PROOF, not the alarm.
+  if (!opts.allowExit) refuseExit(ctx, `selecting menu item "${target.name}"`);
 
   // Watermarked: a step that selects three times must not read the FIRST
   // iteration's line three times and call that three proofs.
@@ -186,14 +206,32 @@ async function commitMenuSelection(ctx: Ctx, targetIndex: number): Promise<numbe
   return id;
 }
 
-/** open + select, the shape every caller after the first measurement wants */
-async function selectMenuItem(ctx: Ctx, targetIndex: number): Promise<number> {
+export interface MenuSelectOpts {
+  /**
+   * Permit the Exit item. Reserved for scenarios/exitLast.ts, which is
+   * registered after every other scenario precisely so the wedge it causes
+   * (D-02) has nothing left to poison.
+   */
+  allowExit?: boolean;
+}
+
+/**
+ * open + select, the shape every caller after the first measurement wants.
+ *
+ * Exported so battle.ts drives the Battle Speed preset through the same
+ * measured navigation instead of keeping a second copy of the arithmetic.
+ */
+export async function selectMenuItem(
+  ctx: Ctx,
+  targetIndex: number,
+  opts: MenuSelectOpts = {},
+): Promise<number> {
   await openMenu(ctx);
-  return commitMenuSelection(ctx, targetIndex);
+  return commitMenuSelection(ctx, targetIndex, opts);
 }
 
 /** index of an item by id, so no caller restates a position */
-function menuIndexOf(id: number): number {
+export function menuIndexOf(id: number): number {
   return MAIN_MENU_CONTEXT_MENU.findIndex((m) => m.id === id);
 }
 
@@ -356,10 +394,11 @@ export const bootScenario: Scenario = {
 
     // -- 5. every input action ----------------------------------------------
     // ROADMAP success criterion 2 wants all seven exercised inside the suite.
-    // This step asserts only that sending them breaks neither the app nor the
-    // simulator: long_press, long_press_release and context_menu have no
-    // handler until Phase 16 (INPUT-01/02), which upgrades this into
-    // behavioural assertions.
+    // This step asserts that sending them breaks neither the app nor the
+    // simulator AND that none of them exits it. Phase 16 owns long_press and
+    // long_press_release, which still have no handler (INPUT-01); context_menu
+    // is handled as of this phase and the two menu steps above are where its
+    // behaviour is asserted.
     await ctx.step("inputs-accepted", async () => {
       for (const action of INPUT_ACTIONS) {
         await ctx.press(action);
@@ -367,6 +406,16 @@ export const bootScenario: Scenario = {
       await quiesce(ctx);
       await ctx.capture("after-seven-inputs");
       expectConsoleClean(ctx.logs);
+      // D-03, at runtime. This storm fires double_click AND context_menu from a
+      // BATTLE screen, which is the exact shape of the accident INPUT-05's
+      // dialogue must never be reachable by: no non-root screen may exit.
+      // Scoped to this step's own lines, which is the only scoping that means
+      // anything — ctx.step() emptied the buffer on the way in.
+      expectNoLoggedLine(
+        ctx.logs,
+        EXIT_CALL,
+        "one of the seven input actions exited the app from a non-root screen (D-03)",
+      );
 
       // Deliberately NOT navigating back to a known screen here. The seven
       // actions land the app somewhere different run to run — glassAdapter's

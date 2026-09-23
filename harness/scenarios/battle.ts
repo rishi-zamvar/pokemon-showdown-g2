@@ -33,8 +33,8 @@
  *               the state rather than guarding it: Battle Speed and About moved
  *               into the root context menu, the list is one row, cursorIndex
  *               never leaves 0 and the fallback is always right. Which is also
- *               why `speed` other than Normal now THROWS here -- there is no
- *               list row left to click.
+ *               why set-speed below drives `context_menu` + `click` rather than
+ *               a list row: there is no list row left to click (D-05).
  *   harness-02  In Instant mode resolveTurn():530 and resolveSwitch():611 call
  *               glass.showText() and `return` WITHOUT going through render(),
  *               and render() is where the `[screen] <NAME>` oracle is logged.
@@ -66,10 +66,12 @@ import {
   AssertionError,
   expectConsoleClean,
   expectFrameInk,
+  expectLoggedLine,
   expectNoLoggedLine,
   expectScreen,
 } from "../assert.ts";
-import { quiesce } from "./boot.ts";
+import { menuIndexOf, quiesce, selectMenuItem } from "./boot.ts";
+import { MENU_ITEM_IDS } from "../../src/config/constants.ts";
 import type { Ctx, Scenario } from "../run.ts";
 import type { ScreenName } from "../../src/screens/ScreenState.ts";
 
@@ -95,9 +97,9 @@ type Select = (index: number, force?: boolean) => Promise<void>;
 
 export interface BattleScriptOpts {
   /**
-   * Only "Normal" is implemented -- see harness-01/harness-02 in the file
-   * header. "Fast"/"Instant" throw a message naming the defect rather than
-   * timing out 25 seconds later with no explanation.
+   * Default "Normal", which is also SpeedConfig's value on every app open, so
+   * the default costs no inputs at all. See harness-02 in the file header
+   * before choosing "Instant".
    */
   speed?: "Normal" | "Fast" | "Instant";
   /** default 60. A battle that needs more turns than this is a stall, not a game. */
@@ -116,6 +118,19 @@ export interface BattleOutcome {
   sawForcedSwitch: boolean;
   hostCallsByTurn: Record<number, Record<string, number>>;
 }
+
+/**
+ * Selections of the "Battle Speed" menu item needed to reach each preset.
+ *
+ * SpeedConfig.cycle() steps Normal -> Fast -> Instant -> Slow -> Normal, and
+ * that order is unchanged by 13.1-02; only the input that drives it moved,
+ * from a main-menu list row to the root context menu (D-05).
+ */
+const SPEED_CLICKS: Record<NonNullable<BattleScriptOpts["speed"]>, number> = {
+  Normal: 0,
+  Fast: 1,
+  Instant: 2,
+};
 
 /** entering a battle generates two teams, loads match data and fetches sprites */
 const ENTER_BATTLE_MS = 120_000;
@@ -275,6 +290,13 @@ function lastScreen(ctx: Ctx, from: number): ScreenName | null {
  * just backed out of). Each branch below strictly reduces the distance home:
  * ATTACK/SWITCH -> BATTLE_HUD -> (double-tap twice = forfeit) -> MAIN_MENU.
  */
+export async function returnToMainMenu(ctx: Ctx): Promise<void> {
+  // Its own selector: the caller (scenarios/exitLast.ts) drives no lists of its
+  // own, so there is no tracker to share and a fresh one is honest about
+  // knowing nothing about the selection it inherits.
+  await ensureMainMenu(ctx, makeSelector(ctx));
+}
+
 async function ensureMainMenu(ctx: Ctx, select: Select): Promise<void> {
   // Round 0 reads the whole buffer, because on a cold `--only battle` run the
   // app really is on the main menu and the boot's `[screen] MAIN_MENU` line is
@@ -375,19 +397,25 @@ export async function runBattleScript(ctx: Ctx, opts: BattleScriptOpts = {}): Pr
 
   // -- 2. speed -------------------------------------------------------------
   await ctx.step("set-speed", async () => {
-    // Normal is SpeedConfig's value on every app open, so there is nothing to
-    // do -- and nothing to undo, which is why it is the default here.
-    if (speed !== "Normal") {
-      // 13.1-02 moved Battle Speed off the main-menu LIST and into the root
-      // context menu, so there is no list row to click any more: the menu is
-      // an OS affordance driven by POST /api/input {"action":"context_menu"}.
-      // The old body clicked list item 1; on today's one-row menu that click
-      // resolves to item 0 and ENTERS A BATTLE, then waits 30s for a MAIN_MENU
-      // that is never coming. Throw instead of failing 30s later with a
-      // misleading message. The menu vocabulary this needs is plan 13.1-03's.
-      throw new AssertionError(
-        `speed "${speed}" is not reachable from this script. 13.1-02 moved Battle Speed into the root context menu; driving it needs the context_menu vocabulary from 13.1-03. Also see harness-02 in the file header: Instant renders TURN_RESULT without render(), so it logs no [screen] oracle at all.`,
-      );
+    // 13.1-02 moved Battle Speed off the main-menu LIST and into the root
+    // context menu (D-05), so this cycles the preset through
+    // `context_menu` + `click`, not through a list row. Normal is
+    // SpeedConfig's value on every app open, so SPEED_CLICKS.Normal is 0 and
+    // the default speed sends no inputs at all.
+    //
+    // No escape hatch any more: onMenuItem's Battle Speed case ends in
+    // render(), which leaves a rendered MAIN_MENU behind by itself. The old
+    // body needed an About detour only because the list row it clicked left
+    // cursorIndex parked on a row that re-cycled the speed.
+    for (let i = 1; i <= SPEED_CLICKS[speed]; i++) {
+      const mark = ctx.logs.nextSeq();
+      await selectMenuItem(ctx, menuIndexOf(MENU_ITEM_IDS.battleSpeed));
+      // Assert on the ROUTE, not on a screen transition -- the same reason
+      // boot's regression step does: About renders via showText and logs no
+      // `[screen]` oracle at all, so a selection that lands on the wrong item
+      // must fail here instead of hanging to the full timeout. Watermarked, so
+      // press i cannot pass on press i-1's line.
+      expectLoggedLine(ctx.logs, /\[screen\] menu: Battle Speed/, mark);
     }
     expectConsoleClean(ctx.logs);
   });
